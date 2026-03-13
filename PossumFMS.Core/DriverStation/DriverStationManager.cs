@@ -40,7 +40,8 @@ public sealed class DriverStationManager : BackgroundService
     private readonly Arena.Arena _arena;
     private readonly ILogger<DriverStationManager> _logger;
 
-    private Socket? _udpSocket;
+    private Socket?            _udpSocket;
+    private CancellationToken  _ct;
 
     public DriverStationManager(Arena.Arena arena, ILogger<DriverStationManager> logger)
     {
@@ -82,6 +83,9 @@ public sealed class DriverStationManager : BackgroundService
 
     protected override Task ExecuteAsync(CancellationToken ct)
     {
+        _ct = ct;
+        _arena.GameDataChanged += OnGameDataChanged;
+
         // UDP control loop: dedicated high-priority thread.
         new Thread(() => RunControlLoop(ct))
         {
@@ -403,6 +407,10 @@ public sealed class DriverStationManager : BackgroundService
             _logger.LogInformation("Team {Team} connected in station {Station} ({IP}).",
                 teamNumber, ds.Station, remoteIp);
 
+            // Send current game data if already set (e.g., DS reconnects after auto).
+            if (_arena.GameData.Length > 0)
+                await SendGameDataAsync(ds.Station, _arena.GameData, ct);
+
             // ── TCP read loop ──────────────────────────────────────────────────
             await RunTcpReadLoopAsync(ds, stream, ct);
         }
@@ -453,6 +461,12 @@ public sealed class DriverStationManager : BackgroundService
     }
 
     // ── TCP game data ──────────────────────────────────────────────────────────
+
+    private void OnGameDataChanged(string data)
+    {
+        foreach (var station in Stations.Keys)
+            _ = SendGameDataAsync(station, data, _ct);
+    }
 
     /// <summary>
     /// Sends game-specific data to a driver station over TCP (type 28).

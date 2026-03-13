@@ -13,6 +13,9 @@ var builder = WebApplication.CreateBuilder(args);
 // Central field state machine — injected into DS manager, hub, etc.
 builder.Services.AddSingleton<Arena>();
 
+// Game logic — owns per-match scoring state and wires phase-transition rules.
+builder.Services.AddSingleton<GameLogic>();
+
 // DS loop — high-freq BackgroundService + injectable singleton for hub commands.
 builder.Services.AddSingleton<DriverStationManager>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<DriverStationManager>());
@@ -39,6 +42,9 @@ builder.Services.AddCors(options =>
 // ── Application ────────────────────────────────────────────────────────────────
 
 var app = builder.Build();
+
+// Force eager construction so Arena.PhaseChanged is subscribed before any match starts.
+app.Services.GetRequiredService<GameLogic>();
 
 // ── Startup checks ─────────────────────────────────────────────────────────────
 

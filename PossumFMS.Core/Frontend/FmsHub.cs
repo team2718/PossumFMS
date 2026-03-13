@@ -34,6 +34,13 @@ public sealed class FmsHub(
 
     // ── Match control ──────────────────────────────────────────────────────────
 
+    public async Task StartPreMatch()
+    {
+        logger.LogInformation("StartPreMatch requested by {Client}.", Context.ConnectionId);
+        arena.StartPreMatch();
+        await BroadcastMatchState();
+    }
+
     public async Task StartMatch()
     {
         logger.LogInformation("StartMatch requested by {Client}.", Context.ConnectionId);
@@ -45,6 +52,13 @@ public sealed class FmsHub(
     {
         logger.LogInformation("AbortMatch requested by {Client}.", Context.ConnectionId);
         arena.AbortMatch();
+        await BroadcastMatchState();
+    }
+
+    public async Task ClearMatch()
+    {
+        logger.LogInformation("ClearMatch requested by {Client}.", Context.ConnectionId);
+        arena.ClearMatch();
         await BroadcastMatchState();
     }
 

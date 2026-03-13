@@ -11,8 +11,9 @@ public sealed class Arena
 {
     // ── Match timing ───────────────────────────────────────────────────────────
 
-    private static readonly TimeSpan AutoDuration    = TimeSpan.FromSeconds(15);
-    private static readonly TimeSpan TeleopDuration  = TimeSpan.FromSeconds(135);
+    private static readonly TimeSpan AutoDuration    = TimeSpan.FromSeconds(20);
+    private static readonly TimeSpan AutoToTeleopTransitionDuration = TimeSpan.FromSeconds(3);
+    private static readonly TimeSpan TeleopDuration  = TimeSpan.FromSeconds(140);
 
     private readonly Stopwatch _phaseTimer = new();
     private TimeSpan _phaseDuration;
@@ -29,7 +30,7 @@ public sealed class Arena
 
     /// <summary>Time remaining in the current phase. Zero when Idle or Over.</summary>
     public TimeSpan TimeRemaining =>
-        Phase is MatchPhase.Idle or MatchPhase.Over
+        Phase is MatchPhase.Idle or MatchPhase.PostMatch
             ? TimeSpan.Zero
             : TimeSpan.FromTicks(Math.Max(0, (_phaseDuration - _phaseTimer.Elapsed).Ticks));
 
@@ -43,15 +44,43 @@ public sealed class Arena
     /// </summary>
     public bool ArenaEstop { get; private set; }
 
+    // ── Game data ──────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Game-specific message forwarded to robots via DS (max ~64 bytes).
+    /// Set by game logic; broadcast to all DSes by DriverStationManager.
+    /// </summary>
+    public string GameData { get; private set; } = string.Empty;
+
+    /// <summary>Fired whenever game data changes. Payload is the new value.</summary>
+    public event Action<string>? GameDataChanged;
+
+    /// <summary>
+    /// Updates game data and notifies listeners. Pass an empty string to clear.
+    /// </summary>
+    public void SetGameData(string data)
+    {
+        GameData = data;
+        GameDataChanged?.Invoke(data);
+    }
+
     // ── Events ─────────────────────────────────────────────────────────────────
 
     public event Action<MatchPhase>? PhaseChanged;
 
     // ── Match control ──────────────────────────────────────────────────────────
 
+    public void StartPreMatch()
+    {
+        if (IsMatchRunning)
+            throw new InvalidOperationException("Cannot start pre-match while a match is running.");
+
+        TransitionTo(MatchPhase.PreMatch, TimeSpan.Zero);
+    }
+
     public void StartMatch()
     {
-        if (Phase != MatchPhase.Idle)
+        if (Phase != MatchPhase.PreMatch)
             throw new InvalidOperationException($"Cannot start match in phase {Phase}.");
 
         TransitionTo(MatchPhase.Auto, AutoDuration);
@@ -61,6 +90,14 @@ public sealed class Arena
     {
         if (!IsMatchRunning)
             throw new InvalidOperationException("No match is running.");
+
+        TransitionTo(MatchPhase.PostMatch, TimeSpan.Zero);
+    }
+
+    public void ClearMatch()
+    {
+        if (IsMatchRunning)
+            throw new InvalidOperationException("Cannot clear match while a match is running.");
 
         TransitionTo(MatchPhase.Idle, TimeSpan.Zero);
     }
@@ -74,11 +111,13 @@ public sealed class Arena
         switch (Phase)
         {
             case MatchPhase.Auto when TimeRemaining == TimeSpan.Zero:
+                TransitionTo(MatchPhase.AutoToTeleopTransition, AutoToTeleopTransitionDuration);
+                break;
+            case MatchPhase.AutoToTeleopTransition when TimeRemaining == TimeSpan.Zero:
                 TransitionTo(MatchPhase.Teleop, TeleopDuration);
                 break;
-
             case MatchPhase.Teleop when TimeRemaining == TimeSpan.Zero:
-                TransitionTo(MatchPhase.Over, TimeSpan.Zero);
+                TransitionTo(MatchPhase.PostMatch, TimeSpan.Zero);
                 break;
         }
     }
