@@ -15,7 +15,7 @@ namespace PossumFMS.Core.Frontend;
 public sealed class FmsHub(
     Arena.Arena arena,
     DriverStationManager dsManager,
-    AccessPointManager apManager,
+    MatchStateBroadcaster broadcaster,
     ILogger<FmsHub> logger) : Hub
 {
     // ── Team assignment ────────────────────────────────────────────────────────
@@ -94,53 +94,7 @@ public sealed class FmsHub(
 
     // ── State push ─────────────────────────────────────────────────────────────
 
-    public async Task RequestMatchState() => await BroadcastMatchState();
+    public Task RequestMatchState() => BroadcastMatchState();
 
-    private Task BroadcastMatchState() =>
-        Clients.All.SendAsync("MatchState", BuildMatchStatePayload());
-
-    private object BuildMatchStatePayload() => new
-    {
-        phase         = arena.Phase.ToString(),
-        matchType     = arena.MatchType.ToString(),
-        matchNumber   = arena.MatchNumber,
-        timeRemaining = arena.TimeRemaining.TotalSeconds,
-        arenaEstop    = arena.ArenaEstop,
-        accessPoint   = new
-        {
-            status   = apManager.ApStatus,
-        },
-        stations      = AllianceStations.All.Select((s, i) =>
-        {
-            var ds   = dsManager[s];
-            var wifi = apManager.StationStatuses[i];
-            return new
-            {
-                index        = i,
-                alliance     = s.Color.ToString(),
-                position     = (int)s.Position,
-                teamNumber   = ds.TeamNumber,
-                dsLinked     = ds.DsLinked,
-                robotLinked  = ds.RobotLinked,
-                radioLinked  = ds.RadioLinked,
-                rioLinked    = ds.RioLinked,
-                battery      = ds.BatteryVoltage,
-                tripTimeMs   = ds.DsRobotTripTimeMs,
-                missedPackets= ds.MissedPacketCount,
-                estop        = ds.Estop,
-                astop        = ds.Astop,
-                bypassed     = ds.Bypassed,
-                wrongStation = ds.WrongStation,
-                wifi         = new
-                {
-                    radioLinked      = wifi.RadioLinked,
-                    bandwidthMbps    = wifi.BandwidthUsedMbps,
-                    rxRateMbps       = wifi.RxRateMbps,
-                    txRateMbps       = wifi.TxRateMbps,
-                    snr              = wifi.SignalNoiseRatio,
-                    connectionQuality= wifi.ConnectionQuality,
-                },
-            };
-        }),
-    };
+    private Task BroadcastMatchState() => broadcaster.BroadcastAsync();
 }

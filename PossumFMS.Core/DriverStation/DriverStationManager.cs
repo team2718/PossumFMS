@@ -43,6 +43,10 @@ public sealed class DriverStationManager : BackgroundService
     private Socket?            _udpSocket;
     private CancellationToken  _ct;
 
+    // Completion signals so StopAsync can wait for both loops to fully clean up.
+    private readonly TaskCompletionSource _controlLoopDone = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private Task                          _tcpListenerTask  = Task.CompletedTask;
+
     public DriverStationManager(Arena.Arena arena, ILogger<DriverStationManager> logger)
     {
         _arena  = arena;
@@ -87,17 +91,40 @@ public sealed class DriverStationManager : BackgroundService
         _arena.GameDataChanged += OnGameDataChanged;
 
         // UDP control loop: dedicated high-priority thread.
-        new Thread(() => RunControlLoop(ct))
+        // We wrap it so StopAsync can await full cleanup (socket dispose) on shutdown.
+        new Thread(() =>
+        {
+            try   { RunControlLoop(ct); }
+            finally { _controlLoopDone.TrySetResult(); }
+        })
         {
             Name         = "DS-ControlLoop",
             Priority     = ThreadPriority.AboveNormal,
-            IsBackground = true,
+            IsBackground = false, // Must not be background — OS must wait for Dispose.
         }.Start();
 
         // TCP accept loop: not timing-critical, runs on thread pool.
-        _ = Task.Run(() => RunTcpListenerAsync(ct), ct);
+        _tcpListenerTask = Task.Run(() => RunTcpListenerAsync(ct), ct);
 
         return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Waits for both the UDP control-loop thread and the TCP listener to finish
+    /// so that sockets are fully closed before the process exits.
+    /// Without this, Ctrl+C would leave port 1160/1750 bound and the next
+    /// dotnet run would fail with WSAEADDRINUSE (10048).
+    /// </summary>
+    public override async Task StopAsync(CancellationToken cancellationToken)
+    {
+        // Signal cancellation (base implementation does this).
+        await base.StopAsync(cancellationToken);
+
+        // Wait for the UDP thread and TCP task to fully exit and dispose sockets.
+        // Use a 5 s safety timeout so a hung loop doesn't block the host forever.
+        var timeout = Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
+        await Task.WhenAny(_controlLoopDone.Task, timeout);
+        await Task.WhenAny(_tcpListenerTask, timeout);
     }
 
     // ── UDP control loop ───────────────────────────────────────────────────────
@@ -105,6 +132,7 @@ public sealed class DriverStationManager : BackgroundService
     private void RunControlLoop(CancellationToken ct)
     {
         _udpSocket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+        _udpSocket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
         _udpSocket.Bind(new IPEndPoint(IPAddress.Any, FmsUdpListenPort));
         _udpSocket.Blocking = false;
 

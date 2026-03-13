@@ -31,6 +31,10 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<FieldHardwareManag
 // SignalR for the frontend website.
 builder.Services.AddSignalR();
 
+// Periodic match-state broadcaster — keeps the timer live in the browser.
+builder.Services.AddSingleton<MatchStateBroadcaster>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<MatchStateBroadcaster>());
+
 // Allow any origin in development; restrict in production via config.
 builder.Services.AddCors(options =>
     options.AddDefaultPolicy(policy =>
