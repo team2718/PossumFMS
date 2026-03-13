@@ -1,0 +1,24 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.5.2.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PossumFMS.Core", "PossumFMS.Core.csproj", "{FB231684-E8A3-BF57-0020-3DD137847862}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{FB231684-E8A3-BF57-0020-3DD137847862}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FB231684-E8A3-BF57-0020-3DD137847862}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FB231684-E8A3-BF57-0020-3DD137847862}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FB231684-E8A3-BF57-0020-3DD137847862}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {471C7F2D-3FAE-4EC9-A5DF-11D76EB7EFCA}
+	EndGlobalSection
+EndGlobal
