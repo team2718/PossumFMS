@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
 	import { fms } from '$lib/fms.svelte';
 
 	// Connect to the FMS hub when the page loads
@@ -28,15 +28,6 @@
 		return `${m}:${s.toString().padStart(2, '0')}`;
 	}
 
-	// Pill color for the current match phase
-	function phaseColor(phase: string): string {
-		if (phase === 'Idle') return 'bg-gray-600';
-		if (phase === 'PreMatch') return 'bg-yellow-600';
-		if (phase === 'Auto' || phase === 'AutoToTeleopTransition' || phase === 'Teleop') return 'bg-green-600';
-		if (phase === 'PostMatch') return 'bg-blue-700';
-		return 'bg-orange-600'; // Disconnected or unknown
-	}
-
 	// Assign the team from the input field, or 0 if the field is blank
 	function assignTeam(idx: number) {
 		const n = parseInt(inputs[idx].team);
@@ -52,296 +43,570 @@
 	// Derived helpers so the template isn't doing repeated fms.state?.... lookups
 	const matchState = $derived(fms.matchState);
 	const phase = $derived(matchState?.phase ?? 'Disconnected');
+	const blueStations = $derived(matchState?.stations.slice(3, 6) ?? []);
+	const redStations = $derived(
+		matchState ? [matchState.stations[2], matchState.stations[1], matchState.stations[0]] : []
+	);
+
+	const blueInputIndices = [3, 4, 5];
+	const redInputIndices = [2, 1, 0];
+
+	// A station is ready if it is bypassed, OR if both DS and robot are linked — and it has no active e-stop.
+	const blueReady = $derived(
+		blueStations.every((s) => (s.bypassed || (s.dsLinked && s.robotLinked)) && !s.estop)
+	);
+	const redReady = $derived(
+		redStations.every((s) => (s.bypassed || (s.dsLinked && s.robotLinked)) && !s.estop)
+	);
+
+	let activeTab = $state('status');
 </script>
 
-<!-- Page wrapper — dark background fills the screen -->
-<div class="flex min-h-screen flex-col bg-gray-900 text-white">
-
-	<!-- ===== HEADER BAR ===== -->
-	<header class="flex items-center justify-between gap-4 border-b border-gray-700 bg-gray-800 px-4 py-3">
-		<!-- Left: title + connection status -->
-		<div class="flex items-center gap-3">
-			<h1 class="text-xl font-bold text-cyan-400">PossumFMS</h1>
-			<span class="text-xs text-gray-400">Team 2718</span>
-			<!-- Green dot = connected, red = not -->
-			<span
-				class="inline-block h-3 w-3 rounded-full {fms.connected ? 'bg-green-500' : 'bg-red-500'}"
-				title={fms.connected ? 'Connected' : 'Disconnected'}
-			></span>
-			<span class="text-xs {fms.connected ? 'text-gray-400' : 'text-red-400'}">
-				{fms.connected ? 'Connected' : 'Connecting…'}
-			</span>
-		</div>
-
-		<!-- Center: phase pill + match type/number + timer -->
-		<div class="flex items-center gap-4">
-			<span class="rounded-full px-3 py-1 text-sm font-semibold {phaseColor(phase)}">
-				{phase}
-			</span>
-			{#if matchState}
-				<span class="text-sm text-gray-300">{matchState.matchType} #{matchState.matchNumber}</span>
-				<span class="font-mono text-2xl font-bold text-white">
-					{formatTime(matchState.timeRemaining)}
-				</span>
-			{/if}
-		</div>
-
-		<!-- Right: Arena E-Stop -->
-		<div class="flex items-center gap-2">
-			{#if matchState?.arenaEstop}
-				<span class="text-sm font-bold text-red-400">ARENA E-STOP ACTIVE</span>
-				<button
-					onclick={() => fms.resetArenaEstop()}
-					class="rounded bg-yellow-600 px-3 py-1.5 text-sm font-bold hover:bg-yellow-500"
-				>
-					Reset E-Stop
-				</button>
-			{:else}
-				<button
-					onclick={() => fms.triggerArenaEstop()}
-					class="rounded bg-red-700 px-4 py-1.5 text-sm font-bold hover:bg-red-600"
-				>
-					ARENA E-STOP
-				</button>
-			{/if}
-		</div>
-	</header>
-
-	<!-- ===== MATCH CONTROLS ===== -->
-	<div class="flex items-center gap-3 border-b border-gray-700 bg-gray-800/60 px-4 py-2">
-		<span class="text-xs font-semibold uppercase tracking-wider text-gray-400">Match</span>
-
-		<!-- Each button is disabled when the phase isn't right -->
-		<button
-			onclick={() => fms.startPreMatch()}
-			disabled={phase !== 'Idle'}
-			class="rounded bg-yellow-700 px-3 py-1.5 text-sm font-semibold hover:bg-yellow-600 disabled:cursor-not-allowed disabled:opacity-40"
-		>
-			Pre-Match
-		</button>
-		<button
-			onclick={() => fms.startMatch()}
-			disabled={phase !== 'PreMatch'}
-			class="rounded bg-green-700 px-3 py-1.5 text-sm font-semibold hover:bg-green-600 disabled:cursor-not-allowed disabled:opacity-40"
-		>
-			Start Match
-		</button>
-		<button
-			onclick={() => fms.abortMatch()}
-			disabled={phase !== 'Auto' && phase !== 'AutoToTeleopTransition' && phase !== 'Teleop'}
-			class="rounded bg-orange-700 px-3 py-1.5 text-sm font-semibold hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-40"
-		>
-			Abort Match
-		</button>
-		<button
-			onclick={() => fms.clearMatch()}
-			disabled={phase !== 'PostMatch' && phase !== 'PreMatch'}
-			class="rounded bg-gray-600 px-3 py-1.5 text-sm font-semibold hover:bg-gray-500 disabled:cursor-not-allowed disabled:opacity-40"
-		>
-			Clear Match
-		</button>
-
-		<!-- Access Point status — shown on the right of the controls bar -->
-		{#if matchState}
-			<div class="ml-auto flex items-center gap-2">
-				<span class="text-xs text-gray-400">Access Point</span>
-				<span
-					class="rounded-full px-2 py-0.5 text-xs font-semibold
-					{matchState.accessPoint.status === 'ACTIVE'
-						? 'bg-green-800 text-green-200'
-						: matchState.accessPoint.status === 'CONFIGURING'
-							? 'bg-yellow-800 text-yellow-200'
-							: 'bg-red-800 text-red-200'}"
-				>
-					{matchState.accessPoint.status}
-				</span>
+<div class="min-h-screen bg-[#e5e7eb] text-slate-900">
+	<div class="border-b border-slate-300 bg-[#f2f4f8]">
+		<div class="mx-auto flex max-w-[1700px] items-end gap-1 px-3 pt-2 text-sm">
+			<div
+				class="rounded-t-md border border-b-0 border-slate-300 bg-white px-4 py-2 font-bold text-slate-900 shadow-[inset_0_3px_0_0_#1d4ed8]"
+			>
+				Match Play
 			</div>
-		{/if}
+			<div class="ml-auto flex items-center gap-3 px-2 pb-1 text-xs text-slate-600">
+				<span class="inline-flex items-center gap-1"
+					><span class="h-2.5 w-2.5 rounded-full {fms.connected ? 'bg-emerald-500' : 'bg-rose-500'}"
+					></span>{fms.connected ? 'Connected' : 'Connecting'}</span
+				>
+				<span>{matchState?.matchType ?? 'None'} #{matchState?.matchNumber ?? 0}</span>
+				<span class="font-mono font-semibold"
+					>{matchState ? formatTime(matchState.timeRemaining) : '0:00'}</span
+				>
+			</div>
+		</div>
 	</div>
 
-	<!-- ===== STATION CARDS ===== -->
-	<main class="flex-1 p-4">
-		<!-- Alliance labels above the grid -->
-		<div class="mb-2 grid grid-cols-6 gap-3">
-			<div class="col-span-3 text-center text-sm font-bold text-red-400">Red Alliance</div>
-			<div class="col-span-3 text-center text-sm font-bold text-blue-400">Blue Alliance</div>
+	<main class="mx-auto flex max-w-[1700px] flex-col gap-3 px-3 py-3">
+		<!-- Alliance readiness panels -->
+		<div class="overflow-x-auto rounded border border-slate-300 bg-white shadow-sm">
+			<div class="grid min-w-[1200px] grid-cols-[1fr_170px_1fr]">
+				<!-- Blue Alliance -->
+				<div class="border-r border-slate-300 bg-[#dfeafc]">
+					<div class="flex items-center justify-between border-b border-blue-200 px-3 py-2">
+						<div class="flex items-center gap-2">
+							<span
+								class="rounded px-2 py-0.5 text-xs font-bold text-white {blueReady
+									? 'bg-emerald-700'
+									: 'bg-rose-700'}">{blueReady ? 'READY' : 'NOT READY'}</span
+							>
+							<span class="text-sm font-bold tracking-wide text-blue-900">BLUE ALLIANCE</span>
+						</div>
+						<span class="rounded-full bg-blue-700 px-3 py-0.5 text-sm font-bold text-white">0</span>
+					</div>
+					<div class="p-2 text-xs">
+						<div
+							class="grid grid-cols-[72px_1fr_52px_46px_56px_56px_64px_100px] items-center gap-1 px-1 py-1 font-bold text-slate-600"
+						>
+							<div>Station</div>
+							<div>Team</div>
+							<div>Bypass</div>
+							<div>WPA</div>
+							<div>DS</div>
+							<div>E-Stop</div>
+							<div>A-Stop</div>
+							<div>Robot</div>
+						</div>
+						{#each blueStations as s, i}
+							{@const idx = blueInputIndices[i]}
+							<div
+								class="mt-1 grid grid-cols-[72px_1fr_52px_46px_56px_56px_64px_100px] items-center gap-1 rounded border border-blue-200 bg-white/75 px-1.5 py-1.5"
+							>
+								<div class="text-center font-bold text-blue-900">Station {i + 1}</div>
+								<div class="flex items-center gap-1">
+									<input
+										type="number"
+										placeholder="Team"
+										bind:value={inputs[idx].team}
+										onkeydown={(e) => e.key === 'Enter' && assignTeam(idx)}
+										class="h-7 w-full rounded border border-slate-300 bg-white px-2 text-xs"
+									/>
+									<button
+										onclick={() => assignTeam(idx)}
+										class="h-7 rounded bg-emerald-700 px-2 text-[10px] font-bold text-white"
+										>Set</button
+									>
+									<button
+										onclick={() => clearTeam(idx)}
+										class="h-7 rounded bg-slate-500 px-2 text-[10px] font-bold text-white"
+										>Clr</button
+									>
+								</div>
+								<input
+									type="checkbox"
+									checked={s.bypassed}
+									onchange={() => fms.bypassStation(idx, !s.bypassed)}
+									class="mx-auto h-4 w-4 cursor-pointer"
+								/>
+								<button class="mx-auto h-7 w-7 rounded bg-slate-400 font-bold text-white">?</button>
+								<div
+									class="mx-auto flex h-7 w-10 items-center justify-center rounded font-bold text-white {s.dsLinked
+										? 'bg-emerald-600'
+										: 'bg-rose-700'}"
+								>
+									{s.dsLinked ? 'OK' : 'X'}
+								</div>
+								<button
+									onclick={() => fms.estopStation(idx)}
+									class="mx-auto h-7 w-12 rounded text-[10px] font-bold text-white {s.estop
+										? 'bg-rose-900'
+										: 'bg-rose-700 hover:bg-rose-600'}">{s.estop ? 'LOCK' : 'E-Stop'}</button
+								>
+								<button
+									onclick={() => fms.astopStation(idx)}
+									class="mx-auto h-7 w-14 rounded text-[10px] font-bold text-white {s.astop
+										? 'bg-orange-900'
+										: 'bg-emerald-700 hover:bg-emerald-600'}">{s.astop ? 'LOCK' : 'A-Stop'}</button
+								>
+								<div
+									class="mx-auto flex h-7 w-full items-center justify-center rounded bg-slate-800 text-white"
+								>
+									{s.robotLinked ? 'OK' : 'X'}
+								</div>
+							</div>
+						{/each}
+					</div>
+				</div>
+
+				<!-- Center column -->
+				<div
+					class="flex items-center justify-center border-r border-slate-300 bg-white text-sm font-bold text-slate-700"
+				>
+					Test Match
+				</div>
+
+				<!-- Red Alliance -->
+				<div class="bg-[#fde3e3]">
+					<div class="flex items-center justify-between border-b border-rose-200 px-3 py-2">
+						<span class="rounded-full bg-rose-700 px-3 py-0.5 text-sm font-bold text-white">0</span>
+						<span class="text-sm font-bold tracking-wide text-rose-900">RED ALLIANCE</span>
+						<span
+							class="rounded px-2 py-0.5 text-xs font-bold text-white {redReady
+								? 'bg-emerald-700'
+								: 'bg-rose-700'}">{redReady ? 'READY' : 'NOT READY'}</span
+						>
+					</div>
+					<div class="p-2 text-xs">
+						<div
+							class="grid grid-cols-[72px_1fr_52px_46px_56px_56px_64px_100px] items-center gap-1 px-1 py-1 font-bold text-slate-600"
+						>
+							<div>Station</div>
+							<div>Team</div>
+							<div>Bypass</div>
+							<div>WPA</div>
+							<div>DS</div>
+							<div>E-Stop</div>
+							<div>A-Stop</div>
+							<div>Robot</div>
+						</div>
+						{#each redStations as s, i}
+							{@const idx = redInputIndices[i]}
+							<div
+								class="mt-1 grid grid-cols-[72px_1fr_52px_46px_56px_56px_64px_100px] items-center gap-1 rounded border border-rose-200 bg-white/75 px-1.5 py-1.5"
+							>
+								<div class="text-center font-bold text-rose-900">Station {3 - i}</div>
+								<div class="flex items-center gap-1">
+									<input
+										type="number"
+										placeholder="Team"
+										bind:value={inputs[idx].team}
+										onkeydown={(e) => e.key === 'Enter' && assignTeam(idx)}
+										class="h-7 w-full rounded border border-slate-300 bg-white px-2 text-xs"
+									/>
+									<button
+										onclick={() => assignTeam(idx)}
+										class="h-7 rounded bg-emerald-700 px-2 text-[10px] font-bold text-white"
+										>Set</button
+									>
+									<button
+										onclick={() => clearTeam(idx)}
+										class="h-7 rounded bg-slate-500 px-2 text-[10px] font-bold text-white"
+										>Clr</button
+									>
+								</div>
+								<input
+									type="checkbox"
+									checked={s.bypassed}
+									onchange={() => fms.bypassStation(idx, !s.bypassed)}
+									class="mx-auto h-4 w-4 cursor-pointer"
+								/>
+								<button class="mx-auto h-7 w-7 rounded bg-slate-400 font-bold text-white">?</button>
+								<div
+									class="mx-auto flex h-7 w-10 items-center justify-center rounded font-bold text-white {s.dsLinked
+										? 'bg-emerald-600'
+										: 'bg-rose-700'}"
+								>
+									{s.dsLinked ? 'OK' : 'X'}
+								</div>
+								<button
+									onclick={() => fms.estopStation(idx)}
+									class="mx-auto h-7 w-12 rounded text-[10px] font-bold text-white {s.estop
+										? 'bg-rose-900'
+										: 'bg-rose-700 hover:bg-rose-600'}">{s.estop ? 'LOCK' : 'E-Stop'}</button
+								>
+								<button
+									onclick={() => fms.astopStation(idx)}
+									class="mx-auto h-7 w-14 rounded text-[10px] font-bold text-white {s.astop
+										? 'bg-orange-900'
+										: 'bg-emerald-700 hover:bg-emerald-600'}">{s.astop ? 'LOCK' : 'A-Stop'}</button
+								>
+								<div
+									class="mx-auto flex h-7 w-full items-center justify-center rounded bg-slate-800 text-white"
+								>
+									{s.robotLinked ? 'OK' : 'X'}
+								</div>
+							</div>
+						{/each}
+					</div>
+				</div>
+			</div>
 		</div>
 
-		<!-- 6 station cards in a single row (Red1 Red2 Red3 | Blue1 Blue2 Blue3) -->
-		<div class="grid grid-cols-6 gap-3">
-			{#each [0, 1, 2, 3, 4, 5] as idx}
-				{@const s = matchState?.stations[idx]}
-				{@const isRed = idx < 3}
-				{@const label = isRed ? `Red ${idx + 1}` : `Blue ${idx - 2}`}
-
-				<div
-					class="flex flex-col gap-2 rounded-lg border p-3
-					{isRed ? 'border-red-900 bg-gray-800' : 'border-blue-900 bg-gray-800'}"
+		<!-- Match control bar -->
+		<div class="rounded border border-slate-300 bg-[#eceef2] p-3 shadow-sm">
+			<div class="flex flex-wrap items-center justify-center gap-3">
+				<button
+					onclick={() => fms.startPreMatch()}
+					disabled={phase !== 'Idle'}
+					class="h-14 min-w-44 rounded px-5 text-sm font-black disabled:cursor-not-allowed disabled:opacity-40 {phase ===
+					'Idle'
+						? 'bg-amber-500 text-slate-900 hover:bg-amber-400'
+						: 'bg-amber-800 text-white'}"
 				>
-					<!-- Station header -->
-					<div
-						class="rounded px-2 py-1 text-center text-sm font-bold
-						{isRed ? 'bg-red-950 text-red-300' : 'bg-blue-950 text-blue-300'}"
+					Prestart Match
+				</button>
+				<button
+					onclick={() => fms.startMatch()}
+					disabled={phase !== 'PreMatch' || !blueReady || !redReady}
+					class="h-14 min-w-44 rounded px-5 text-sm font-black disabled:cursor-not-allowed {phase ===
+						'PreMatch' &&
+					blueReady &&
+					redReady
+						? 'bg-emerald-700 text-white hover:bg-emerald-600'
+						: 'bg-[repeating-linear-gradient(-45deg,#b9bec8_0px,#b9bec8_8px,#a9aeb8_8px,#a9aeb8_16px)] text-slate-500'}"
+				>
+					Start Match
+				</button>
+				<button
+					onclick={() => fms.abortMatch()}
+					disabled={phase !== 'Auto' && phase !== 'AutoToTeleopTransition' && phase !== 'Teleop'}
+					class="h-14 min-w-44 rounded px-5 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-40 {phase ===
+						'Auto' ||
+					phase === 'AutoToTeleopTransition' ||
+					phase === 'Teleop'
+						? 'bg-orange-600 hover:bg-orange-500'
+						: 'bg-orange-900'}"
+				>
+					Abort Match
+				</button>
+				<button
+					onclick={() => fms.clearMatch()}
+					disabled={phase !== 'PostMatch' && phase !== 'PreMatch'}
+					class="h-14 min-w-44 rounded bg-slate-500 px-5 text-sm font-black text-white hover:bg-slate-400 disabled:cursor-not-allowed disabled:opacity-40"
+				>
+					Clear Match
+				</button>
+				{#if matchState?.arenaEstop}
+					<button
+						class="h-14 min-w-44 rounded bg-[repeating-linear-gradient(-45deg,#e7ca4f_0px,#e7ca4f_8px,#9a9a9a_8px,#9a9a9a_16px)] px-5 text-sm font-black text-black"
 					>
-						{label}
+						Arena is E-STOPPED!
+					</button>
+				{:else}
+					<button
+						onclick={() => fms.triggerArenaEstop()}
+						class="h-14 min-w-44 rounded bg-rose-700 px-5 text-sm font-black text-white hover:bg-rose-600"
+					>
+						Arena E-STOP
+					</button>
+				{/if}
+			</div>
+		</div>
+
+		<!-- Tab panel -->
+		<div class="rounded border border-slate-300 bg-white shadow-sm">
+			<div class="flex items-center gap-0 border-b border-slate-300 px-3 pt-2 text-sm">
+				<button
+					onclick={() => {
+						activeTab = 'score';
+					}}
+					class="mr-6 pb-2 {activeTab === 'score'
+						? 'border-b-2 border-blue-600 font-semibold text-blue-700'
+						: 'text-slate-500 hover:text-slate-800'}">Score</button
+				>
+				<button
+					onclick={() => {
+						activeTab = 'status';
+					}}
+					class="mr-6 pb-2 {activeTab === 'status'
+						? 'border-b-2 border-blue-600 font-semibold text-blue-700'
+						: 'text-slate-500 hover:text-slate-800'}">Status</button
+				>
+				<button
+					onclick={() => {
+						activeTab = 'options';
+					}}
+					class="mr-6 pb-2 {activeTab === 'options'
+						? 'border-b-2 border-blue-600 font-semibold text-blue-700'
+						: 'text-slate-500 hover:text-slate-800'}">Options</button
+				>
+			</div>
+
+			{#if activeTab === 'score'}
+				<div class="flex min-h-48 items-center justify-center p-6 text-center text-slate-400">
+					<div>
+						<div class="text-sm font-semibold">Scoring not yet implemented</div>
 					</div>
-
-					<!-- Team number input -->
-					<input
-						type="number"
-						placeholder="Team #"
-						bind:value={inputs[idx].team}
-						onkeydown={(e) => e.key === 'Enter' && assignTeam(idx)}
-						class="w-full rounded border border-gray-600 bg-gray-700 px-2 py-1 text-sm text-white placeholder-gray-500 focus:border-cyan-500 focus:outline-none"
-					/>
-
-					<!-- WPA key input -->
-					<input
-						type="text"
-						placeholder="WPA Key (optional)"
-						bind:value={inputs[idx].wpa}
-						class="rounded border border-gray-600 bg-gray-700 px-2 py-1 text-xs text-white placeholder-gray-500 focus:border-cyan-500 focus:outline-none"
-					/>
-
-					<!-- Assign / Clear buttons -->
-					<div class="flex gap-1">
-						<button
-							onclick={() => assignTeam(idx)}
-							class="flex-1 rounded bg-cyan-700 px-2 py-1 text-xs font-semibold hover:bg-cyan-600"
-						>
-							Assign
-						</button>
-						<button
-							onclick={() => clearTeam(idx)}
-							class="rounded bg-gray-700 px-2 py-1 text-xs hover:bg-gray-600"
-						>
-							Clear
-						</button>
-					</div>
-
-					<!-- Status indicators: DS, RIO, Radio, Robot -->
-					{#if s}
-						<div class="grid grid-cols-2 gap-x-2 gap-y-1 text-xs">
-							{#each [
-								{ label: 'DS', ok: s.dsLinked },
-								{ label: 'RIO', ok: s.rioLinked },
-								{ label: 'Radio', ok: s.radioLinked },
-								{ label: 'Robot', ok: s.robotLinked }
-							] as item}
-								<div class="flex items-center gap-1">
-									<span class="h-2 w-2 rounded-full {item.ok ? 'bg-green-500' : 'bg-gray-600'}"></span>
-									<span class="{item.ok ? 'text-gray-200' : 'text-gray-500'}">{item.label}</span>
+				</div>
+			{:else if activeTab === 'status'}
+				<div class="grid grid-cols-2">
+					<!-- Blue Alliance -->
+					<div class="border-r border-slate-200 bg-blue-50 p-3">
+						<div class="mb-2 text-xs font-bold tracking-wider text-blue-800 uppercase">
+							Blue Alliance
+						</div>
+						{#each blueStations as s, i}
+							<div
+								class="mb-2 rounded border p-2 text-xs {s.estop
+									? 'border-rose-400 bg-rose-50'
+									: 'border-blue-200 bg-white'}"
+							>
+								<div class="mb-1.5 flex items-center justify-between">
+									<span class="font-black text-blue-900"
+										>Station {i + 1} — Team {s.teamNumber || '—'}</span
+									>
+									<div class="flex gap-1">
+										{#if s.estop}<span
+												class="rounded bg-rose-700 px-1.5 py-0.5 text-[10px] font-bold text-white"
+												>E-STOP</span
+											>{/if}
+										{#if s.astop}<span
+												class="rounded bg-orange-600 px-1.5 py-0.5 text-[10px] font-bold text-white"
+												>A-STOP</span
+											>{/if}
+										{#if s.bypassed}<span
+												class="rounded bg-slate-500 px-1.5 py-0.5 text-[10px] font-bold text-white"
+												>BYPASS</span
+											>{/if}
+										{#if s.wrongStation}<span
+												class="rounded bg-yellow-600 px-1.5 py-0.5 text-[10px] font-bold text-white"
+												>WRONG STN</span
+											>{/if}
+									</div>
 								</div>
-							{/each}
-						</div>
-
-						<!-- Battery voltage + round-trip time + missed packets -->
-						<div class="flex justify-between text-xs text-gray-400">
-							<span>
-								{#if s.robotLinked}
-									<span class="{s.battery < 11 ? 'text-yellow-400' : 'text-gray-300'}">
-										{s.battery.toFixed(1)}V
-									</span>
-								{:else}
-									—
+								<div class="grid grid-cols-4 gap-1">
+									{#each [{ label: 'DS', ok: s.dsLinked }, { label: 'Radio', ok: s.radioLinked }, { label: 'RIO', ok: s.rioLinked }, { label: 'Robot', ok: s.robotLinked }] as item}
+										<div
+											class="flex flex-col items-center gap-0.5 rounded py-1 {item.ok
+												? 'bg-emerald-100'
+												: 'bg-slate-100'}"
+										>
+											<span
+												class="h-2 w-2 rounded-full {item.ok ? 'bg-emerald-500' : 'bg-slate-400'}"
+											></span>
+											<span class="font-semibold {item.ok ? 'text-emerald-800' : 'text-slate-500'}"
+												>{item.label}</span
+											>
+										</div>
+									{/each}
+								</div>
+								<div class="mt-1.5 grid grid-cols-3 gap-1 text-slate-600">
+									<div class="rounded bg-slate-50 px-1.5 py-1">
+										<div class="text-[10px] text-slate-400">Battery</div>
+										<div
+											class="font-semibold {s.battery < 11 && s.robotLinked
+												? 'text-yellow-600'
+												: ''}"
+										>
+											{s.robotLinked ? s.battery.toFixed(1) + 'V' : '—'}
+										</div>
+									</div>
+									<div class="rounded bg-slate-50 px-1.5 py-1">
+										<div class="text-[10px] text-slate-400">Trip</div>
+										<div class="font-semibold">{s.dsLinked ? s.tripTimeMs + ' ms' : '—'}</div>
+									</div>
+									<div class="rounded bg-slate-50 px-1.5 py-1">
+										<div class="text-[10px] text-slate-400">Lost Pkts</div>
+										<div class="font-semibold {s.missedPackets > 0 ? 'text-yellow-600' : ''}">
+											{s.missedPackets}
+										</div>
+									</div>
+								</div>
+								{#if s.wifi}
+									<div class="mt-1 grid grid-cols-4 gap-1 text-slate-600">
+										<div class="rounded bg-slate-50 px-1.5 py-1">
+											<div class="text-[10px] text-slate-400">SNR</div>
+											<div class="font-semibold">{s.wifi.snr}</div>
+										</div>
+										<div class="rounded bg-slate-50 px-1.5 py-1">
+											<div class="text-[10px] text-slate-400">Rx Mbps</div>
+											<div class="font-semibold">{s.wifi.rxRateMbps.toFixed(1)}</div>
+										</div>
+										<div class="rounded bg-slate-50 px-1.5 py-1">
+											<div class="text-[10px] text-slate-400">Tx Mbps</div>
+											<div class="font-semibold">{s.wifi.txRateMbps.toFixed(1)}</div>
+										</div>
+										<div class="rounded bg-slate-50 px-1.5 py-1">
+											<div class="text-[10px] text-slate-400">BW Mbps</div>
+											<div class="font-semibold">{s.wifi.bandwidthMbps.toFixed(2)}</div>
+										</div>
+									</div>
 								{/if}
-							</span>
-							<span>{s.dsLinked ? `${s.tripTimeMs}ms` : '—'}</span>
-							{#if s.missedPackets > 0}
-								<span class="text-yellow-500">{s.missedPackets} lost</span>
-							{/if}
-						</div>
+							</div>
+						{/each}
+					</div>
 
-						<!-- Warnings -->
-						{#if s.wrongStation}
-							<div class="rounded bg-yellow-800/70 px-2 py-0.5 text-center text-xs font-semibold text-yellow-300">
-								Wrong Station
+					<!-- Red Alliance -->
+					<div class="bg-rose-50 p-3">
+						<div class="mb-2 text-xs font-bold tracking-wider text-rose-800 uppercase">
+							Red Alliance
+						</div>
+						{#each redStations as s, i}
+							<div
+								class="mb-2 rounded border p-2 text-xs {s.estop
+									? 'border-rose-400 bg-rose-100'
+									: 'border-rose-200 bg-white'}"
+							>
+								<div class="mb-1.5 flex items-center justify-between">
+									<span class="font-black text-rose-900"
+										>Station {3 - i} — Team {s.teamNumber || '—'}</span
+									>
+									<div class="flex gap-1">
+										{#if s.estop}<span
+												class="rounded bg-rose-700 px-1.5 py-0.5 text-[10px] font-bold text-white"
+												>E-STOP</span
+											>{/if}
+										{#if s.astop}<span
+												class="rounded bg-orange-600 px-1.5 py-0.5 text-[10px] font-bold text-white"
+												>A-STOP</span
+											>{/if}
+										{#if s.bypassed}<span
+												class="rounded bg-slate-500 px-1.5 py-0.5 text-[10px] font-bold text-white"
+												>BYPASS</span
+											>{/if}
+										{#if s.wrongStation}<span
+												class="rounded bg-yellow-600 px-1.5 py-0.5 text-[10px] font-bold text-white"
+												>WRONG STN</span
+											>{/if}
+									</div>
+								</div>
+								<div class="grid grid-cols-4 gap-1">
+									{#each [{ label: 'DS', ok: s.dsLinked }, { label: 'Radio', ok: s.radioLinked }, { label: 'RIO', ok: s.rioLinked }, { label: 'Robot', ok: s.robotLinked }] as item}
+										<div
+											class="flex flex-col items-center gap-0.5 rounded py-1 {item.ok
+												? 'bg-emerald-100'
+												: 'bg-slate-100'}"
+										>
+											<span
+												class="h-2 w-2 rounded-full {item.ok ? 'bg-emerald-500' : 'bg-slate-400'}"
+											></span>
+											<span class="font-semibold {item.ok ? 'text-emerald-800' : 'text-slate-500'}"
+												>{item.label}</span
+											>
+										</div>
+									{/each}
+								</div>
+								<div class="mt-1.5 grid grid-cols-3 gap-1 text-slate-600">
+									<div class="rounded bg-slate-50 px-1.5 py-1">
+										<div class="text-[10px] text-slate-400">Battery</div>
+										<div
+											class="font-semibold {s.battery < 11 && s.robotLinked
+												? 'text-yellow-600'
+												: ''}"
+										>
+											{s.robotLinked ? s.battery.toFixed(1) + 'V' : '—'}
+										</div>
+									</div>
+									<div class="rounded bg-slate-50 px-1.5 py-1">
+										<div class="text-[10px] text-slate-400">Trip</div>
+										<div class="font-semibold">{s.dsLinked ? s.tripTimeMs + ' ms' : '—'}</div>
+									</div>
+									<div class="rounded bg-slate-50 px-1.5 py-1">
+										<div class="text-[10px] text-slate-400">Lost Pkts</div>
+										<div class="font-semibold {s.missedPackets > 0 ? 'text-yellow-600' : ''}">
+											{s.missedPackets}
+										</div>
+									</div>
+								</div>
+								{#if s.wifi}
+									<div class="mt-1 grid grid-cols-4 gap-1 text-slate-600">
+										<div class="rounded bg-slate-50 px-1.5 py-1">
+											<div class="text-[10px] text-slate-400">SNR</div>
+											<div class="font-semibold">{s.wifi.snr}</div>
+										</div>
+										<div class="rounded bg-slate-50 px-1.5 py-1">
+											<div class="text-[10px] text-slate-400">Rx Mbps</div>
+											<div class="font-semibold">{s.wifi.rxRateMbps.toFixed(1)}</div>
+										</div>
+										<div class="rounded bg-slate-50 px-1.5 py-1">
+											<div class="text-[10px] text-slate-400">Tx Mbps</div>
+											<div class="font-semibold">{s.wifi.txRateMbps.toFixed(1)}</div>
+										</div>
+										<div class="rounded bg-slate-50 px-1.5 py-1">
+											<div class="text-[10px] text-slate-400">BW Mbps</div>
+											<div class="font-semibold">{s.wifi.bandwidthMbps.toFixed(2)}</div>
+										</div>
+									</div>
+								{/if}
+							</div>
+						{/each}
+					</div>
+				</div>
+			{:else if activeTab === 'options'}
+				<div class="p-4">
+					<div class="mb-3 text-xs font-bold tracking-wider text-slate-500 uppercase">
+						Arena Control
+					</div>
+					<div class="flex flex-wrap gap-3">
+						{#if matchState?.arenaEstop}
+							<div
+								class="flex items-center gap-3 rounded border border-rose-300 bg-rose-50 px-4 py-3"
+							>
+								<span class="font-bold text-rose-700">Arena E-Stop is ACTIVE</span>
+								<button
+								onclick={() => fms.resetArenaEstop()}
+									class="rounded bg-yellow-500 px-3 py-1.5 text-sm font-bold text-slate-900 hover:bg-yellow-400"
+									>Reset E-Stop</button
+								>
 							</div>
 						{/if}
-						{#if s.bypassed}
-							<div class="rounded bg-gray-700 px-2 py-0.5 text-center text-xs text-gray-400">
-								Bypassed
-							</div>
-						{/if}
-
-						<!-- E-Stop and A-Stop buttons -->
-						<div class="mt-auto flex gap-1">
-							<button
-								onclick={() => fms.estopStation(idx)}
-								disabled={s.estop}
-								class="flex-1 rounded px-2 py-1 text-xs font-bold
-								{s.estop
-									? 'cursor-not-allowed bg-red-900 text-red-400'
-									: 'bg-red-800 text-white hover:bg-red-700'}"
+					</div>
+					<div class="mt-4 mb-2 text-xs font-bold tracking-wider text-slate-500 uppercase">
+						Access Point
+					</div>
+					{#if matchState}
+						<div class="flex items-center gap-2 text-sm">
+							<span class="text-slate-600">Status:</span>
+							<span
+								class="rounded px-2 py-0.5 text-xs font-bold {matchState.accessPoint.status ===
+								'ACTIVE'
+									? 'bg-emerald-100 text-emerald-800'
+									: matchState.accessPoint.status === 'CONFIGURING'
+										? 'bg-yellow-100 text-yellow-800'
+										: 'bg-rose-100 text-rose-800'}">{matchState.accessPoint.status}</span
 							>
-								{s.estop ? 'E-STOPPED' : 'E-STOP'}
-							</button>
-							<button
-								onclick={() => fms.astopStation(idx)}
-								disabled={s.astop}
-								class="flex-1 rounded px-2 py-1 text-xs font-bold
-								{s.astop
-									? 'cursor-not-allowed bg-orange-900 text-orange-400'
-									: 'bg-orange-800 text-white hover:bg-orange-700'}"
-							>
-								{s.astop ? 'A-STOPPED' : 'A-STOP'}
-							</button>
 						</div>
-					{:else}
-						<!-- No state received yet (still connecting) -->
-						<div class="flex-1 py-4 text-center text-xs text-gray-600">No data</div>
 					{/if}
 				</div>
-			{/each}
+			{/if}
 		</div>
-
-		<!-- ===== WIFI DIAGNOSTICS TABLE ===== -->
-		{#if matchState}
-			<div class="mt-4 rounded-lg border border-gray-700 bg-gray-800 p-3">
-				<h2 class="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-400">
-					Wifi Diagnostics
-				</h2>
-				<table class="w-full text-xs">
-					<thead>
-						<tr class="text-left text-gray-500">
-							<th class="pb-1 pr-4">Station</th>
-							<th class="pb-1 pr-4">Team</th>
-							<th class="pb-1 pr-4">Radio</th>
-							<th class="pb-1 pr-4">Rx Mbps</th>
-							<th class="pb-1 pr-4">Tx Mbps</th>
-							<th class="pb-1 pr-4">SNR</th>
-							<th class="pb-1 pr-4">BW Used</th>
-							<th class="pb-1">Quality</th>
-						</tr>
-					</thead>
-					<tbody>
-						{#each matchState.stations as s, i}
-							{@const label = i < 3 ? `Red ${i + 1}` : `Blue ${i - 2}`}
-							<tr class="border-t border-gray-700">
-								<td class="py-0.5 pr-4 {i < 3 ? 'text-red-400' : 'text-blue-400'}">{label}</td>
-								<td class="py-0.5 pr-4 text-gray-300">{s.teamNumber || '—'}</td>
-								<td class="py-0.5 pr-4">
-									<span
-										class="inline-block h-2 w-2 rounded-full
-										{s.wifi?.radioLinked ? 'bg-green-500' : 'bg-gray-600'}"
-									></span>
-								</td>
-								<td class="py-0.5 pr-4 text-gray-300">{s.wifi?.rxRateMbps.toFixed(1) ?? '—'}</td>
-								<td class="py-0.5 pr-4 text-gray-300">{s.wifi?.txRateMbps.toFixed(1) ?? '—'}</td>
-								<td class="py-0.5 pr-4 text-gray-300">{s.wifi?.snr ?? '—'}</td>
-								<td class="py-0.5 pr-4 text-gray-300">{s.wifi?.bandwidthMbps.toFixed(2) ?? '—'}</td>
-								<td class="py-0.5 text-gray-300">{s.wifi?.connectionQuality ?? '—'}</td>
-							</tr>
-						{/each}
-					</tbody>
-				</table>
-			</div>
-		{/if}
 	</main>
 
-	<!-- Footer with link to audience overlay -->
-	<footer class="border-t border-gray-700 px-4 py-2 text-center text-xs text-gray-600">
-		PossumFMS · FRC Team 2718 ·
-		<a href="/audience" class="text-cyan-700 hover:text-cyan-500">Audience Overlay →</a>
+	<footer
+		class="fixed right-0 bottom-0 left-0 border-t border-slate-300 bg-[#eceff4] px-3 py-1 text-xs text-slate-600"
+	>
+		<div class="relative mx-auto max-w-[1700px]">
+			<span>0.4 ms</span>
+			<span class="absolute left-1/2 -translate-x-1/2">POSM - Team 2718</span>
+			<a href="/audience" class="absolute right-0 text-blue-700 hover:text-blue-500"
+				>Audience Overlay</a
+			>
+		</div>
 	</footer>
 </div>

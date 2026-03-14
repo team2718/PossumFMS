@@ -44,6 +44,12 @@ public sealed class FmsHub(
     public async Task StartMatch()
     {
         logger.LogInformation("StartMatch requested by {Client}.", Context.ConnectionId);
+        // Only start if every non-bypassed station has a driver station linked.
+        if (!dsManager.Stations.Values.All(s => s.IsReady))
+        {
+            logger.LogWarning("StartMatch blocked — not all stations ready.");
+            return;
+        }
         arena.StartMatch();
         await BroadcastMatchState();
     }
@@ -58,6 +64,8 @@ public sealed class FmsHub(
     public async Task ClearMatch()
     {
         logger.LogInformation("ClearMatch requested by {Client}.", Context.ConnectionId);
+        dsManager.ResetAllStops();
+        arena.ResetArenaEstop();
         arena.ClearMatch();
         await BroadcastMatchState();
     }
@@ -89,6 +97,15 @@ public sealed class FmsHub(
         var station = AllianceStations.All[stationIndex];
         logger.LogWarning("A-stop {Station} by {Client}.", station, Context.ConnectionId);
         dsManager.Astop(station);
+        await BroadcastMatchState();
+    }
+
+    public async Task BypassStation(int stationIndex, bool bypassed)
+    {
+        var station = AllianceStations.All[stationIndex];
+        logger.LogInformation("{Action} bypass on {Station} by {Client}.",
+            bypassed ? "Set" : "Clear", station, Context.ConnectionId);
+        dsManager.SetBypass(station, bypassed);
         await BroadcastMatchState();
     }
 

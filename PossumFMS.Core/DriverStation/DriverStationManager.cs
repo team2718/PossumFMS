@@ -83,6 +83,19 @@ public sealed class DriverStationManager : BackgroundService
         Stations[station].Astop = false;
     }
 
+    public void SetBypass(AllianceStation station, bool bypassed)
+        => Stations[station].Bypassed = bypassed;
+
+    /// <summary>Clears all e-stops and a-stops on every station (called on Clear Match).</summary>
+    public void ResetAllStops()
+    {
+        foreach (var ds in Stations.Values)
+        {
+            ds.Estop = false;
+            ds.Astop = false;
+        }
+    }
+
     // ── BackgroundService ──────────────────────────────────────────────────────
 
     protected override Task ExecuteAsync(CancellationToken ct)

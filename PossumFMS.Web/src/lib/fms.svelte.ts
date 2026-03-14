@@ -122,6 +122,10 @@ class FmsConnection {
 	astopStation(stationIndex: number) {
 		this.hub?.invoke('AstopStation', stationIndex);
 	}
+	/** Set or clear the bypass flag on a station */
+	bypassStation(stationIndex: number, bypassed: boolean) {
+		this.hub?.invoke('BypassStation', stationIndex, bypassed);
+	}
 }
 
 // Singleton — the same instance (and its reactive state) is shared across all
