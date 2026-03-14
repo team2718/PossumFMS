@@ -23,8 +23,9 @@
 
 	// Format seconds as M:SS (e.g. 2:05)
 	function formatTime(secs: number): string {
-		const m = Math.floor(secs / 60);
-		const s = Math.floor(secs % 60);
+		const total = Math.ceil(secs);
+		const m = Math.floor(total / 60);
+		const s = total % 60;
 		return `${m}:${s.toString().padStart(2, '0')}`;
 	}
 

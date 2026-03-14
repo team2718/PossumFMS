@@ -46,6 +46,7 @@ public sealed class MatchStateBroadcaster(
         matchNumber   = arena.MatchNumber,
         timeRemaining = arena.TimeRemaining.TotalSeconds,
         arenaEstop    = arena.ArenaEstop,
+        wasAborted    = arena.WasAborted,
         accessPoint   = new { status = apManager.ApStatus },
         stations      = AllianceStations.All.Select((s, i) =>
         {

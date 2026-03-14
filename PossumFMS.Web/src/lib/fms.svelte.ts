@@ -36,6 +36,7 @@ export interface MatchState {
 	matchNumber: number;
 	timeRemaining: number; // seconds
 	arenaEstop: boolean;
+	wasAborted: boolean;
 	accessPoint: { status: string }; // "ACTIVE" | "CONFIGURING" | "ERROR"
 	stations: Station[]; // always 6: Red1, Red2, Red3, Blue1, Blue2, Blue3
 }

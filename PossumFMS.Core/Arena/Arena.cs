@@ -36,6 +36,9 @@ public sealed class Arena
 
     public bool IsMatchRunning => Phase is MatchPhase.Auto or MatchPhase.Teleop;
 
+    /// <summary>True if the last match ended via AbortMatch rather than running to completion.</summary>
+    public bool WasAborted { get; private set; }
+
     // ── Arena-wide stops ───────────────────────────────────────────────────────
 
     /// <summary>
@@ -75,6 +78,7 @@ public sealed class Arena
         if (IsMatchRunning)
             throw new InvalidOperationException("Cannot start pre-match while a match is running.");
 
+        WasAborted = false;
         TransitionTo(MatchPhase.PreMatch, TimeSpan.Zero);
     }
 
@@ -91,6 +95,7 @@ public sealed class Arena
         if (!IsMatchRunning)
             throw new InvalidOperationException("No match is running.");
 
+        WasAborted = true;
         TransitionTo(MatchPhase.PostMatch, TimeSpan.Zero);
     }
 
@@ -99,6 +104,7 @@ public sealed class Arena
         if (IsMatchRunning)
             throw new InvalidOperationException("Cannot clear match while a match is running.");
 
+        WasAborted = false;
         TransitionTo(MatchPhase.Idle, TimeSpan.Zero);
     }
 
