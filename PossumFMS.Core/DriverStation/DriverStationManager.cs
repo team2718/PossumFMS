@@ -70,7 +70,7 @@ public sealed class DriverStationManager : BackgroundService
     {
         var ds = Stations[station];
         ds.TeamNumber = teamNumber;
-        ds.WpaKey     = wpaKey;
+        ds.WpaKey     = "" + teamNumber + "" + teamNumber;
         TeamAssignmentsChanged?.Invoke();
     }
 
@@ -107,7 +107,15 @@ public sealed class DriverStationManager : BackgroundService
         // We wrap it so StopAsync can await full cleanup (socket dispose) on shutdown.
         new Thread(() =>
         {
-            try   { RunControlLoop(ct); }
+            try
+            {
+                RunControlLoop(ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogCritical(ex,
+                    "DS control loop crashed unexpectedly and has stopped. Driver Station networking is unavailable.");
+            }
             finally { _controlLoopDone.TrySetResult(); }
         })
         {
@@ -144,9 +152,15 @@ public sealed class DriverStationManager : BackgroundService
 
     private void RunControlLoop(CancellationToken ct)
     {
-        _udpSocket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-        _udpSocket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
-        _udpSocket.Bind(new IPEndPoint(IPAddress.Any, FmsUdpListenPort));
+        _udpSocket = TryCreateAndBindUdpSocket();
+        if (_udpSocket is null)
+        {
+            _logger.LogError(
+                "Driver Station UDP control loop disabled because port {Port} could not be bound.",
+                FmsUdpListenPort);
+            return;
+        }
+
         _udpSocket.Blocking = false;
 
         _logger.LogInformation("DS control loop started (target {Period} ms).", LoopPeriod.TotalMilliseconds);
@@ -167,6 +181,36 @@ public sealed class DriverStationManager : BackgroundService
 
         _udpSocket.Dispose();
         _logger.LogInformation("DS control loop stopped.");
+    }
+
+    private Socket? TryCreateAndBindUdpSocket()
+    {
+        var socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+        socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+
+        try
+        {
+            socket.Bind(new IPEndPoint(IPAddress.Any, FmsUdpListenPort));
+            return socket;
+        }
+        catch (SocketException ex) when (ex.SocketErrorCode == SocketError.AccessDenied)
+        {
+            _logger.LogError(ex,
+                "Access denied while binding UDP port {Port}. On Windows this is usually a reserved/excluded port range or security policy. " +
+                "Run 'netsh int ipv4 show excludedportrange protocol=udp' and choose a non-excluded port for local testing, " +
+                "or run with elevated privileges if required by policy.",
+                FmsUdpListenPort);
+            socket.Dispose();
+            return null;
+        }
+        catch (SocketException ex) when (ex.SocketErrorCode == SocketError.AddressAlreadyInUse)
+        {
+            _logger.LogError(ex,
+                "UDP port {Port} is already in use by another process. Stop the conflicting process or change the DS port.",
+                FmsUdpListenPort);
+            socket.Dispose();
+            return null;
+        }
     }
 
     // ── UDP receive ────────────────────────────────────────────────────────────
@@ -369,16 +413,22 @@ public sealed class DriverStationManager : BackgroundService
     private async Task RunTcpListenerAsync(CancellationToken ct)
     {
         var listener = new TcpListener(IPAddress.Any, FmsTcpListenPort);
-        listener.Start();
-        _logger.LogInformation("Listening for driver stations on TCP port {Port}.", FmsTcpListenPort);
-
         try
         {
+            listener.Start();
+            _logger.LogInformation("Listening for driver stations on TCP port {Port}.", FmsTcpListenPort);
+
             while (!ct.IsCancellationRequested)
             {
                 var tcpClient = await listener.AcceptTcpClientAsync(ct);
                 _ = Task.Run(() => HandleTcpConnectionAsync(tcpClient, ct), ct);
             }
+        }
+        catch (SocketException ex)
+        {
+            _logger.LogError(ex,
+                "Failed to start Driver Station TCP listener on port {Port}. Driver Station networking is unavailable.",
+                FmsTcpListenPort);
         }
         catch (OperationCanceledException) { }
         finally { listener.Stop(); }

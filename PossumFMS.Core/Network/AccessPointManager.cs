@@ -28,6 +28,7 @@ public sealed class AccessPointManager : BackgroundService
     private const int PollIntervalMs    = 1000;
     private const int DebounceMs        =   50;
     private const int HttpTimeoutSec    =    3;
+    private const int DefaultChannel    =    13;
 
     // Station keys in AllianceStations.All order: R1, R2, R3, B1, B2, B3.
     private static readonly string[] StationKeys = ["red1", "red2", "red3", "blue1", "blue2", "blue3"];
@@ -66,7 +67,18 @@ public sealed class AccessPointManager : BackgroundService
 
         var address  = config["AccessPoint:Address"] ?? "10.0.100.2";
         var password = config["AccessPoint:Password"] ?? "";
-        _channel     = config.GetValue("AccessPoint:Channel", 36);
+
+        var configuredChannel = config.GetValue("AccessPoint:Channel", DefaultChannel);
+        if (configuredChannel is < 1 or > 11)
+        {
+            _logger.LogWarning(
+                "AccessPoint:Channel={ConfiguredChannel} is invalid for VH-113 (TypeVividHosting). " +
+                "Using fallback channel {FallbackChannel}.",
+                configuredChannel, DefaultChannel);
+            configuredChannel = DefaultChannel;
+        }
+
+        _channel = configuredChannel;
 
         _http = new HttpClient { BaseAddress = new Uri($"http://{address}") };
         if (!string.IsNullOrEmpty(password))
