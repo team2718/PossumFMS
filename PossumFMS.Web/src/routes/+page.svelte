@@ -29,20 +29,93 @@
 		return `${m}:${s.toString().padStart(2, '0')}`;
 	}
 
-	// Assign the team from the input field, or 0 if the field is blank
-	function assignTeam(idx: number) {
-		const n = parseInt(inputs[idx].team);
-		fms.assignTeam(idx, isNaN(n) ? 0 : n, inputs[idx].wpa);
+	function formatLastRobotLink(secondsSinceLink: number, robotLinked: boolean): string {
+		if (robotLinked) return 'Now';
+		if (secondsSinceLink >= 300) return '>5 mins ago';
+
+		const wholeSeconds = Math.max(0, Math.round(secondsSinceLink));
+		return `${wholeSeconds} ${wholeSeconds === 1 ? 'second' : 'seconds'} ago`;
 	}
 
-	function clearTeam(idx: number) {
-		inputs[idx].team = '';
-		inputs[idx].wpa = '';
-		fms.assignTeam(idx, 0);
+	// Assign the team from the input field, or 0 if the field is blank
+	let configureWarning = $state('');
+	let configureSuccess = $state('');
+	let isConfiguring = $state(false);
+
+	function stationLabel(idx: number): string {
+		return idx < 3 ? `Red ${idx + 1}` : `Blue ${idx - 2}`;
+	}
+
+	async function configureAccessPoint() {
+		configureWarning = '';
+		configureSuccess = '';
+		const seenTeams = new Map<number, number>();
+		const teamsToAssign = new Array<number>(inputs.length).fill(0);
+
+		for (let idx = 0; idx < inputs.length; idx++) {
+			const raw = String(inputs[idx].team ?? '').trim();
+			if (!raw) continue;
+
+			const teamNumber = parseInt(raw);
+			if (isNaN(teamNumber) || teamNumber <= 0) continue;
+			teamsToAssign[idx] = teamNumber;
+
+			const seenAt = seenTeams.get(teamNumber);
+			if (seenAt !== undefined) {
+				configureWarning = `Team ${teamNumber} is entered for both ${stationLabel(seenAt)} and ${stationLabel(idx)}.`;
+				return;
+			}
+
+			seenTeams.set(teamNumber, idx);
+		}
+
+		isConfiguring = true;
+
+		try {
+			for (let idx = 0; idx < teamsToAssign.length; idx++) {
+				await fms.assignTeam(idx, teamsToAssign[idx], inputs[idx].wpa);
+			}
+
+			await fms.configureAccessPoint();
+			configureSuccess = 'Teams assigned and AP configuration requested.';
+		} catch (error) {
+			configureWarning =
+				error instanceof Error ? error.message : 'Failed to configure. Please try again.';
+		} finally {
+			isConfiguring = false;
+		}
+	}
+
+	async function clearAllTeams() {
+		if (isConfiguring) return;
+
+		configureWarning = '';
+		configureSuccess = '';
+		isConfiguring = true;
+
+		try {
+			for (let idx = 0; idx < inputs.length; idx++) {
+				inputs[idx].team = '';
+				inputs[idx].wpa = '';
+				await fms.assignTeam(idx, 0);
+			}
+
+			configureSuccess = 'All teams were cleared.';
+		} catch (error) {
+			configureWarning =
+				error instanceof Error ? error.message : 'Failed to clear teams. Please try again.';
+		} finally {
+			isConfiguring = false;
+		}
 	}
 
 	// Derived helpers so the template isn't doing repeated fms.state?.... lookups
 	const matchState = $derived(fms.matchState);
+	$effect(() => {
+		if (configureSuccess && matchState?.accessPoint.status === 'ACTIVE') {
+			configureSuccess = '';
+		}
+	});
 	const phase = $derived(matchState?.phase ?? 'Disconnected');
 	const blueStations = $derived(matchState?.stations.slice(3, 6) ?? []);
 	const redStations = $derived(
@@ -103,41 +176,33 @@
 					</div>
 					<div class="p-2 text-xs">
 						<div
-							class="grid grid-cols-[72px_1fr_52px_46px_56px_56px_64px_100px] items-center gap-1 px-1 py-1 font-bold text-slate-600"
+							class="grid grid-cols-[68px_1fr_48px_44px_44px_44px_44px_62px_62px] items-center gap-1 px-1 py-1 font-bold text-slate-600"
 						>
 							<div>Station</div>
 							<div>Team</div>
 							<div>Bypass</div>
-							<div>WPA</div>
 							<div>DS</div>
+							<div>Radio</div>
+							<div>RIO</div>
+							<div>Robot</div>
 							<div>E-Stop</div>
 							<div>A-Stop</div>
-							<div>Robot</div>
 						</div>
 						{#each blueStations as s, i}
 							{@const idx = blueInputIndices[i]}
 							<div
-								class="mt-1 grid grid-cols-[72px_1fr_52px_46px_56px_56px_64px_100px] items-center gap-1 rounded border border-blue-200 bg-white/75 px-1.5 py-1.5"
+								class="mt-1 grid grid-cols-[68px_1fr_48px_44px_44px_44px_44px_62px_62px] items-center gap-1 rounded border border-blue-200 bg-white/75 px-1.5 py-1.5"
 							>
 								<div class="text-center font-bold text-blue-900">Station {i + 1}</div>
 								<div class="flex items-center gap-1">
 									<input
-										type="number"
+										type="text"
+										inputmode="numeric"
+										pattern="[0-9]*"
 										placeholder="Team"
 										bind:value={inputs[idx].team}
-										onkeydown={(e) => e.key === 'Enter' && assignTeam(idx)}
 										class="h-7 w-full rounded border border-slate-300 bg-white px-2 text-xs"
 									/>
-									<button
-										onclick={() => assignTeam(idx)}
-										class="h-7 rounded bg-emerald-700 px-2 text-[10px] font-bold text-white"
-										>Set</button
-									>
-									<button
-										onclick={() => clearTeam(idx)}
-										class="h-7 rounded bg-slate-500 px-2 text-[10px] font-bold text-white"
-										>Clr</button
-									>
 								</div>
 								<input
 									type="checkbox"
@@ -145,7 +210,6 @@
 									onchange={() => fms.bypassStation(idx, !s.bypassed)}
 									class="mx-auto h-4 w-4 cursor-pointer"
 								/>
-								<button class="mx-auto h-7 w-7 rounded bg-slate-400 font-bold text-white">?</button>
 								<div
 									class="mx-auto flex h-7 w-10 items-center justify-center rounded font-bold text-white {s.dsLinked
 										? 'bg-emerald-600'
@@ -153,23 +217,39 @@
 								>
 									{s.dsLinked ? 'OK' : 'X'}
 								</div>
+								<div
+									class="mx-auto flex h-7 w-10 items-center justify-center rounded font-bold text-white {s.radioLinked
+										? 'bg-emerald-600'
+										: 'bg-rose-700'}"
+								>
+									{s.radioLinked ? 'OK' : 'X'}
+								</div>
+								<div
+									class="mx-auto flex h-7 w-10 items-center justify-center rounded font-bold text-white {s.rioLinked
+										? 'bg-emerald-600'
+										: 'bg-rose-700'}"
+								>
+									{s.rioLinked ? 'OK' : 'X'}
+								</div>
+								<div
+									class="mx-auto flex h-7 w-10 items-center justify-center rounded font-bold text-white {s.robotLinked
+										? 'bg-emerald-600'
+										: 'bg-rose-700'}"
+								>
+									{s.robotLinked ? 'OK' : 'X'}
+								</div>
 								<button
 									onclick={() => fms.estopStation(idx)}
-									class="mx-auto h-7 w-12 rounded text-[10px] font-bold text-white {s.estop
-										? 'bg-rose-900'
+									class="mx-auto h-7 w-14 cursor-pointer rounded border border-rose-900 px-1 text-[10px] font-black tracking-wide text-white shadow-sm transition active:translate-y-px {s.estop
+										? 'bg-rose-950'
 										: 'bg-rose-700 hover:bg-rose-600'}">{s.estop ? 'LOCK' : 'E-Stop'}</button
 								>
 								<button
 									onclick={() => fms.astopStation(idx)}
-									class="mx-auto h-7 w-14 rounded text-[10px] font-bold text-white {s.astop
-										? 'bg-orange-900'
-										: 'bg-emerald-700 hover:bg-emerald-600'}">{s.astop ? 'LOCK' : 'A-Stop'}</button
+									class="mx-auto h-7 w-14 cursor-pointer rounded border border-rose-900 px-1 text-[10px] font-black tracking-wide text-white shadow-sm transition active:translate-y-px {s.astop
+										? 'bg-rose-950'
+										: 'bg-rose-700 hover:bg-rose-600'}">{s.astop ? 'LOCK' : 'A-Stop'}</button
 								>
-								<div
-									class="mx-auto flex h-7 w-full items-center justify-center rounded bg-slate-800 text-white"
-								>
-									{s.robotLinked ? 'OK' : 'X'}
-								</div>
 							</div>
 						{/each}
 					</div>
@@ -195,41 +275,33 @@
 					</div>
 					<div class="p-2 text-xs">
 						<div
-							class="grid grid-cols-[72px_1fr_52px_46px_56px_56px_64px_100px] items-center gap-1 px-1 py-1 font-bold text-slate-600"
+							class="grid grid-cols-[68px_1fr_48px_44px_44px_44px_44px_62px_62px] items-center gap-1 px-1 py-1 font-bold text-slate-600"
 						>
 							<div>Station</div>
 							<div>Team</div>
 							<div>Bypass</div>
-							<div>WPA</div>
 							<div>DS</div>
+							<div>Radio</div>
+							<div>RIO</div>
+							<div>Robot</div>
 							<div>E-Stop</div>
 							<div>A-Stop</div>
-							<div>Robot</div>
 						</div>
 						{#each redStations as s, i}
 							{@const idx = redInputIndices[i]}
 							<div
-								class="mt-1 grid grid-cols-[72px_1fr_52px_46px_56px_56px_64px_100px] items-center gap-1 rounded border border-rose-200 bg-white/75 px-1.5 py-1.5"
+								class="mt-1 grid grid-cols-[68px_1fr_48px_44px_44px_44px_44px_62px_62px] items-center gap-1 rounded border border-rose-200 bg-white/75 px-1.5 py-1.5"
 							>
 								<div class="text-center font-bold text-rose-900">Station {3 - i}</div>
 								<div class="flex items-center gap-1">
 									<input
-										type="number"
+										type="text"
+										inputmode="numeric"
+										pattern="[0-9]*"
 										placeholder="Team"
 										bind:value={inputs[idx].team}
-										onkeydown={(e) => e.key === 'Enter' && assignTeam(idx)}
 										class="h-7 w-full rounded border border-slate-300 bg-white px-2 text-xs"
 									/>
-									<button
-										onclick={() => assignTeam(idx)}
-										class="h-7 rounded bg-emerald-700 px-2 text-[10px] font-bold text-white"
-										>Set</button
-									>
-									<button
-										onclick={() => clearTeam(idx)}
-										class="h-7 rounded bg-slate-500 px-2 text-[10px] font-bold text-white"
-										>Clr</button
-									>
 								</div>
 								<input
 									type="checkbox"
@@ -237,7 +309,6 @@
 									onchange={() => fms.bypassStation(idx, !s.bypassed)}
 									class="mx-auto h-4 w-4 cursor-pointer"
 								/>
-								<button class="mx-auto h-7 w-7 rounded bg-slate-400 font-bold text-white">?</button>
 								<div
 									class="mx-auto flex h-7 w-10 items-center justify-center rounded font-bold text-white {s.dsLinked
 										? 'bg-emerald-600'
@@ -245,27 +316,80 @@
 								>
 									{s.dsLinked ? 'OK' : 'X'}
 								</div>
+								<div
+									class="mx-auto flex h-7 w-10 items-center justify-center rounded font-bold text-white {s.radioLinked
+										? 'bg-emerald-600'
+										: 'bg-rose-700'}"
+								>
+									{s.radioLinked ? 'OK' : 'X'}
+								</div>
+								<div
+									class="mx-auto flex h-7 w-10 items-center justify-center rounded font-bold text-white {s.rioLinked
+										? 'bg-emerald-600'
+										: 'bg-rose-700'}"
+								>
+									{s.rioLinked ? 'OK' : 'X'}
+								</div>
+								<div
+									class="mx-auto flex h-7 w-10 items-center justify-center rounded font-bold text-white {s.robotLinked
+										? 'bg-emerald-600'
+										: 'bg-rose-700'}"
+								>
+									{s.robotLinked ? 'OK' : 'X'}
+								</div>
 								<button
 									onclick={() => fms.estopStation(idx)}
-									class="mx-auto h-7 w-12 rounded text-[10px] font-bold text-white {s.estop
-										? 'bg-rose-900'
+									class="mx-auto h-7 w-14 cursor-pointer rounded border border-rose-900 px-1 text-[10px] font-black tracking-wide text-white shadow-sm transition active:translate-y-px {s.estop
+										? 'bg-rose-950'
 										: 'bg-rose-700 hover:bg-rose-600'}">{s.estop ? 'LOCK' : 'E-Stop'}</button
 								>
 								<button
 									onclick={() => fms.astopStation(idx)}
-									class="mx-auto h-7 w-14 rounded text-[10px] font-bold text-white {s.astop
-										? 'bg-orange-900'
-										: 'bg-emerald-700 hover:bg-emerald-600'}">{s.astop ? 'LOCK' : 'A-Stop'}</button
+									class="mx-auto h-7 w-14 cursor-pointer rounded border border-rose-900 px-1 text-[10px] font-black tracking-wide text-white shadow-sm transition active:translate-y-px {s.astop
+										? 'bg-rose-950'
+										: 'bg-rose-700 hover:bg-rose-600'}">{s.astop ? 'LOCK' : 'A-Stop'}</button
 								>
-								<div
-									class="mx-auto flex h-7 w-full items-center justify-center rounded bg-slate-800 text-white"
-								>
-									{s.robotLinked ? 'OK' : 'X'}
-								</div>
 							</div>
 						{/each}
 					</div>
 				</div>
+			</div>
+
+			<div class="border-t border-slate-200 p-3">
+				{#if matchState}
+					<div class="flex flex-wrap items-center justify-center gap-3 text-sm">
+						<button
+							onclick={configureAccessPoint}
+							disabled={isConfiguring}
+							aria-busy={isConfiguring}
+							class="rounded bg-blue-700 px-3 py-1.5 text-sm font-bold text-white hover:bg-blue-600"
+						>
+							{isConfiguring ? 'Configuring...' : 'Configure'}
+						</button>
+						<button
+							onclick={clearAllTeams}
+							disabled={isConfiguring}
+							class="rounded bg-slate-600 px-3 py-1.5 text-sm font-bold text-white hover:bg-slate-500"
+						>
+							Clear All
+						</button>
+						{#if configureWarning}
+							<span class="text-xs font-semibold text-rose-700">{configureWarning}</span>
+						{/if}
+						{#if configureSuccess}
+							<span class="text-xs font-semibold text-emerald-700">{configureSuccess}</span>
+						{/if}
+						<span class="text-slate-600">FMS AP Status:</span>
+						<span
+							class="rounded px-2 py-0.5 text-xs font-bold {matchState.accessPoint.status === 'ACTIVE'
+								? 'bg-emerald-100 text-emerald-800'
+								: matchState.accessPoint.status === 'CONFIGURING'
+									? 'bg-yellow-100 text-yellow-800'
+									: 'bg-rose-100 text-rose-800'}"
+						>{matchState.accessPoint.status}</span
+						>
+					</div>
+				{/if}
 			</div>
 		</div>
 
@@ -401,23 +525,12 @@
 											>{/if}
 									</div>
 								</div>
-								<div class="grid grid-cols-4 gap-1">
-									{#each [{ label: 'DS', ok: s.dsLinked }, { label: 'Radio', ok: s.radioLinked }, { label: 'RIO', ok: s.rioLinked }, { label: 'Robot', ok: s.robotLinked }] as item}
-										<div
-											class="flex flex-col items-center gap-0.5 rounded py-1 {item.ok
-												? 'bg-emerald-100'
-												: 'bg-slate-100'}"
-										>
-											<span
-												class="h-2 w-2 rounded-full {item.ok ? 'bg-emerald-500' : 'bg-slate-400'}"
-											></span>
-											<span class="font-semibold {item.ok ? 'text-emerald-800' : 'text-slate-500'}"
-												>{item.label}</span
-											>
-										</div>
-									{/each}
-								</div>
-								<div class="mt-1.5 grid grid-cols-3 gap-1 text-slate-600">
+								{#if s.wrongStation}
+									<div class="mb-1 rounded bg-yellow-50 px-1.5 py-1 text-[10px] font-semibold text-yellow-800">
+										Expected station: {s.wrongStation}
+									</div>
+								{/if}
+								<div class="mt-1.5 grid grid-cols-4 gap-1 text-slate-600">
 									<div class="rounded bg-slate-50 px-1.5 py-1">
 										<div class="text-[10px] text-slate-400">Battery</div>
 										<div
@@ -425,7 +538,7 @@
 												? 'text-yellow-600'
 												: ''}"
 										>
-											{s.robotLinked ? s.battery.toFixed(1) + 'V' : '—'}
+											{s.robotLinked ? s.battery.toFixed(2) + 'V' : '—'}
 										</div>
 									</div>
 									<div class="rounded bg-slate-50 px-1.5 py-1">
@@ -438,9 +551,15 @@
 											{s.missedPackets}
 										</div>
 									</div>
+									<div class="rounded bg-slate-50 px-1.5 py-1">
+										<div class="text-[10px] text-slate-400">Last Robot Link</div>
+										<div class="font-semibold {s.secondsSinceLastRobotLink > 3 ? 'text-yellow-600' : ''}">
+											{formatLastRobotLink(s.secondsSinceLastRobotLink, s.robotLinked)}
+										</div>
+									</div>
 								</div>
 								{#if s.wifi}
-									<div class="mt-1 grid grid-cols-4 gap-1 text-slate-600">
+									<div class="mt-1 grid grid-cols-5 gap-1 text-slate-600">
 										<div class="rounded bg-slate-50 px-1.5 py-1">
 											<div class="text-[10px] text-slate-400">SNR</div>
 											<div class="font-semibold">{s.wifi.snr}</div>
@@ -456,6 +575,12 @@
 										<div class="rounded bg-slate-50 px-1.5 py-1">
 											<div class="text-[10px] text-slate-400">BW Mbps</div>
 											<div class="font-semibold">{s.wifi.bandwidthMbps.toFixed(2)}</div>
+										</div>
+										<div class="rounded bg-slate-50 px-1.5 py-1">
+											<div class="text-[10px] text-slate-400">WiFi Link</div>
+											<div class="font-semibold {s.wifi.radioLinked ? 'text-emerald-700' : 'text-rose-700'}">
+												{s.wifi.radioLinked ? 'Linked' : 'Not Linked'}
+											</div>
 										</div>
 									</div>
 								{/if}
@@ -497,23 +622,12 @@
 											>{/if}
 									</div>
 								</div>
-								<div class="grid grid-cols-4 gap-1">
-									{#each [{ label: 'DS', ok: s.dsLinked }, { label: 'Radio', ok: s.radioLinked }, { label: 'RIO', ok: s.rioLinked }, { label: 'Robot', ok: s.robotLinked }] as item}
-										<div
-											class="flex flex-col items-center gap-0.5 rounded py-1 {item.ok
-												? 'bg-emerald-100'
-												: 'bg-slate-100'}"
-										>
-											<span
-												class="h-2 w-2 rounded-full {item.ok ? 'bg-emerald-500' : 'bg-slate-400'}"
-											></span>
-											<span class="font-semibold {item.ok ? 'text-emerald-800' : 'text-slate-500'}"
-												>{item.label}</span
-											>
-										</div>
-									{/each}
-								</div>
-								<div class="mt-1.5 grid grid-cols-3 gap-1 text-slate-600">
+								{#if s.wrongStation}
+									<div class="mb-1 rounded bg-yellow-50 px-1.5 py-1 text-[10px] font-semibold text-yellow-800">
+										Expected station: {s.wrongStation}
+									</div>
+								{/if}
+								<div class="mt-1.5 grid grid-cols-4 gap-1 text-slate-600">
 									<div class="rounded bg-slate-50 px-1.5 py-1">
 										<div class="text-[10px] text-slate-400">Battery</div>
 										<div
@@ -521,7 +635,7 @@
 												? 'text-yellow-600'
 												: ''}"
 										>
-											{s.robotLinked ? s.battery.toFixed(1) + 'V' : '—'}
+											{s.robotLinked ? s.battery.toFixed(2) + 'V' : '—'}
 										</div>
 									</div>
 									<div class="rounded bg-slate-50 px-1.5 py-1">
@@ -534,9 +648,15 @@
 											{s.missedPackets}
 										</div>
 									</div>
+									<div class="rounded bg-slate-50 px-1.5 py-1">
+										<div class="text-[10px] text-slate-400">Last Robot Link</div>
+										<div class="font-semibold {s.secondsSinceLastRobotLink > 3 ? 'text-yellow-600' : ''}">
+											{formatLastRobotLink(s.secondsSinceLastRobotLink, s.robotLinked)}
+										</div>
+									</div>
 								</div>
 								{#if s.wifi}
-									<div class="mt-1 grid grid-cols-4 gap-1 text-slate-600">
+									<div class="mt-1 grid grid-cols-5 gap-1 text-slate-600">
 										<div class="rounded bg-slate-50 px-1.5 py-1">
 											<div class="text-[10px] text-slate-400">SNR</div>
 											<div class="font-semibold">{s.wifi.snr}</div>
@@ -552,6 +672,12 @@
 										<div class="rounded bg-slate-50 px-1.5 py-1">
 											<div class="text-[10px] text-slate-400">BW Mbps</div>
 											<div class="font-semibold">{s.wifi.bandwidthMbps.toFixed(2)}</div>
+										</div>
+										<div class="rounded bg-slate-50 px-1.5 py-1">
+											<div class="text-[10px] text-slate-400">WiFi Link</div>
+											<div class="font-semibold {s.wifi.radioLinked ? 'text-emerald-700' : 'text-rose-700'}">
+												{s.wifi.radioLinked ? 'Linked' : 'Not Linked'}
+											</div>
 										</div>
 									</div>
 								{/if}
@@ -578,22 +704,6 @@
 							</div>
 						{/if}
 					</div>
-					<div class="mt-4 mb-2 text-xs font-bold tracking-wider text-slate-500 uppercase">
-						Access Point
-					</div>
-					{#if matchState}
-						<div class="flex items-center gap-2 text-sm">
-							<span class="text-slate-600">Status:</span>
-							<span
-								class="rounded px-2 py-0.5 text-xs font-bold {matchState.accessPoint.status ===
-								'ACTIVE'
-									? 'bg-emerald-100 text-emerald-800'
-									: matchState.accessPoint.status === 'CONFIGURING'
-										? 'bg-yellow-100 text-yellow-800'
-										: 'bg-rose-100 text-rose-800'}">{matchState.accessPoint.status}</span
-							>
-						</div>
-					{/if}
 				</div>
 			{/if}
 		</div>
@@ -603,7 +713,11 @@
 		class="fixed right-0 bottom-0 left-0 border-t border-slate-300 bg-[#eceff4] px-3 py-1 text-xs text-slate-600"
 	>
 		<div class="relative mx-auto max-w-[1700px]">
-			<span>0.4 ms</span>
+			<span
+				>{matchState
+					? `Loop ${matchState.loopTiming.currentMs.toFixed(2)} ms (30s max ${matchState.loopTiming.maxMs30s.toFixed(2)} ms)`
+					: 'Loop — ms'}</span
+			>
 			<span class="absolute left-1/2 -translate-x-1/2">POSM - Team 2718</span>
 			<a href="/audience" class="absolute right-0 text-blue-700 hover:text-blue-500"
 				>Audience Overlay</a

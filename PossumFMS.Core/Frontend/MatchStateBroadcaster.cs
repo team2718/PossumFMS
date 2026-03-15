@@ -21,7 +21,7 @@ public sealed class MatchStateBroadcaster(
     DriverStationManager dsManager,
     AccessPointManager   apManager) : BackgroundService
 {
-    private static readonly TimeSpan BroadcastInterval = TimeSpan.FromMilliseconds(500);
+    private static readonly TimeSpan BroadcastInterval = TimeSpan.FromMilliseconds(200);
 
     /// <summary>Push the current state snapshot to all connected clients immediately.</summary>
     public Task BroadcastAsync() =>
@@ -32,21 +32,27 @@ public sealed class MatchStateBroadcaster(
         while (!ct.IsCancellationRequested)
         {
             await Task.Delay(BroadcastInterval, ct);
-
-            // Only push while something interesting is happening; Idle is static.
-            if (arena.Phase != MatchPhase.Idle)
-                await BroadcastAsync();
+            await BroadcastAsync();
         }
     }
 
-    internal object Build() => new
+    internal object Build()
     {
+        var loopTiming = dsManager.GetLoopTimingSnapshot();
+
+        return new
+        {
         phase         = arena.Phase.ToString(),
         matchType     = arena.MatchType.ToString(),
         matchNumber   = arena.MatchNumber,
         timeRemaining = arena.TimeRemaining.TotalSeconds,
         arenaEstop    = arena.ArenaEstop,
         wasAborted    = arena.WasAborted,
+        loopTiming    = new
+        {
+            currentMs = loopTiming.CurrentMs,
+            maxMs30s  = loopTiming.MaxMs30s,
+        },
         accessPoint   = new { status = apManager.ApStatus },
         stations      = AllianceStations.All.Select((s, i) =>
         {
@@ -65,6 +71,7 @@ public sealed class MatchStateBroadcaster(
                 battery       = ds.BatteryVoltage,
                 tripTimeMs    = ds.DsRobotTripTimeMs,
                 missedPackets = ds.MissedPacketCount,
+                secondsSinceLastRobotLink = ds.SecondsSinceLastRobotLink,
                 estop         = ds.Estop,
                 astop         = ds.Astop,
                 bypassed      = ds.Bypassed,
@@ -81,4 +88,5 @@ public sealed class MatchStateBroadcaster(
             };
         }),
     };
+    }
 }

@@ -11,8 +11,8 @@ namespace PossumFMS.Core.Network;
 /// Manages configuration and monitoring of the VH-113 access point over its REST API.
 ///
 /// Configuration flow:
-///   1. When any station's team assignment changes, a debounced POST to /configuration
-///      is sent with the SSID (team number) and WPA key for each occupied slot.
+///   1. On explicit operator request, POST /configuration is sent with the SSID
+///      (team number) and WPA key for each occupied slot.
 ///   2. A background loop polls GET /status every second; if the AP reports ACTIVE
 ///      but its SSIDs don't match what was last configured, the configuration is retried
 ///      automatically (the same self-healing logic as cheesy-arena).
@@ -26,7 +26,6 @@ public sealed class AccessPointManager : BackgroundService
     // ── Config ─────────────────────────────────────────────────────────────────
 
     private const int PollIntervalMs    = 1000;
-    private const int DebounceMs        =   50;
     private const int HttpTimeoutSec    =    3;
     private const int DefaultChannel    =    13;
 
@@ -50,10 +49,6 @@ public sealed class AccessPointManager : BackgroundService
 
     // Last team numbers successfully sent to the AP (0 = empty slot).
     private readonly int[] _lastConfiguredTeams = new int[6];
-
-    // Debounce: cancels the previous pending configure task on each new change.
-    private CancellationTokenSource? _debounceCts;
-    private readonly object           _debounceLock = new();
 
     private readonly SemaphoreSlim _configureLock = new(1, 1);
 
@@ -84,8 +79,12 @@ public sealed class AccessPointManager : BackgroundService
         if (!string.IsNullOrEmpty(password))
             _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", password);
 
-        _dsManager.TeamAssignmentsChanged += ScheduleReconfiguration;
     }
+
+    /// <summary>
+    /// Sends the current team assignment map to the AP immediately.
+    /// </summary>
+    public Task ConfigureNowAsync(CancellationToken ct = default) => ConfigureAsync(ct);
 
     // ── BackgroundService ──────────────────────────────────────────────────────
 
@@ -113,33 +112,6 @@ public sealed class AccessPointManager : BackgroundService
                 _logger.LogWarning("AP monitoring error: {Error}", ex.Message);
             }
         }
-    }
-
-    // ── Reconfiguration trigger ────────────────────────────────────────────────
-
-    /// <summary>
-    /// Schedules a POST /configuration after a short debounce delay so that rapid
-    /// successive team-number changes (e.g. assigning all 6 stations at once) are
-    /// collapsed into a single API call.
-    /// </summary>
-    private void ScheduleReconfiguration()
-    {
-        CancellationTokenSource newCts;
-        lock (_debounceLock)
-        {
-            _debounceCts?.Cancel();
-            _debounceCts = newCts = new CancellationTokenSource();
-        }
-
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                await Task.Delay(DebounceMs, newCts.Token);
-                await ConfigureAsync(newCts.Token);
-            }
-            catch (OperationCanceledException) { }
-        });
     }
 
     // ── POST /configuration ────────────────────────────────────────────────────
@@ -309,9 +281,7 @@ public sealed class AccessPointManager : BackgroundService
 
     public override void Dispose()
     {
-        _dsManager.TeamAssignmentsChanged -= ScheduleReconfiguration;
         _http.Dispose();
-        _debounceCts?.Dispose();
         _configureLock.Dispose();
         base.Dispose();
     }

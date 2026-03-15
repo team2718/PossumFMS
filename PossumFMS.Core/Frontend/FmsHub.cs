@@ -15,13 +15,14 @@ namespace PossumFMS.Core.Frontend;
 public sealed class FmsHub(
     Arena.Arena arena,
     DriverStationManager dsManager,
+    AccessPointManager apManager,
     MatchStateBroadcaster broadcaster,
     ILogger<FmsHub> logger) : Hub
 {
     // ── Team assignment ────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Assigns a team to a station. Triggers automatic VH-113 reconfiguration.
+    /// Assigns a team to a station.
     /// Pass teamNumber = 0 to clear the slot.
     /// </summary>
     public async Task AssignTeam(int stationIndex, int teamNumber, string wpaKey = "")
@@ -29,6 +30,13 @@ public sealed class FmsHub(
         var station = AllianceStations.All[stationIndex];
         logger.LogInformation("Assigning team {Team} to {Station}.", teamNumber, station);
         dsManager.AssignTeam(station, teamNumber, wpaKey);
+        await BroadcastMatchState();
+    }
+
+    public async Task ConfigureAccessPoint()
+    {
+        logger.LogInformation("Manual AP configure requested by {Client}.", Context.ConnectionId);
+        await apManager.ConfigureNowAsync();
         await BroadcastMatchState();
     }
 

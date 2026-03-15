@@ -39,6 +39,12 @@ public sealed class DriverStationManager : BackgroundService
 
     private readonly Arena.Arena _arena;
     private readonly ILogger<DriverStationManager> _logger;
+    private static readonly TimeSpan LoopTimingWindow = TimeSpan.FromSeconds(30);
+
+    private readonly object _loopTimingLock = new();
+    private readonly Queue<(long Timestamp, double DurationMs)> _loopTimingSamples = new();
+    private double _currentLoopMs;
+    private double _maxLoopMs30s;
 
     private Socket?            _udpSocket;
     private CancellationToken  _ct;
@@ -59,6 +65,12 @@ public sealed class DriverStationManager : BackgroundService
 
     public DriverStationConnection this[AllianceStation station] => Stations[station];
 
+    public (double CurrentMs, double MaxMs30s) GetLoopTimingSnapshot()
+    {
+        lock (_loopTimingLock)
+            return (_currentLoopMs, _maxLoopMs30s);
+    }
+
     /// <summary>Raised whenever any station's team assignment changes.</summary>
     public event Action? TeamAssignmentsChanged;
 
@@ -70,7 +82,7 @@ public sealed class DriverStationManager : BackgroundService
     {
         var ds = Stations[station];
         ds.TeamNumber = teamNumber;
-        ds.WpaKey     = "" + teamNumber + "" + teamNumber;
+        ds.WpaKey     = "possum2718";
         TeamAssignmentsChanged?.Invoke();
     }
 
@@ -102,6 +114,7 @@ public sealed class DriverStationManager : BackgroundService
     {
         _ct = ct;
         _arena.GameDataChanged += OnGameDataChanged;
+        _arena.PhaseChanged += OnArenaPhaseChanged;
 
         // UDP control loop: dedicated high-priority thread.
         // We wrap it so StopAsync can await full cleanup (socket dispose) on shutdown.
@@ -128,6 +141,14 @@ public sealed class DriverStationManager : BackgroundService
         _tcpListenerTask = Task.Run(() => RunTcpListenerAsync(ct), ct);
 
         return Task.CompletedTask;
+    }
+
+    private void OnArenaPhaseChanged(MatchPhase phase)
+    {
+        if (phase != MatchPhase.Teleop) return;
+
+        foreach (var ds in Stations.Values)
+            ds.Astop = false;
     }
 
     /// <summary>
@@ -170,6 +191,8 @@ public sealed class DriverStationManager : BackgroundService
 
         while (!ct.IsCancellationRequested)
         {
+            var loopStart = Stopwatch.GetTimestamp();
+
             DrainUdpReceiveBuffer();
             CheckUdpLinkTimeouts();
             SendControlPackets();
@@ -177,6 +200,10 @@ public sealed class DriverStationManager : BackgroundService
 
             SpinUntil(sw, next);
             next += LoopPeriod;
+
+            var loopEnd = Stopwatch.GetTimestamp();
+            var loopMs = (loopEnd - loopStart) * 1000.0 / Stopwatch.Frequency;
+            RecordLoopTiming(loopEnd, loopMs);
         }
 
         _udpSocket.Dispose();
@@ -611,5 +638,26 @@ public sealed class DriverStationManager : BackgroundService
 
         while (sw.Elapsed < target)
             Thread.SpinWait(10);
+    }
+
+    private void RecordLoopTiming(long nowTimestamp, double durationMs)
+    {
+        var minTimestamp = nowTimestamp - (long)(LoopTimingWindow.TotalSeconds * Stopwatch.Frequency);
+
+        lock (_loopTimingLock)
+        {
+            _currentLoopMs = durationMs;
+            _loopTimingSamples.Enqueue((nowTimestamp, durationMs));
+
+            while (_loopTimingSamples.Count > 0 && _loopTimingSamples.Peek().Timestamp < minTimestamp)
+                _loopTimingSamples.Dequeue();
+
+            var maxLoopMs = 0.0;
+            foreach (var sample in _loopTimingSamples)
+                if (sample.DurationMs > maxLoopMs)
+                    maxLoopMs = sample.DurationMs;
+
+            _maxLoopMs30s = maxLoopMs;
+        }
     }
 }

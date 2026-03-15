@@ -26,7 +26,7 @@ public sealed class Arena
 
     public MatchType MatchType   { get; set; } = MatchType.None;
     public int       MatchNumber { get; set; } = 1;
-    public int       MatchRepeat { get; set; } = 1;
+    public int       MatchRepeat { get; set; } = 0;
 
     /// <summary>Time remaining in the current phase. Zero when Idle or Over.</summary>
     public TimeSpan TimeRemaining =>

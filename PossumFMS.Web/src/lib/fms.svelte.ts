@@ -23,6 +23,7 @@ export interface Station {
 	battery: number;
 	tripTimeMs: number;
 	missedPackets: number;
+	secondsSinceLastRobotLink: number;
 	estop: boolean;
 	astop: boolean;
 	bypassed: boolean;
@@ -37,6 +38,7 @@ export interface MatchState {
 	timeRemaining: number; // seconds
 	arenaEstop: boolean;
 	wasAborted: boolean;
+	loopTiming: { currentMs: number; maxMs30s: number };
 	accessPoint: { status: string }; // "ACTIVE" | "CONFIGURING" | "ERROR"
 	stations: Station[]; // always 6: Red1, Red2, Red3, Blue1, Blue2, Blue3
 }
@@ -87,9 +89,14 @@ class FmsConnection {
 
 	// --- Hub method wrappers (mirror FmsHub.cs on the backend) ---
 
+	private invoke(methodName: string, ...args: unknown[]): Promise<void> {
+		if (!this.hub) return Promise.reject(new Error('FMS is not connected yet.'));
+		return this.hub.invoke(methodName, ...args);
+	}
+
 	/** Assign a team number (and optional WPA key) to a station (0=Red1 … 5=Blue3) */
 	assignTeam(stationIndex: number, teamNumber: number, wpaKey = '') {
-		this.hub?.invoke('AssignTeam', stationIndex, teamNumber, wpaKey);
+		return this.invoke('AssignTeam', stationIndex, teamNumber, wpaKey);
 	}
 	/** Move arena to PreMatch phase so teams can connect */
 	startPreMatch() {
@@ -126,6 +133,10 @@ class FmsConnection {
 	/** Set or clear the bypass flag on a station */
 	bypassStation(stationIndex: number, bypassed: boolean) {
 		this.hub?.invoke('BypassStation', stationIndex, bypassed);
+	}
+	/** Manually push current team assignments to the access point */
+	configureAccessPoint() {
+		return this.invoke('ConfigureAccessPoint');
 	}
 }
 
