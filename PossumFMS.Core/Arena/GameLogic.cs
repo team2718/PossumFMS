@@ -9,8 +9,6 @@ public sealed class GameLogic
 
     public AllianceScore RedScore  { get; } = new();
     public AllianceScore BlueScore { get; } = new();
-
-    /// <summary>Raised whenever score changes.</summary>
     public event Action? ScoreChanged;
 
     public GameLogic(Arena arena)

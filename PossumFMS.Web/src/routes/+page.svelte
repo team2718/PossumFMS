@@ -72,9 +72,12 @@
 		isConfiguring = true;
 
 		try {
-			for (let idx = 0; idx < teamsToAssign.length; idx++) {
-				await fms.assignTeam(idx, teamsToAssign[idx], inputs[idx].wpa);
-			}
+			await fms.assignTeams(
+				teamsToAssign.map((teamNumber, idx) => ({
+					teamNumber,
+					wpaKey: inputs[idx].wpa
+				}))
+			);
 
 			await fms.configureAccessPoint();
 			configureSuccess = 'Teams assigned and AP configuration requested.';
@@ -97,8 +100,14 @@
 			for (let idx = 0; idx < inputs.length; idx++) {
 				inputs[idx].team = '';
 				inputs[idx].wpa = '';
-				await fms.assignTeam(idx, 0);
 			}
+
+			await fms.assignTeams(
+				Array.from({ length: inputs.length }, () => ({
+					teamNumber: 0,
+					wpaKey: ''
+				}))
+			);
 
 			configureSuccess = 'All teams were cleared.';
 		} catch (error) {
@@ -718,7 +727,7 @@
 					? `Loop ${matchState.loopTiming.currentMs.toFixed(2)} ms (30s max ${matchState.loopTiming.maxMs30s.toFixed(2)} ms)`
 					: 'Loop — ms'}</span
 			>
-			<span class="absolute left-1/2 -translate-x-1/2">POSM - Team 2718</span>
+			<span class="absolute left-1/2 -translate-x-1/2">PossumFMS</span>
 			<a href="/audience" class="absolute right-0 text-blue-700 hover:text-blue-500"
 				>Audience Overlay</a
 			>

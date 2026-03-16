@@ -15,20 +15,8 @@
 	}
 
 	const matchState = $derived(fms.matchState);
-
-	// -------------------------------------------------------------------------
-	// TODO: Score tracking
-	//
-	// Right now the FMS backend doesn't send score data in MatchState.
-	// When it does, you'll add score fields here like:
-	//
-	//   const redScore = $derived(matchState?.redScore ?? 0);
-	//   const blueScore = $derived(matchState?.blueScore ?? 0);
-	//
-	// For now they're just hardcoded to 0 as placeholders.
-	// -------------------------------------------------------------------------
-	let redScore = $state(0);
-	let blueScore = $state(0);
+	const redScore = $derived(matchState?.redScore ?? 0);
+	const blueScore = $derived(matchState?.blueScore ?? 0);
 
 	const redStations = $derived(matchState?.stations.slice(0, 3) ?? []);
 	const blueStations = $derived(matchState?.stations.slice(3, 6) ?? []);

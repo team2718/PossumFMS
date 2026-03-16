@@ -18,6 +18,7 @@ namespace PossumFMS.Core.Frontend;
 public sealed class MatchStateBroadcaster(
     IHubContext<FmsHub> hubContext,
     Arena.Arena         arena,
+    GameLogic            gameLogic,
     DriverStationManager dsManager,
     AccessPointManager   apManager) : BackgroundService
 {
@@ -48,6 +49,8 @@ public sealed class MatchStateBroadcaster(
         timeRemaining = arena.TimeRemaining.TotalSeconds,
         arenaEstop    = arena.ArenaEstop,
         wasAborted    = arena.WasAborted,
+        redScore      = gameLogic.RedScore.Total,
+        blueScore     = gameLogic.BlueScore.Total,
         loopTiming    = new
         {
             currentMs = loopTiming.CurrentMs,

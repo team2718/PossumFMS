@@ -28,8 +28,71 @@ public sealed class FmsHub(
     public async Task AssignTeam(int stationIndex, int teamNumber, string wpaKey = "")
     {
         var station = AllianceStations.All[stationIndex];
+
+        if (teamNumber < 0)
+            throw new HubException("Team number cannot be negative.");
+
+        if (teamNumber != 0)
+        {
+            var duplicateStation = AllianceStations.All
+                .Where(s => s != station)
+                .FirstOrDefault(s => dsManager[s].TeamNumber == teamNumber);
+
+            if (duplicateStation is not null)
+                throw new HubException(
+                    $"Team {teamNumber} is already assigned to {duplicateStation}. " +
+                    "Use AssignTeams to move teams between stations in one operation.");
+        }
+
         logger.LogInformation("Assigning team {Team} to {Station}.", teamNumber, station);
         dsManager.AssignTeam(station, teamNumber, wpaKey);
+        await BroadcastMatchState();
+    }
+
+    /// <summary>
+    /// Atomically assigns all six stations in order (Red1, Red2, Red3, Blue1, Blue2, Blue3).
+    /// Use teamNumber = 0 to clear a slot.
+    /// </summary>
+    public async Task AssignTeams(IReadOnlyList<TeamAssignmentRequest> assignments)
+    {
+        if (assignments is null)
+            throw new HubException("Assignments payload is required.");
+
+        if (assignments.Count != AllianceStations.All.Count)
+            throw new HubException($"Expected {AllianceStations.All.Count} assignments, received {assignments.Count}.");
+
+        var duplicateTeams = assignments
+            .Select((assignment, index) => new { assignment, index })
+            .Where(x => x.assignment.TeamNumber > 0)
+            .GroupBy(x => x.assignment.TeamNumber)
+            .Where(g => g.Count() > 1)
+            .Select(g => new
+            {
+                Team = g.Key,
+                Stations = string.Join(", ", g.Select(x => AllianceStations.All[x.index].ToString()).OrderBy(s => s))
+            })
+            .ToList();
+
+        if (duplicateTeams.Count > 0)
+        {
+            var details = string.Join("; ", duplicateTeams.Select(x => $"Team {x.Team}: {x.Stations}"));
+            throw new HubException($"Duplicate team assignments are not allowed. {details}");
+        }
+
+        for (int i = 0; i < AllianceStations.All.Count; i++)
+        {
+            if (assignments[i].TeamNumber < 0)
+                throw new HubException($"Team number for {AllianceStations.All[i]} cannot be negative.");
+        }
+
+        logger.LogInformation("Assigning all stations at once requested by {Client}.", Context.ConnectionId);
+
+        for (int i = 0; i < AllianceStations.All.Count; i++)
+            dsManager.AssignTeam(AllianceStations.All[i], 0, string.Empty);
+
+        for (int i = 0; i < AllianceStations.All.Count; i++)
+            dsManager.AssignTeam(AllianceStations.All[i], assignments[i].TeamNumber, assignments[i].WpaKey ?? string.Empty);
+
         await BroadcastMatchState();
     }
 
@@ -122,4 +185,6 @@ public sealed class FmsHub(
     public Task RequestMatchState() => BroadcastMatchState();
 
     private Task BroadcastMatchState() => broadcaster.BroadcastAsync();
+
+    public sealed record TeamAssignmentRequest(int TeamNumber, string WpaKey = "");
 }

@@ -6,36 +6,43 @@ using PossumFMS.Core.FieldHardware;
 using PossumFMS.Core.Frontend;
 using PossumFMS.Core.Network;
 
+// Check that this is the only instance of PossumFMS.Core running
+const string SingleInstanceMutexName = "PossumFMS.Core.Singleton";
+using var singleInstanceMutex = new Mutex(initiallyOwned: true, name: SingleInstanceMutexName, createdNew: out bool isPrimaryInstance);
+if (!isPrimaryInstance)
+{
+    Console.Error.WriteLine("Another instance of PossumFMS.Core is already running. Exiting.");
+    return;
+}
+
 var builder = WebApplication.CreateBuilder(args);
 
-// ── Services ───────────────────────────────────────────────────────────────────
-
-// Central field state machine — injected into DS manager, hub, etc.
+// Central field state machine
 builder.Services.AddSingleton<Arena>();
 
-// Game logic — owns per-match scoring state and wires phase-transition rules.
+// Game logic
 builder.Services.AddSingleton<GameLogic>();
 
-// DS loop — high-freq BackgroundService + injectable singleton for hub commands.
+// DS loop
 builder.Services.AddSingleton<DriverStationManager>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<DriverStationManager>());
 
-// VH-113 access point — configures team SSIDs/WPA keys, polls link status.
+// VH-113 access point configuration manager
 builder.Services.AddSingleton<AccessPointManager>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<AccessPointManager>());
 
-// Field hardware — reconnecting TCP manager for ESP32 devices.
+// Field hardware
 builder.Services.AddSingleton<FieldHardwareManager>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<FieldHardwareManager>());
 
-// SignalR for the frontend website.
+// Frontend SignalR hub
 builder.Services.AddSignalR();
 
-// Periodic match-state broadcaster — keeps the timer live in the browser.
+// Match-state broadcaster
 builder.Services.AddSingleton<MatchStateBroadcaster>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<MatchStateBroadcaster>());
 
-// Allow any origin in development; restrict in production via config.
+// Allow any origin since this will be only ever be on private local networks
 builder.Services.AddCors(options =>
     options.AddDefaultPolicy(policy =>
         policy.SetIsOriginAllowed(_ => true)
@@ -43,15 +50,10 @@ builder.Services.AddCors(options =>
               .AllowAnyMethod()
               .AllowCredentials()));
 
-// ── Application ────────────────────────────────────────────────────────────────
-
 var app = builder.Build();
-
-// Force eager construction so Arena.PhaseChanged is subscribed before any match starts.
 app.Services.GetRequiredService<GameLogic>();
 
-// ── Startup checks ─────────────────────────────────────────────────────────────
-
+// Check that the host has the required FMS IP address
 const string RequiredIp = "10.0.100.5";
 var logger = app.Services.GetRequiredService<ILogger<Program>>();
 

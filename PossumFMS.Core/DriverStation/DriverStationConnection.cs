@@ -15,8 +15,6 @@ public sealed class DriverStationConnection
     // ── Team assignment ────────────────────────────────────────────────────────
 
     public int    TeamNumber    { get; internal set; }
-
-    /// <summary>WPA key used by this team's robot radio. Required for AP configuration.</summary>
     public string WpaKey        { get; internal set; } = string.Empty;
 
     /// <summary>

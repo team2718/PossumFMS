@@ -80,9 +80,12 @@ public sealed class DriverStationManager : BackgroundService
     /// </summary>
     public void AssignTeam(AllianceStation station, int teamNumber, string wpaKey = "")
     {
+        if (teamNumber < 0)
+            throw new ArgumentOutOfRangeException(nameof(teamNumber), "Team number cannot be negative.");
+
         var ds = Stations[station];
         ds.TeamNumber = teamNumber;
-        ds.WpaKey     = "possum2718";
+        ds.WpaKey     = teamNumber == 0 ? string.Empty : wpaKey;
         TeamAssignmentsChanged?.Invoke();
     }
 

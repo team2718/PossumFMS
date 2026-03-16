@@ -38,9 +38,16 @@ export interface MatchState {
 	timeRemaining: number; // seconds
 	arenaEstop: boolean;
 	wasAborted: boolean;
+	redScore: number;
+	blueScore: number;
 	loopTiming: { currentMs: number; maxMs30s: number };
 	accessPoint: { status: string }; // "ACTIVE" | "CONFIGURING" | "ERROR"
 	stations: Station[]; // always 6: Red1, Red2, Red3, Blue1, Blue2, Blue3
+}
+
+export interface TeamAssignment {
+	teamNumber: number;
+	wpaKey?: string;
 }
 
 // Using a class is the recommended Svelte 5 pattern for shared reactive state.
@@ -97,6 +104,10 @@ class FmsConnection {
 	/** Assign a team number (and optional WPA key) to a station (0=Red1 … 5=Blue3) */
 	assignTeam(stationIndex: number, teamNumber: number, wpaKey = '') {
 		return this.invoke('AssignTeam', stationIndex, teamNumber, wpaKey);
+	}
+	/** Assign all 6 stations at once in Red1, Red2, Red3, Blue1, Blue2, Blue3 order */
+	assignTeams(assignments: TeamAssignment[]) {
+		return this.invoke('AssignTeams', assignments);
 	}
 	/** Move arena to PreMatch phase so teams can connect */
 	startPreMatch() {

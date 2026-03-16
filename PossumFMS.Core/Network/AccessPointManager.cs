@@ -64,7 +64,7 @@ public sealed class AccessPointManager : BackgroundService
         var password = config["AccessPoint:Password"] ?? "";
 
         var configuredChannel = config.GetValue("AccessPoint:Channel", DefaultChannel);
-        if (configuredChannel is < 1 or > 11)
+        if (configuredChannel is < 1 or > 200)
         {
             _logger.LogWarning(
                 "AccessPoint:Channel={ConfiguredChannel} is invalid for VH-113 (TypeVividHosting). " +
@@ -121,6 +121,27 @@ public sealed class AccessPointManager : BackgroundService
         await _configureLock.WaitAsync(ct);
         try
         {
+            var duplicateAssignments = _dsManager.Stations
+                .Where(kvp => kvp.Value.TeamNumber != 0)
+                .GroupBy(kvp => kvp.Value.TeamNumber)
+                .Where(g => g.Count() > 1)
+                .Select(g => new
+                {
+                    TeamNumber = g.Key,
+                    Stations = string.Join(", ", g.Select(x => x.Key.ToString()).OrderBy(s => s))
+                })
+                .ToList();
+
+            if (duplicateAssignments.Count > 0)
+            {
+                var details = string.Join("; ", duplicateAssignments.Select(x => $"Team {x.TeamNumber}: {x.Stations}"));
+                ApStatus = "ERROR";
+                _logger.LogError(
+                    "AP configuration blocked due to duplicate team assignments. {Details}",
+                    details);
+                return;
+            }
+
             var stationConfigs = new Dictionary<string, StationConfigRequest>();
             for (int i = 0; i < 6; i++)
             {

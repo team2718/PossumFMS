@@ -109,7 +109,7 @@ public sealed class Arena
     }
 
     /// <summary>
-    /// Called by one of the workers on each tick to advance phase transitions
+    /// Called by the DriverStationManager on each tick to advance phase transitions
     /// (e.g. Auto → Teleop → Over) based on elapsed time.
     /// </summary>
     public void Tick()
@@ -133,7 +133,6 @@ public sealed class Arena
     public void TriggerArenaEstop()
     {
         ArenaEstop = true;
-        // Individual DS e-stops are handled on the DriverStationConnection.
     }
 
     /// <summary>Clears the arena e-stop. Only valid when match is not running.</summary>
