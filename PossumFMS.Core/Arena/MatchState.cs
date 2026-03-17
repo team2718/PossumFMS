@@ -56,6 +56,20 @@ public sealed class AllianceScore
     }
 }
 
+/// <summary>
+/// Sub-periods within Teleop for REBUILT 2026. Based on Table 6-3.
+/// </summary>
+public enum TeleopPeriod
+{
+    NotStarted,
+    TransitionShift,
+    Shift1,
+    Shift2,
+    Shift3,
+    Shift4,
+    EndGame,
+}
+
 public static class AllianceStations
 {
     public static readonly AllianceStation Red1 = new(AllianceColor.Red, StationPosition.One);

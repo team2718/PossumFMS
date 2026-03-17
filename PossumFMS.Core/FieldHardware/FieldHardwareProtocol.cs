@@ -40,7 +40,7 @@ public sealed class FieldHardwareProtocol
         return parseResult.TriggerArenaEstop;
     }
 
-    public BsonDocument BuildReply(FieldDevice device, Arena.Arena arena, string? parseError)
+    public BsonDocument BuildReply(FieldDevice device, Arena.Arena arena, GameLogic gameLogic, string? parseError)
     {
         if (parseError is not null)
         {
@@ -60,7 +60,7 @@ public sealed class FieldHardwareProtocol
             };
         }
 
-        return handler.BuildReply(device, arena);
+        return handler.BuildReply(device, arena, gameLogic);
     }
 }
 
@@ -68,7 +68,7 @@ internal interface IFieldDeviceProtocolHandler
 {
     FieldDeviceType DeviceType { get; }
     DeviceHeartbeatParseResult Parse(BsonDocument heartbeat);
-    BsonDocument BuildReply(FieldDevice device, Arena.Arena arena);
+    BsonDocument BuildReply(FieldDevice device, Arena.Arena arena, GameLogic gameLogic);
 }
 
 internal readonly record struct DeviceHeartbeatParseResult(FieldDeviceHeartbeat Heartbeat, bool TriggerArenaEstop = false);
@@ -80,52 +80,75 @@ internal sealed class HubDeviceProtocolHandler : IFieldDeviceProtocolHandler
     public DeviceHeartbeatParseResult Parse(BsonDocument heartbeat)
     {
         var alliance = BsonField.GetString(heartbeat, "alliance")?.ToLowerInvariant();
-        var fuelScored = BsonField.GetInt32(heartbeat, "fuel_count")
-            ?? 0;
+        var fuelDelta = BsonField.GetInt32(heartbeat, "fuel_delta") ?? 0;
 
         if (alliance is not ("red" or "blue"))
             throw new InvalidOperationException("Hub heartbeat must include alliance as 'red' or 'blue'.");
 
-        return new DeviceHeartbeatParseResult(new HubHeartbeat(alliance, fuelScored, DateTime.UtcNow));
+        return new DeviceHeartbeatParseResult(new HubHeartbeat(alliance, fuelDelta, DateTime.UtcNow));
     }
 
-    public BsonDocument BuildReply(FieldDevice device, Arena.Arena arena)
+    public BsonDocument BuildReply(FieldDevice device, Arena.Arena arena, GameLogic gameLogic)
     {
-        var clearFuelScoredCounter = arena.Phase is MatchPhase.Idle or MatchPhase.PreMatch;
         var hubHeartbeat = device.LastHeartbeat as HubHeartbeat;
-        var (r, g, b) = GetHubLedColor(hubHeartbeat?.Alliance, arena);
+        var alliance = ParseAlliance(hubHeartbeat?.Alliance);
+        var (r, g, b) = GetHubLedColor(alliance, arena, gameLogic);
+        var flashingStatus = GetFlashingStatus(alliance, arena, gameLogic);
 
         return new BsonDocument
         {
-            { "clear_fuel_scored_counter", clearFuelScoredCounter },
-            {
-                "led_color", new BsonDocument
-                {
-                    { "r", r },
-                    { "g", g },
-                    { "b", b }
-                }
-            }
+            { "flashing_status", flashingStatus },
+            { "led_r", r},
+            { "led_g", g},
+            { "led_b", b}
         };
     }
 
-    private static (int r, int g, int b) GetHubLedColor(string? alliance, Arena.Arena arena)
+    private static (int r, int g, int b) GetHubLedColor(AllianceColor? alliance, Arena.Arena arena, GameLogic gameLogic)
     {
-        if (arena.ArenaEstop)
-            return (255, 0, 0);
+        if (arena.Phase == MatchPhase.Idle)
+            return (0, 255, 0); // Green
 
-        return arena.Phase switch
+        if (arena.Phase == MatchPhase.PostMatch)
+            return (128, 0, 128); // Purple
+
+        if (arena.IsMatchRunning && alliance is not null && gameLogic.IsHubStrictlyActive(alliance.Value))
         {
-            MatchPhase.Idle => (0, 0, 0),
-            MatchPhase.PreMatch => (255, 160, 0),
-            MatchPhase.Auto => (255, 255, 255),
-            MatchPhase.AutoToTeleopTransition => (255, 255, 0),
-            MatchPhase.Teleop => string.Equals(alliance, "red", StringComparison.OrdinalIgnoreCase)
+            return alliance == AllianceColor.Red
                 ? (255, 0, 0)
-                : (0, 0, 255),
-            MatchPhase.PostMatch => (128, 0, 128),
-            _ => (0, 0, 0)
-        };
+                : (0, 0, 255);
+        }
+
+        return (0, 0, 0); // Off
+    }
+
+    private static string GetFlashingStatus(AllianceColor? alliance, Arena.Arena arena, GameLogic gameLogic)
+    {
+        if (alliance is null)
+            return "off";
+
+        if (arena.Phase == MatchPhase.Teleop
+            && gameLogic.CurrentTeleopPeriod == TeleopPeriod.TransitionShift
+            && gameLogic.ShiftAutoWinnerAlliance == alliance)
+        {
+            return "flash_white";
+        }
+
+        if (gameLogic.IsHubAboutToBecomeInactive(alliance.Value, TimeSpan.FromSeconds(3)))
+            return "flash_off";
+
+        return "off";
+    }
+
+    private static AllianceColor? ParseAlliance(string? alliance)
+    {
+        if (string.Equals(alliance, "red", StringComparison.OrdinalIgnoreCase))
+            return AllianceColor.Red;
+
+        if (string.Equals(alliance, "blue", StringComparison.OrdinalIgnoreCase))
+            return AllianceColor.Blue;
+
+        return null;
     }
 }
 
@@ -144,10 +167,11 @@ internal sealed class EstopDeviceProtocolHandler : IFieldDeviceProtocolHandler
         return new DeviceHeartbeatParseResult(new EstopHeartbeat(astop, estop, DateTime.UtcNow), estop);
     }
 
-    public BsonDocument BuildReply(FieldDevice device, Arena.Arena arena)
+    public BsonDocument BuildReply(FieldDevice device, Arena.Arena arena, GameLogic gameLogic)
     {
         _ = device;
         _ = arena;
+        _ = gameLogic;
         return new BsonDocument();
     }
 }

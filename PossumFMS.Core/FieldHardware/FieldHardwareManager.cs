@@ -22,6 +22,7 @@ public sealed class FieldHardwareManager : BackgroundService
     private readonly ConcurrentDictionary<int, FieldDevice> _devices = new();
     private readonly ILogger<FieldHardwareManager> _logger;
     private readonly Arena.Arena _arena;
+    private readonly GameLogic _gameLogic;
     private readonly FieldHardwareProtocol _protocol = new();
     private readonly int _listenPort;
     private readonly IPAddress _listenAddress;
@@ -32,10 +33,11 @@ public sealed class FieldHardwareManager : BackgroundService
 
     public IReadOnlyList<FieldDevice> Devices => _devices.Values.ToList();
 
-    public FieldHardwareManager(IConfiguration config, Arena.Arena arena, ILogger<FieldHardwareManager> logger)
+    public FieldHardwareManager(IConfiguration config, Arena.Arena arena, GameLogic gameLogic, ILogger<FieldHardwareManager> logger)
     {
         _logger = logger;
         _arena = arena;
+        _gameLogic = gameLogic;
 
         var section = config.GetSection("FieldHardware");
         _listenPort = section.GetValue<int?>("ListenPort") ?? DefaultListenPort;
@@ -120,8 +122,20 @@ public sealed class FieldHardwareManager : BackgroundService
                     _logger.LogWarning("Invalid field hardware packet from {RemoteEndpoint}: {Error}", endpoint, ex.Message);
                 }
 
+                // Credit newly-scored fuel to GameLogic. IsHubActive gates inactive-period scoring.
+                if (parseError is null && device.LastHeartbeat is HubHeartbeat hub)
+                {
+                    if (hub.FuelDelta > 0)
+                    {
+                        var alliance = string.Equals(hub.Alliance, "red", StringComparison.OrdinalIgnoreCase)
+                            ? AllianceColor.Red
+                            : AllianceColor.Blue;
+                        _gameLogic.ScoreFuel(alliance, hub.FuelDelta);
+                    }
+                }
+
                 device.LastSeen = DateTime.UtcNow;
-                var response = _protocol.BuildReply(device, _arena, parseError);
+                var response = _protocol.BuildReply(device, _arena, _gameLogic, parseError);
                 await stream.WriteAsync(response.ToBson(), serviceCt);
             }
         }
