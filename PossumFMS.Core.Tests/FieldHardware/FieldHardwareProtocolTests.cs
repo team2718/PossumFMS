@@ -361,7 +361,7 @@ public sealed class FieldHardwareProtocolTests : IDisposable
     // ── BuildReply — Estop device ──────────────────────────────────────────────
 
     [Fact]
-    public void BuildReply_EstopDevice_ReturnsEmptyDocument()
+    public void BuildReply_EstopDevice_ReturnsAcceptedTrue()
     {
         var arena = new PossumFMS.Core.Arena.Arena();
         var logic = new GameLogic(arena);
@@ -377,8 +377,7 @@ public sealed class FieldHardwareProtocolTests : IDisposable
 
         var reply = _protocol.BuildReply(_device, arena, logic, null);
 
-        // EstopDeviceProtocolHandler.BuildReply returns an empty BsonDocument
-        Assert.Empty(reply);
+        Assert.True(reply["accepted"].AsBoolean);
     }
 
     // ── BuildReply — unknown device type ──────────────────────────────────────

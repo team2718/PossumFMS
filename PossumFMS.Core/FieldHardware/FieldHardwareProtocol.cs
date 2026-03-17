@@ -95,6 +95,7 @@ internal sealed class HubDeviceProtocolHandler : IFieldDeviceProtocolHandler
 
         return new BsonDocument
         {
+            { "accepted", true },
             { "flashing_status", flashingStatus },
             { "led_r", r},
             { "led_g", g},
@@ -170,7 +171,7 @@ internal sealed class EstopDeviceProtocolHandler : IFieldDeviceProtocolHandler
         _ = device;
         _ = arena;
         _ = gameLogic;
-        return new BsonDocument();
+        return new BsonDocument { { "accepted", true } };
     }
 }
 
