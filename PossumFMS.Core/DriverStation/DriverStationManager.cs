@@ -286,7 +286,7 @@ public sealed class DriverStationManager : BackgroundService
         }
     }
 
-    private void ParseStatusPacket(ReadOnlySpan<byte> packet)
+    internal void ParseStatusPacket(ReadOnlySpan<byte> packet)
     {
         // DS → FMS UDP status packet layout:
         //   [0-1]  Sequence number (not used by FMS)

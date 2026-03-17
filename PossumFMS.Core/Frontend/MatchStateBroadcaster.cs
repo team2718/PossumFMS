@@ -137,7 +137,7 @@ public sealed class MatchStateBroadcaster(
     };
     }
 
-    private static object BuildRankingPointBreakdown(int fuelCombined, int towerCombined, bool winsMatch, bool tiedMatch)
+    internal static object BuildRankingPointBreakdown(int fuelCombined, int towerCombined, bool winsMatch, bool tiedMatch)
     {
         var energized = fuelCombined >= 100;
         var supercharged = fuelCombined >= 360;
