@@ -367,7 +367,7 @@ public sealed class DriverStationManager : BackgroundService
         }
     }
 
-    private void EncodeControlPacket(byte[] buf, DriverStationConnection ds)
+    internal void EncodeControlPacket(byte[] buf, DriverStationConnection ds)
     {
         // FMS → DS UDP control packet (22 bytes), per cheesy-arena protocol:
         //   [0-1]  Sequence number (big-endian, incremented each packet)

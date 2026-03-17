@@ -87,7 +87,25 @@ pnpm dev
 
 Open the Vite URL shown in Terminal B (typically `http://localhost:5173`).
 
-## 5. Optional validation commands
+## 5. Running unit tests
+
+Unit tests live in `PossumFMS.Core.Tests` (xUnit, targeting `net10.0`).
+
+```powershell
+# Run all tests (from repo root or PossumFMS.Core.Tests/)
+dotnet test PossumFMS.Core.Tests/PossumFMS.Core.Tests.csproj
+
+# Run with detailed output
+dotnet test PossumFMS.Core.Tests/PossumFMS.Core.Tests.csproj --logger "console;verbosity=normal"
+
+# Run a specific test class
+dotnet test PossumFMS.Core.Tests/PossumFMS.Core.Tests.csproj --filter "FullyQualifiedName~ArenaTests"
+
+# Run with code coverage (requires coverlet — installed automatically via xunit template)
+dotnet test PossumFMS.Core.Tests/PossumFMS.Core.Tests.csproj --collect:"XPlat Code Coverage"
+```
+
+## 6. Optional validation commands
 
 ```powershell
 # Backend build
