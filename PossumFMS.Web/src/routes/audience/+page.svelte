@@ -21,13 +21,9 @@
 	const redStations = $derived(matchState?.stations.slice(0, 3) ?? []);
 	const blueStations = $derived(matchState?.stations.slice(3, 6) ?? []);
 
-	const redTeams = $derived(
-		redStations.map((s) => s.teamNumber)
-	);
-	
-	const blueTeams = $derived(
-		blueStations.map((s) => s.teamNumber)
-	);
+	const redTeams = $derived(redStations.map((s) => s.teamNumber));
+
+	const blueTeams = $derived(blueStations.map((s) => s.teamNumber));
 
 	const teleopPeriodIndicator = $derived(
 		(() => {
@@ -74,7 +70,7 @@
 		'/sounds/auto-end.wav',
 		'/sounds/teleop-start.wav',
 		'/sounds/match-end.wav',
-		'/sounds/match-abort.wav',
+		'/sounds/match-abort.wav'
 	] as const;
 
 	type SoundFile = (typeof soundFiles)[number];
@@ -166,20 +162,14 @@
 
 {#snippet hubIndicator(side: 'left' | 'right', active: boolean)}
 	<div
-		class="absolute inset-y-0 {side === 'left' ? 'right-full pr-3' : 'left-full pl-3'} flex items-center {active ? '' : 'invisible'}"
+		class="absolute inset-y-0 {side === 'left'
+			? 'right-full pr-3'
+			: 'left-full pl-3'} flex items-center {active ? '' : 'invisible'}"
 	>
-		<div class="flex items-center">
-			{#if side === 'left'}
-				<div
-					style="width:0;height:0;border-top:28px solid transparent;border-bottom:28px solid transparent;border-right:36px solid black"
-				></div>
-				<div class="h-16 w-16 bg-[#fbf700]"></div>
-			{:else}
-				<div class="h-16 w-16 bg-[#fbf700]"></div>
-				<div
-					style="width:0;height:0;border-top:28px solid transparent;border-bottom:28px solid transparent;border-left:36px solid black"
-				></div>
-			{/if}
+		<div
+			class="flex h-16 w-16 items-center justify-center bg-[#fbf700] text-5xl leading-none font-black text-black"
+		>
+			{side === 'left' ? '🡨' : '🡪'}
 		</div>
 	</div>
 {/snippet}
@@ -200,83 +190,95 @@
 				: 'bg-[#850e12]'} px-3 py-3 text-sm font-semibold md:text-5xl"
 	>
 		{#if alliance === 'blue'}
-			<span class="h-2 w-2 shrink-0 rounded-full {linked ? 'bg-emerald-300' : 'bg-white/25'}"></span>
+			<span class="h-2 w-2 shrink-0 rounded-full {linked ? 'bg-emerald-300' : 'bg-white/25'}"
+			></span>
 			<span>{team > 0 ? team : '----'}</span>
 		{:else}
 			<span>{team > 0 ? team : '----'}</span>
-			<span class="h-2 w-2 shrink-0 rounded-full {linked ? 'bg-emerald-300' : 'bg-white/25'}"></span>
+			<span class="h-2 w-2 shrink-0 rounded-full {linked ? 'bg-emerald-300' : 'bg-white/25'}"
+			></span>
 		{/if}
 	</div>
 {/snippet}
 
-{#snippet rankingProgress(
-	alliance: 'red' | 'blue',
-	fuelCombined: number,
-	towerCombined: number
-)}
+{#snippet rankingProgress(alliance: 'red' | 'blue', fuelCombined: number, towerCombined: number)}
 	<div
-		class="rounded-lg border {alliance === 'blue' ? 'bg-[#003151]/90' : 'bg-[#620a0c]/90'} {alliance ===
+		class="rounded-lg {alliance === 'blue' ? 'bg-[#003151]/90' : 'bg-[#620a0c]/90'} {alliance ===
 		'red'
 			? 'text-right'
-			: ''} px-4 py-2 text-sm font-semibold md:text-xl"
+			: ''} px-4 py-2 text-sm font-semibold md:text-xl shadow-md shadow-black/70"
 	>
-		<span class="mr-4"
-			>Energized {Math.min(fuelCombined, 100)}/100{matchState?.rankingPoints[alliance].energized
-				? ' ✓'
-				: ''}</span
+		<span class="mr-4 {matchState?.rankingPoints[alliance].energized
+				? 'text-teal-400'
+				: 'text-slate-400'}"
+			>Energized {Math.min(fuelCombined, 100)}/100</span
 		>
-		<span class="mr-4"
-			>Supercharged {Math.min(fuelCombined, 360)}/360{matchState?.rankingPoints[alliance].supercharged
-				? ' ✓'
-				: ''}</span
+		<span class="mr-4 {matchState?.rankingPoints[alliance].supercharged
+				? 'text-teal-400'
+				: 'text-slate-400'}"
+			>Supercharged {Math.min(fuelCombined, 360)}/360</span
 		>
-		<span
-			>Traversal {Math.min(towerCombined, 50)}/50{matchState?.rankingPoints[alliance].traversal
-				? ' ✓'
-				: ''}</span
+		<span class="{matchState?.rankingPoints[alliance].traversal
+				? 'text-teal-400'
+				: 'text-slate-400'}"
+			>Traversal {Math.min(towerCombined, 50)}/50</span
 		>
 	</div>
 {/snippet}
 
 <div class="relative h-screen w-full overflow-hidden bg-transparent text-white">
-	<div class="absolute inset-0 pointer-events-none">
-		<div class="absolute left-1/2 top-4 w-[95%] -translate-x-1/2 shadow-2xl shadow-black/70 md:w-[88%]">
+	<div class="pointer-events-none absolute inset-0">
+		<div class="absolute top-4 left-1/2 w-[95%] -translate-x-1/2 md:w-[88%]">
 			<div class="relative">
 				<!-- Blue hub active indicator (left of panel, arrow pointing toward left screen edge) -->
 				{@render hubIndicator('left', blueHubActive)}
 				<!-- Red hub active indicator (right of panel, arrow pointing toward right screen edge) -->
 				{@render hubIndicator('right', redHubActive)}
-			<div class="grid grid-cols-[1fr_1fr_1fr_auto_auto_auto_1fr_1fr_1fr] overflow-hidden rounded-lg border border-black/30">
-				<!-- Blue Team 1 -->
-				{@render allianceTeamCell(blueTeams[0], !!blueStations[0]?.robotLinked, 'blue', false)}
-				<!-- Blue Team 2 (middle) -->
-				{@render allianceTeamCell(blueTeams[1], !!blueStations[1]?.robotLinked, 'blue', true)}
-				<!-- Blue Team 3 -->
-				{@render allianceTeamCell(blueTeams[2], !!blueStations[2]?.robotLinked, 'blue', false)}
-				<!-- Blue Score -->
-				<div class="flex items-center justify-center bg-[#0066b3] px-5 text-4xl font-black md:text-6xl">
-					{blueScore}
-				</div>
-				<!-- Timer -->
-				<div class="flex flex-col items-center justify-center bg-white px-6 py-3 text-black">
-					<div class="text-4xl font-black md:text-6xl">
-						{matchState?.phase === 'AutoToTeleopTransition' ? '0:00' : matchState ? formatTime(matchState.timeRemaining) : '0:00'}
+				<div
+					class="grid grid-cols-[1fr_1fr_1fr_auto_auto_auto_1fr_1fr_1fr] overflow-hidden rounded-lg border border-black/30 shadow-md shadow-black/70"
+				>
+					<!-- Blue Team 1 -->
+					{@render allianceTeamCell(blueTeams[0], !!blueStations[0]?.robotLinked, 'blue', false)}
+					<!-- Blue Team 2 (middle) -->
+					{@render allianceTeamCell(blueTeams[1], !!blueStations[1]?.robotLinked, 'blue', true)}
+					<!-- Blue Team 3 -->
+					{@render allianceTeamCell(blueTeams[2], !!blueStations[2]?.robotLinked, 'blue', false)}
+					<!-- Blue Score -->
+					<div
+						class="flex items-center justify-center bg-[#0066b3] px-5 text-4xl font-black md:text-6xl"
+					>
+						{blueScore}
 					</div>
-					<div class="-mt-1 text-sm font-black md:text-2xl {teleopPeriodIndicator ? '' : 'invisible'}">
-						{teleopPeriodIndicator ?? '\u00a0'}
+					<!-- Timer -->
+					<div class="flex flex-col items-center justify-center bg-white px-6 py-3 text-black">
+						<div class="text-4xl font-black md:text-6xl">
+							{matchState?.phase === 'AutoToTeleopTransition'
+								? '0:00'
+								: matchState
+									? formatTime(matchState.timeRemaining)
+									: '0:00'}
+						</div>
+						<div
+							class="-mt-1 text-sm font-black md:text-2xl {teleopPeriodIndicator
+								? ''
+								: 'invisible'}"
+						>
+							{teleopPeriodIndicator ?? '\u00a0'}
+						</div>
 					</div>
+					<!-- Red Score -->
+					<div
+						class="flex items-center justify-center bg-[#ec1d23] px-5 text-4xl font-black md:text-6xl"
+					>
+						{redScore}
+					</div>
+					<!-- Red Team 1 -->
+					{@render allianceTeamCell(redTeams[0], !!redStations[0]?.robotLinked, 'red', false)}
+					<!-- Red Team 2 (middle) -->
+					{@render allianceTeamCell(redTeams[1], !!redStations[1]?.robotLinked, 'red', true)}
+					<!-- Red Team 3 -->
+					{@render allianceTeamCell(redTeams[2], !!redStations[2]?.robotLinked, 'red', false)}
 				</div>
-				<!-- Red Score -->
-				<div class="flex items-center justify-center bg-[#ec1d23] px-5 text-4xl font-black md:text-6xl">
-					{redScore}
-				</div>
-				<!-- Red Team 1 -->
-				{@render allianceTeamCell(redTeams[0], !!redStations[0]?.robotLinked, 'red', false)}
-				<!-- Red Team 2 (middle) -->
-				{@render allianceTeamCell(redTeams[1], !!redStations[1]?.robotLinked, 'red', true)}
-				<!-- Red Team 3 -->
-				{@render allianceTeamCell(redTeams[2], !!redStations[2]?.robotLinked, 'red', false)}
-			</div>
 			</div>
 			<div class="mt-2 grid grid-cols-1 gap-2 md:grid-cols-2">
 				{@render rankingProgress('blue', blueFuelCombined, blueTowerCombined)}

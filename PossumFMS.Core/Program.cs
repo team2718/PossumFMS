@@ -99,8 +99,29 @@ if (Directory.Exists(webBuildPath))
             return;
         }
 
-        context.Response.ContentType = "text/html; charset=utf-8";
-        await context.Response.SendFileAsync(Path.Combine(webBuildPath, "index.html"));
+        var normalizedPath = requestedPath.Trim('/');
+        string[] candidates =
+        [
+            normalizedPath.Length == 0 ? "index.html" : $"{normalizedPath}.html",
+            normalizedPath.Length == 0 ? "index.html" : Path.Combine(normalizedPath, "index.html"),
+            "index.html",
+        ];
+
+        foreach (var candidate in candidates)
+        {
+            var fullPath = Path.GetFullPath(Path.Combine(webBuildPath, candidate));
+            if (!fullPath.StartsWith(webBuildPath, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            if (File.Exists(fullPath))
+            {
+                context.Response.ContentType = "text/html; charset=utf-8";
+                await context.Response.SendFileAsync(fullPath);
+                return;
+            }
+        }
+
+        context.Response.StatusCode = StatusCodes.Status404NotFound;
     });
 
     logger.LogInformation("Serving frontend static files from {WebBuildPath}.", webBuildPath);
