@@ -7,5 +7,9 @@
     <UserSecretsId>dotnet-PossumFMS.Core-14dd4457-1bad-4459-b6de-436785e10ac7</UserSecretsId>
   </PropertyGroup>
 
+  <ItemGroup>
+    <PackageReference Include="MongoDB.Bson" Version="2.25.0" />
+  </ItemGroup>
+
 
 </Project>
