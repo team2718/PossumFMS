@@ -1,5 +1,6 @@
 ﻿<script lang="ts">
 	import { fms } from '$lib/fms.svelte';
+	import type { TowerEndgameLevel } from '$lib/fms.svelte';
 
 	// Connect to the FMS hub when the page loads
 	$effect(() => {
@@ -133,6 +134,9 @@
 
 	const blueInputIndices = [3, 4, 5];
 	const redInputIndices = [2, 1, 0];
+	const redScoreStationIndices = [0, 1, 2];
+	const blueScoreStationIndices = [3, 4, 5];
+	const fuelAdjustments = [10, 5, 1, -1, -5, -10];
 
 	// A station is ready if it is bypassed, OR if both DS and robot are linked — and it has no active e-stop.
 	const blueReady = $derived(
@@ -143,6 +147,41 @@
 	);
 
 	let activeTab = $state('status');
+	let scoreWarning = $state('');
+
+	function stationCode(idx: number): string {
+		return idx < 3 ? `Red${idx + 1}` : `Blue${idx - 2}`;
+	}
+
+	async function adjustFuelPoints(alliance: 'Red' | 'Blue', isAuto: boolean, delta: number) {
+		scoreWarning = '';
+		try {
+			await fms.adjustFuelPoints(alliance, isAuto, delta);
+		} catch (error) {
+			scoreWarning =
+				error instanceof Error ? error.message : 'Failed to update fuel score. Please try again.';
+		}
+	}
+
+	async function setAutoTowerClimb(stationIndex: number, climbed: boolean) {
+		scoreWarning = '';
+		try {
+			await fms.setAutoTowerClimb(stationIndex, climbed);
+		} catch (error) {
+			scoreWarning =
+				error instanceof Error ? error.message : 'Failed to update auto tower climb. Please try again.';
+		}
+	}
+
+	async function setEndgameTowerLevel(stationIndex: number, level: TowerEndgameLevel) {
+		scoreWarning = '';
+		try {
+			await fms.setEndgameTowerLevel(stationIndex, level);
+		} catch (error) {
+			scoreWarning =
+				error instanceof Error ? error.message : 'Failed to update endgame tower level. Please try again.';
+		}
+	}
 </script>
 
 <div class="min-h-screen bg-[#e5e7eb] text-slate-900">
@@ -493,9 +532,214 @@
 			</div>
 
 			{#if activeTab === 'score'}
-				<div class="flex min-h-48 items-center justify-center p-6 text-center text-slate-400">
-					<div>
-						<div class="text-sm font-semibold">Scoring not yet implemented</div>
+				<div class="p-3">
+					{#if scoreWarning}
+						<div class="mb-3 rounded border border-rose-300 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">
+							{scoreWarning}
+						</div>
+					{/if}
+					<div class="grid grid-cols-2 gap-3">
+						<div class="rounded border border-rose-200 bg-rose-50 p-3">
+							<div class="mb-3 flex items-center justify-between">
+								<div class="text-xs font-bold tracking-wider text-rose-800 uppercase">Red Alliance</div>
+								<div class="rounded bg-rose-700 px-2 py-0.5 text-xs font-bold text-white">
+									Total {matchState?.redBreakdown.total ?? 0}
+								</div>
+							</div>
+
+							<div class="mb-2 rounded border border-rose-200 bg-white p-2">
+								<div class="mb-2 flex items-center justify-between text-xs font-semibold text-slate-700">
+									<span>Auto Fuel</span>
+									<span>{matchState?.redBreakdown.autoFuelPoints ?? 0}</span>
+								</div>
+								<div class="flex flex-wrap gap-1">
+									{#each fuelAdjustments as delta}
+										<button
+											onclick={() => adjustFuelPoints('Red', true, delta)}
+											class="rounded px-2 py-1 text-xs font-bold text-white {delta > 0
+												? 'bg-emerald-700 hover:bg-emerald-600'
+												: 'bg-rose-700 hover:bg-rose-600'}"
+										>
+											{delta > 0 ? '+' : ''}{delta}
+										</button>
+									{/each}
+								</div>
+							</div>
+
+							<div class="mb-2 rounded border border-rose-200 bg-white p-2">
+								<div class="mb-2 flex items-center justify-between text-xs font-semibold text-slate-700">
+									<span>Teleop Fuel</span>
+									<span>{matchState?.redBreakdown.teleopFuelPoints ?? 0}</span>
+								</div>
+								<div class="flex flex-wrap gap-1">
+									{#each fuelAdjustments as delta}
+										<button
+											onclick={() => adjustFuelPoints('Red', false, delta)}
+											class="rounded px-2 py-1 text-xs font-bold text-white {delta > 0
+												? 'bg-emerald-700 hover:bg-emerald-600'
+												: 'bg-rose-700 hover:bg-rose-600'}"
+										>
+											{delta > 0 ? '+' : ''}{delta}
+										</button>
+									{/each}
+								</div>
+							</div>
+
+							<div class="mb-2 rounded border border-rose-200 bg-white p-2 text-xs">
+								<div class="mb-1 font-semibold text-slate-700">Auto Tower Climb (15 pts each)</div>
+								<div class="flex flex-wrap gap-3">
+									{#each redScoreStationIndices as idx}
+										<label class="inline-flex items-center gap-1 text-slate-700">
+											<input
+												type="checkbox"
+												checked={matchState?.stationClimbs?.[idx]?.autoClimbed ?? false}
+												onchange={(e) =>
+														setAutoTowerClimb(idx, (e.currentTarget as HTMLInputElement).checked)}
+											/>
+											<span>{stationCode(idx)}</span>
+										</label>
+									{/each}
+								</div>
+							</div>
+
+							<div class="mb-2 rounded border border-rose-200 bg-white p-2 text-xs">
+								<div class="mb-1 font-semibold text-slate-700">Endgame Tower Level</div>
+								<div class="grid grid-cols-3 gap-2">
+									{#each redScoreStationIndices as idx}
+										<div class="rounded border border-slate-200 bg-slate-50 px-2 py-1.5">
+											<div class="mb-1 text-[10px] font-semibold text-slate-500 uppercase">{stationCode(idx)}</div>
+											<select
+												value={matchState?.stationClimbs?.[idx]?.endgameLevel ?? 'None'}
+												onchange={(e) =>
+														setEndgameTowerLevel(
+															idx,
+															(e.currentTarget as HTMLSelectElement).value as TowerEndgameLevel
+														)}
+												class="w-full rounded border border-slate-300 bg-white px-1 py-1 text-xs"
+											>
+												<option value="None">None</option>
+												<option value="L1">L1 (10)</option>
+												<option value="L2">L2 (20)</option>
+												<option value="L3">L3 (30)</option>
+											</select>
+										</div>
+									{/each}
+								</div>
+							</div>
+
+							<div class="rounded border border-rose-200 bg-white p-2 text-xs text-slate-700">
+								<div>Fuel Combined: <span class="font-bold">{matchState?.redBreakdown.fuelCombined ?? 0}</span></div>
+								<div>Tower Combined: <span class="font-bold">{matchState?.redBreakdown.towerCombined ?? 0}</span></div>
+								<div class="mt-1 border-t border-slate-200 pt-1">
+									<div>Energized RP (100 Fuel): <span class="font-bold">{matchState?.rankingPoints.red.energized ? 'Yes' : 'No'}</span></div>
+									<div>Supercharged RP (360 Fuel): <span class="font-bold">{matchState?.rankingPoints.red.supercharged ? 'Yes' : 'No'}</span></div>
+									<div>Traversal RP (50 Tower): <span class="font-bold">{matchState?.rankingPoints.red.traversal ? 'Yes' : 'No'}</span></div>
+									<div>Win/Tie RP: <span class="font-bold">{matchState?.rankingPoints.red.winTie ?? 0}</span></div>
+									<div>Total RP: <span class="font-bold">{matchState?.rankingPoints.red.total ?? 0}</span></div>
+								</div>
+							</div>
+						</div>
+
+						<div class="rounded border border-blue-200 bg-blue-50 p-3">
+							<div class="mb-3 flex items-center justify-between">
+								<div class="text-xs font-bold tracking-wider text-blue-800 uppercase">Blue Alliance</div>
+								<div class="rounded bg-blue-700 px-2 py-0.5 text-xs font-bold text-white">
+									Total {matchState?.blueBreakdown.total ?? 0}
+								</div>
+							</div>
+
+							<div class="mb-2 rounded border border-blue-200 bg-white p-2">
+								<div class="mb-2 flex items-center justify-between text-xs font-semibold text-slate-700">
+									<span>Auto Fuel</span>
+									<span>{matchState?.blueBreakdown.autoFuelPoints ?? 0}</span>
+								</div>
+								<div class="flex flex-wrap gap-1">
+									{#each fuelAdjustments as delta}
+										<button
+											onclick={() => adjustFuelPoints('Blue', true, delta)}
+											class="rounded px-2 py-1 text-xs font-bold text-white {delta > 0
+												? 'bg-emerald-700 hover:bg-emerald-600'
+												: 'bg-rose-700 hover:bg-rose-600'}"
+										>
+											{delta > 0 ? '+' : ''}{delta}
+										</button>
+									{/each}
+								</div>
+							</div>
+
+							<div class="mb-2 rounded border border-blue-200 bg-white p-2">
+								<div class="mb-2 flex items-center justify-between text-xs font-semibold text-slate-700">
+									<span>Teleop Fuel</span>
+									<span>{matchState?.blueBreakdown.teleopFuelPoints ?? 0}</span>
+								</div>
+								<div class="flex flex-wrap gap-1">
+									{#each fuelAdjustments as delta}
+										<button
+											onclick={() => adjustFuelPoints('Blue', false, delta)}
+											class="rounded px-2 py-1 text-xs font-bold text-white {delta > 0
+												? 'bg-emerald-700 hover:bg-emerald-600'
+												: 'bg-rose-700 hover:bg-rose-600'}"
+										>
+											{delta > 0 ? '+' : ''}{delta}
+										</button>
+									{/each}
+								</div>
+							</div>
+
+							<div class="mb-2 rounded border border-blue-200 bg-white p-2 text-xs">
+								<div class="mb-1 font-semibold text-slate-700">Auto Tower Climb (15 pts each)</div>
+								<div class="flex flex-wrap gap-3">
+									{#each blueScoreStationIndices as idx}
+										<label class="inline-flex items-center gap-1 text-slate-700">
+											<input
+												type="checkbox"
+												checked={matchState?.stationClimbs?.[idx]?.autoClimbed ?? false}
+												onchange={(e) =>
+														setAutoTowerClimb(idx, (e.currentTarget as HTMLInputElement).checked)}
+											/>
+											<span>{stationCode(idx)}</span>
+										</label>
+									{/each}
+								</div>
+							</div>
+
+							<div class="mb-2 rounded border border-blue-200 bg-white p-2 text-xs">
+								<div class="mb-1 font-semibold text-slate-700">Endgame Tower Level</div>
+								<div class="grid grid-cols-3 gap-2">
+									{#each blueScoreStationIndices as idx}
+										<div class="rounded border border-slate-200 bg-slate-50 px-2 py-1.5">
+											<div class="mb-1 text-[10px] font-semibold text-slate-500 uppercase">{stationCode(idx)}</div>
+											<select
+												value={matchState?.stationClimbs?.[idx]?.endgameLevel ?? 'None'}
+												onchange={(e) =>
+														setEndgameTowerLevel(
+															idx,
+															(e.currentTarget as HTMLSelectElement).value as TowerEndgameLevel
+														)}
+												class="w-full rounded border border-slate-300 bg-white px-1 py-1 text-xs"
+											>
+												<option value="None">None</option>
+												<option value="L1">L1 (10)</option>
+												<option value="L2">L2 (20)</option>
+												<option value="L3">L3 (30)</option>
+											</select>
+										</div>
+									{/each}
+								</div>
+							</div>
+
+							<div class="rounded border border-blue-200 bg-white p-2 text-xs text-slate-700">
+								<div>Fuel Combined: <span class="font-bold">{matchState?.blueBreakdown.fuelCombined ?? 0}</span></div>
+								<div>Tower Combined: <span class="font-bold">{matchState?.blueBreakdown.towerCombined ?? 0}</span></div>
+								<div class="mt-1 border-t border-slate-200 pt-1">
+									<div>Energized RP (100 Fuel): <span class="font-bold">{matchState?.rankingPoints.blue.energized ? 'Yes' : 'No'}</span></div>
+									<div>Supercharged RP (360 Fuel): <span class="font-bold">{matchState?.rankingPoints.blue.supercharged ? 'Yes' : 'No'}</span></div>
+									<div>Traversal RP (50 Tower): <span class="font-bold">{matchState?.rankingPoints.blue.traversal ? 'Yes' : 'No'}</span></div>
+									<div>Win/Tie RP: <span class="font-bold">{matchState?.rankingPoints.blue.winTie ?? 0}</span></div>
+									<div>Total RP: <span class="font-bold">{matchState?.rankingPoints.blue.total ?? 0}</span></div>
+								</div>
+							</div>
+						</div>
 					</div>
 				</div>
 			{:else if activeTab === 'status'}

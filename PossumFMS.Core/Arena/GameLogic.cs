@@ -9,6 +9,8 @@ public sealed class GameLogic
     private readonly Arena _arena;
     private static readonly TimeSpan HubInactiveGracePeriod = TimeSpan.FromSeconds(3);
     private AllianceColor? _shiftAutoWinnerAlliance;
+    private readonly bool[] _autoTowerClimbed = new bool[AllianceStations.All.Count];
+    private readonly TowerEndgameLevel[] _endgameTowerLevels = new TowerEndgameLevel[AllianceStations.All.Count];
 
     public AllianceColor? ShiftAutoWinnerAlliance => _shiftAutoWinnerAlliance;
 
@@ -20,6 +22,18 @@ public sealed class GameLogic
     {
         _arena = arena;
         _arena.PhaseChanged += OnPhaseChanged;
+
+        Array.Fill(_endgameTowerLevels, TowerEndgameLevel.None);
+    }
+
+    public bool GetAutoTowerClimbed(AllianceStation station)
+    {
+        return _autoTowerClimbed[GetStationIndex(station)];
+    }
+
+    public TowerEndgameLevel GetEndgameTowerLevel(AllianceStation station)
+    {
+        return _endgameTowerLevels[GetStationIndex(station)];
     }
 
     // ── Teleop period ──────────────────────────────────────────────────────────
@@ -186,6 +200,8 @@ public sealed class GameLogic
                 RedScore.Reset();
                 BlueScore.Reset();
                 _shiftAutoWinnerAlliance = null;
+                Array.Fill(_autoTowerClimbed, false);
+                Array.Fill(_endgameTowerLevels, TowerEndgameLevel.None);
                 _arena.SetGameData(string.Empty);
                 ScoreChanged?.Invoke();
                 break;
@@ -215,15 +231,82 @@ public sealed class GameLogic
         if (count <= 0) return;
         if (!IsHubActive(alliance)) return;
 
-        var score = alliance == AllianceColor.Red ? RedScore : BlueScore;
-
         if (_arena.Phase == MatchPhase.Auto)
-            score.AutoFuelPoints += count;
+            AdjustFuelPoints(alliance, isAuto: true, count);
         else if (_arena.Phase == MatchPhase.Teleop)
-            score.TeleopFuelPoints += count;
+            AdjustFuelPoints(alliance, isAuto: false, count);
+    }
+
+    public void AdjustFuelPoints(AllianceColor alliance, bool isAuto, int delta)
+    {
+        if (delta == 0) return;
+
+        var score = alliance == AllianceColor.Red ? RedScore : BlueScore;
+        if (isAuto)
+            score.AutoFuelPoints = Math.Max(0, score.AutoFuelPoints + delta);
         else
-            return;
+            score.TeleopFuelPoints = Math.Max(0, score.TeleopFuelPoints + delta);
 
         ScoreChanged?.Invoke();
     }
+
+    public void SetAutoTowerClimbed(AllianceStation station, bool climbed)
+    {
+        var idx = GetStationIndex(station);
+        if (_autoTowerClimbed[idx] == climbed) return;
+
+        _autoTowerClimbed[idx] = climbed;
+        RecalculateTowerPoints(station.Color);
+        ScoreChanged?.Invoke();
+    }
+
+    public void SetEndgameTowerLevel(AllianceStation station, TowerEndgameLevel level)
+    {
+        var idx = GetStationIndex(station);
+        if (_endgameTowerLevels[idx] == level) return;
+
+        _endgameTowerLevels[idx] = level;
+        RecalculateTowerPoints(station.Color);
+        ScoreChanged?.Invoke();
+    }
+
+    private void RecalculateTowerPoints(AllianceColor alliance)
+    {
+        var score = alliance == AllianceColor.Red ? RedScore : BlueScore;
+
+        var autoTower = 0;
+        var teleopTower = 0;
+
+        for (int idx = 0; idx < AllianceStations.All.Count; idx++)
+        {
+            if (AllianceStations.All[idx].Color != alliance)
+                continue;
+
+            if (_autoTowerClimbed[idx])
+                autoTower += 15;
+
+            teleopTower += _endgameTowerLevels[idx] switch
+            {
+                TowerEndgameLevel.L1 => 10,
+                TowerEndgameLevel.L2 => 20,
+                TowerEndgameLevel.L3 => 30,
+                _ => 0,
+            };
+        }
+
+        score.AutoTowerPoints = autoTower;
+        score.TeleopTowerPoints = teleopTower;
+    }
+
+    private static int GetStationIndex(AllianceStation station)
+    {
+        for (int i = 0; i < AllianceStations.All.Count; i++)
+        {
+            if (AllianceStations.All[i] == station)
+                return i;
+        }
+
+        throw new ArgumentOutOfRangeException(nameof(station), "Unknown alliance station.");
+    }
+
 }

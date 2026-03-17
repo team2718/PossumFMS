@@ -14,6 +14,7 @@ namespace PossumFMS.Core.Frontend;
 /// </summary>
 public sealed class FmsHub(
     Arena.Arena arena,
+    GameLogic gameLogic,
     DriverStationManager dsManager,
     AccessPointManager apManager,
     MatchStateBroadcaster broadcaster,
@@ -103,6 +104,52 @@ public sealed class FmsHub(
         await BroadcastMatchState();
     }
 
+    // ── Scoring ───────────────────────────────────────────────────────────────
+
+    public async Task AdjustFuelPoints(string alliance, bool isAuto, int delta)
+    {
+        var allianceColor = ParseAllianceColor(alliance);
+        logger.LogInformation(
+            "Manual fuel adjustment by {Client}: Alliance={Alliance}, IsAuto={IsAuto}, Delta={Delta}.",
+            Context.ConnectionId,
+            allianceColor,
+            isAuto,
+            delta);
+
+        gameLogic.AdjustFuelPoints(allianceColor, isAuto, delta);
+        await BroadcastMatchState();
+    }
+
+    public async Task SetAutoTowerClimb(int stationIndex, bool climbed)
+    {
+        var station = GetStationByIndex(stationIndex);
+        logger.LogInformation(
+            "Set auto tower climb by {Client}: Station={Station}, Climbed={Climbed}.",
+            Context.ConnectionId,
+            station,
+            climbed);
+
+        gameLogic.SetAutoTowerClimbed(station, climbed);
+        await BroadcastMatchState();
+    }
+
+    public async Task SetEndgameTowerLevel(int stationIndex, int level)
+    {
+        var station = GetStationByIndex(stationIndex);
+        if (!Enum.IsDefined(typeof(TowerEndgameLevel), level))
+            throw new HubException($"Invalid tower level '{level}'.");
+
+        var towerLevel = (TowerEndgameLevel)level;
+        logger.LogInformation(
+            "Set endgame tower level by {Client}: Station={Station}, Level={Level}.",
+            Context.ConnectionId,
+            station,
+            towerLevel);
+
+        gameLogic.SetEndgameTowerLevel(station, towerLevel);
+        await BroadcastMatchState();
+    }
+
     // ── Match control ──────────────────────────────────────────────────────────
 
     public async Task StartPreMatch()
@@ -185,6 +232,22 @@ public sealed class FmsHub(
     public Task RequestMatchState() => BroadcastMatchState();
 
     private Task BroadcastMatchState() => broadcaster.BroadcastAsync();
+
+    private static AllianceStation GetStationByIndex(int stationIndex)
+    {
+        if (stationIndex < 0 || stationIndex >= AllianceStations.All.Count)
+            throw new HubException($"stationIndex must be between 0 and {AllianceStations.All.Count - 1}.");
+
+        return AllianceStations.All[stationIndex];
+    }
+
+    private static AllianceColor ParseAllianceColor(string alliance)
+    {
+        if (Enum.TryParse<AllianceColor>(alliance, true, out var parsed))
+            return parsed;
+
+        throw new HubException("alliance must be either 'Red' or 'Blue'.");
+    }
 
     public sealed record TeamAssignmentRequest(int TeamNumber, string WpaKey = "");
 }

@@ -57,21 +57,35 @@ pnpm install
 
 ## 4. Run in development
 
-Use two terminals.
+### Option A: Full-stack from `PossumFMS.Core` only (recommended for local field testing)
 
-Terminal A (from PossumFMS.Core):
+Build the frontend once, then run only the backend:
 
 ```powershell
+# Terminal 1 (from PossumFMS.Web)
+pnpm build
+
+# Terminal 2 (from PossumFMS.Core)
 dotnet run
 ```
 
-Terminal B (from PossumFMS.Web):
+Open the UI from the backend URL (typically `http://localhost:5000`).
+
+The backend serves static files from `PossumFMS.Web/build`.
+
+### Option B: Frontend hot-reload development
+
+Use two terminals when actively editing Svelte UI:
 
 ```powershell
+# Terminal A (from PossumFMS.Core)
+dotnet run
+
+# Terminal B (from PossumFMS.Web)
 pnpm dev
 ```
 
-Open the web UI at the Vite URL shown in Terminal B (typically `http://localhost:5173`).
+Open the Vite URL shown in Terminal B (typically `http://localhost:5173`).
 
 ## 5. Optional validation commands
 

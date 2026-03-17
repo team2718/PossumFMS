@@ -1,5 +1,6 @@
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using Microsoft.Extensions.FileProviders;
 using PossumFMS.Core.Arena;
 using PossumFMS.Core.DriverStation;
 using PossumFMS.Core.FieldHardware;
@@ -71,5 +72,44 @@ if (!hasRequiredIp)
 
 app.UseCors();
 app.MapHub<FmsHub>("/fmshub");
+
+var webBuildPath = Path.GetFullPath(Path.Combine(app.Environment.ContentRootPath, "..", "PossumFMS.Web", "build"));
+if (Directory.Exists(webBuildPath))
+{
+    var webBuildProvider = new PhysicalFileProvider(webBuildPath);
+
+    app.UseDefaultFiles(new DefaultFilesOptions
+    {
+        FileProvider = webBuildProvider,
+        RequestPath = string.Empty,
+    });
+
+    app.UseStaticFiles(new StaticFileOptions
+    {
+        FileProvider = webBuildProvider,
+        RequestPath = string.Empty,
+    });
+
+    app.MapFallback(async context =>
+    {
+        var requestedPath = context.Request.Path.Value ?? string.Empty;
+        if (Path.HasExtension(requestedPath))
+        {
+            context.Response.StatusCode = StatusCodes.Status404NotFound;
+            return;
+        }
+
+        context.Response.ContentType = "text/html; charset=utf-8";
+        await context.Response.SendFileAsync(Path.Combine(webBuildPath, "index.html"));
+    });
+
+    logger.LogInformation("Serving frontend static files from {WebBuildPath}.", webBuildPath);
+}
+else
+{
+    logger.LogWarning(
+        "Frontend build directory not found at {WebBuildPath}. Run 'pnpm build' in PossumFMS.Web to serve the UI from PossumFMS.Core.",
+        webBuildPath);
+}
 
 app.Run();

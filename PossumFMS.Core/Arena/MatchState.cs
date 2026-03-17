@@ -32,6 +32,14 @@ public enum StationPosition
     Three = 3,
 }
 
+public enum TowerEndgameLevel
+{
+    None = 0,
+    L1 = 1,
+    L2 = 2,
+    L3 = 3,
+}
+
 public record AllianceStation(AllianceColor Color, StationPosition Position);
 
 /// <summary>

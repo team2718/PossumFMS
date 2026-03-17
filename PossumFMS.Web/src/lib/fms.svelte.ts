@@ -40,6 +40,10 @@ export interface MatchState {
 	wasAborted: boolean;
 	redScore: number;
 	blueScore: number;
+	redBreakdown: AllianceScoreBreakdown;
+	blueBreakdown: AllianceScoreBreakdown;
+	stationClimbs: StationClimbState[];
+	rankingPoints: { red: RankingPointBreakdown; blue: RankingPointBreakdown };
 	loopTiming: { currentMs: number; maxMs30s: number };
 	accessPoint: { status: string }; // "ACTIVE" | "CONFIGURING" | "ERROR"
 	stations: Station[]; // always 6: Red1, Red2, Red3, Blue1, Blue2, Blue3
@@ -48,6 +52,31 @@ export interface MatchState {
 export interface TeamAssignment {
 	teamNumber: number;
 	wpaKey?: string;
+}
+
+export type TowerEndgameLevel = 'None' | 'L1' | 'L2' | 'L3';
+
+export interface AllianceScoreBreakdown {
+	autoFuelPoints: number;
+	autoTowerPoints: number;
+	teleopFuelPoints: number;
+	teleopTowerPoints: number;
+	fuelCombined: number;
+	towerCombined: number;
+	total: number;
+}
+
+export interface StationClimbState {
+	autoClimbed: boolean;
+	endgameLevel: TowerEndgameLevel;
+}
+
+export interface RankingPointBreakdown {
+	energized: boolean;
+	supercharged: boolean;
+	traversal: boolean;
+	winTie: number;
+	total: number;
 }
 
 // Using a class is the recommended Svelte 5 pattern for shared reactive state.
@@ -148,6 +177,19 @@ class FmsConnection {
 	/** Manually push current team assignments to the access point */
 	configureAccessPoint() {
 		return this.invoke('ConfigureAccessPoint');
+	}
+	/** Adjust alliance fuel score in Auto or Teleop. Delta may be positive or negative. */
+	adjustFuelPoints(alliance: 'Red' | 'Blue', isAuto: boolean, delta: number) {
+		return this.invoke('AdjustFuelPoints', alliance, isAuto, delta);
+	}
+	/** Set whether a station climbed tower in Auto (15 points). */
+	setAutoTowerClimb(stationIndex: number, climbed: boolean) {
+		return this.invoke('SetAutoTowerClimb', stationIndex, climbed);
+	}
+	/** Set station endgame climb level: None=0, L1=1, L2=2, L3=3. */
+	setEndgameTowerLevel(stationIndex: number, level: TowerEndgameLevel) {
+		const numericLevel = level === 'L1' ? 1 : level === 'L2' ? 2 : level === 'L3' ? 3 : 0;
+		return this.invoke('SetEndgameTowerLevel', stationIndex, numericLevel);
 	}
 }
 

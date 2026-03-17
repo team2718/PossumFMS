@@ -41,6 +41,15 @@ public sealed class MatchStateBroadcaster(
     {
         var loopTiming = dsManager.GetLoopTimingSnapshot();
 
+        var redFuelCombined = gameLogic.RedScore.AutoFuelPoints + gameLogic.RedScore.TeleopFuelPoints;
+        var blueFuelCombined = gameLogic.BlueScore.AutoFuelPoints + gameLogic.BlueScore.TeleopFuelPoints;
+        var redTowerCombined = gameLogic.RedScore.AutoTowerPoints + gameLogic.RedScore.TeleopTowerPoints;
+        var blueTowerCombined = gameLogic.BlueScore.AutoTowerPoints + gameLogic.BlueScore.TeleopTowerPoints;
+
+        var redWins = gameLogic.RedScore.Total > gameLogic.BlueScore.Total;
+        var blueWins = gameLogic.BlueScore.Total > gameLogic.RedScore.Total;
+        var tie = gameLogic.RedScore.Total == gameLogic.BlueScore.Total;
+
         return new
         {
         phase         = arena.Phase.ToString(),
@@ -51,6 +60,36 @@ public sealed class MatchStateBroadcaster(
         wasAborted    = arena.WasAborted,
         redScore      = gameLogic.RedScore.Total,
         blueScore     = gameLogic.BlueScore.Total,
+        redBreakdown  = new
+        {
+            autoFuelPoints = gameLogic.RedScore.AutoFuelPoints,
+            autoTowerPoints = gameLogic.RedScore.AutoTowerPoints,
+            teleopFuelPoints = gameLogic.RedScore.TeleopFuelPoints,
+            teleopTowerPoints = gameLogic.RedScore.TeleopTowerPoints,
+            fuelCombined = redFuelCombined,
+            towerCombined = redTowerCombined,
+            total = gameLogic.RedScore.Total,
+        },
+        blueBreakdown = new
+        {
+            autoFuelPoints = gameLogic.BlueScore.AutoFuelPoints,
+            autoTowerPoints = gameLogic.BlueScore.AutoTowerPoints,
+            teleopFuelPoints = gameLogic.BlueScore.TeleopFuelPoints,
+            teleopTowerPoints = gameLogic.BlueScore.TeleopTowerPoints,
+            fuelCombined = blueFuelCombined,
+            towerCombined = blueTowerCombined,
+            total = gameLogic.BlueScore.Total,
+        },
+        stationClimbs = AllianceStations.All.Select(s => new
+        {
+            autoClimbed = gameLogic.GetAutoTowerClimbed(s),
+            endgameLevel = gameLogic.GetEndgameTowerLevel(s).ToString(),
+        }),
+        rankingPoints = new
+        {
+            red = BuildRankingPointBreakdown(redFuelCombined, redTowerCombined, redWins, tie),
+            blue = BuildRankingPointBreakdown(blueFuelCombined, blueTowerCombined, blueWins, tie),
+        },
         loopTiming    = new
         {
             currentMs = loopTiming.CurrentMs,
@@ -91,5 +130,22 @@ public sealed class MatchStateBroadcaster(
             };
         }),
     };
+    }
+
+    private static object BuildRankingPointBreakdown(int fuelCombined, int towerCombined, bool winsMatch, bool tiedMatch)
+    {
+        var energized = fuelCombined >= 100;
+        var supercharged = fuelCombined >= 360;
+        var traversal = towerCombined >= 50;
+        var winTie = winsMatch ? 3 : tiedMatch ? 1 : 0;
+
+        return new
+        {
+            energized,
+            supercharged,
+            traversal,
+            winTie,
+            total = (energized ? 1 : 0) + (supercharged ? 1 : 0) + (traversal ? 1 : 0) + winTie,
+        };
     }
 }
