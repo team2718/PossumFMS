@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging.Abstractions;
+using System.Net;
 using PossumFMS.Core.Arena;
 using PossumFMS.Core.DriverStation;
 using Xunit;
@@ -319,5 +320,37 @@ public sealed class DriverStationManagerTests
 
         foreach (var ds in mgr.Stations.Values)
             Assert.False(ds.Astop); // handler must clear all astops when Teleop begins
+    }
+
+    // ── DS IP parsing ─────────────────────────────────────────────────────────
+
+    [Fact]
+    public void TryGetTeamNumberFromDriverStationIp_Ipv4_ReturnsExpectedTeamNumber()
+    {
+        var ip = IPAddress.Parse("10.27.18.2");
+
+        int? teamNumber = DriverStationManager.TryGetTeamNumberFromDriverStationIp(ip);
+
+        Assert.Equal(2718, teamNumber);
+    }
+
+    [Fact]
+    public void TryGetTeamNumberFromDriverStationIp_Ipv4MappedIpv6_ReturnsExpectedTeamNumber()
+    {
+        var ip = IPAddress.Parse("::ffff:10.46.11.5");
+
+        int? teamNumber = DriverStationManager.TryGetTeamNumberFromDriverStationIp(ip);
+
+        Assert.Equal(4611, teamNumber);
+    }
+
+    [Fact]
+    public void TryGetTeamNumberFromDriverStationIp_NativeIpv6_ReturnsNull()
+    {
+        var ip = IPAddress.Parse("2001:db8::1");
+
+        int? teamNumber = DriverStationManager.TryGetTeamNumberFromDriverStationIp(ip);
+
+        Assert.Null(teamNumber);
     }
 }

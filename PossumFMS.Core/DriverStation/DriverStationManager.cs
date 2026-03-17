@@ -340,6 +340,21 @@ public sealed class DriverStationManager : BackgroundService
         return null;
     }
 
+    internal static int? TryGetTeamNumberFromDriverStationIp(IPAddress ipAddress)
+    {
+        if (ipAddress.AddressFamily == AddressFamily.InterNetworkV6 && ipAddress.IsIPv4MappedToIPv6)
+            ipAddress = ipAddress.MapToIPv4();
+
+        if (ipAddress.AddressFamily != AddressFamily.InterNetwork)
+            return null;
+
+        byte[] ipBytes = ipAddress.GetAddressBytes();
+        if (ipBytes.Length < 3)
+            return null;
+
+        return ipBytes[1] * 100 + ipBytes[2];
+    }
+
     // ── UDP send ───────────────────────────────────────────────────────────────
 
     private readonly byte[] _txBuf = new byte[22];
@@ -514,11 +529,12 @@ public sealed class DriverStationManager : BackgroundService
             // ── Wrong-station detection ────────────────────────────────────────
             // DS IPs follow 10.TE.AM.x, e.g. team 2718 → 10.27.18.x
             byte stationStatus = 0x00;
-            var  ipBytes       = remoteIp.GetAddressBytes();
-            int  ipTeamNumber  = ipBytes[1] * 100 + ipBytes[2];
-            if (ipTeamNumber != teamNumber)
+            ds.WrongStation = string.Empty;
+
+            int? ipTeamNumber = TryGetTeamNumberFromDriverStationIp(remoteIp);
+            if (ipTeamNumber is int stationTeamNumber && stationTeamNumber != teamNumber)
             {
-                var wrongDs = FindStationByTeamNumber(ipTeamNumber);
+                var wrongDs = FindStationByTeamNumber(stationTeamNumber);
                 if (wrongDs is not null)
                 {
                     ds.WrongStation = wrongDs.Station.ToString();
@@ -527,13 +543,9 @@ public sealed class DriverStationManager : BackgroundService
                         teamNumber, wrongDs.Station);
                 }
             }
-            else
-            {
-                ds.WrongStation = string.Empty;
-            }
 
             // ── Send station assignment packet ─────────────────────────────────
-            // Format: [0x00, 0x03, 0x19, stationIndex, stationStatus]
+            // Format: [packetSize, packetSize, packetType, stationIndex, stationStatus]
             byte stationIndex = (byte)((ds.Station.Color == AllianceColor.Red ? 0 : 3) + (int)ds.Station.Position - 1);
             await stream.WriteAsync(new byte[] { 0x00, 0x03, 0x19, stationIndex, stationStatus }, ct);
 
