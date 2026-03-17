@@ -167,7 +167,7 @@ public sealed class FieldHardwareManager : BackgroundService
 
     private void AbortMatchForEstopTimeout(FieldDevice device, string endpoint)
     {
-        if (!_arena.IsMatchRunning)
+        if (!_arena.IsMatchInProgress)
             return;
 
         try

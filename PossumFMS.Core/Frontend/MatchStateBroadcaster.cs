@@ -90,6 +90,11 @@ public sealed class MatchStateBroadcaster(
             red = BuildRankingPointBreakdown(redFuelCombined, redTowerCombined, redWins, tie),
             blue = BuildRankingPointBreakdown(blueFuelCombined, blueTowerCombined, blueWins, tie),
         },
+        hubActive = new
+        {
+            red  = gameLogic.IsHubStrictlyActive(AllianceColor.Red),
+            blue = gameLogic.IsHubStrictlyActive(AllianceColor.Blue),
+        },
         loopTiming    = new
         {
             currentMs = loopTiming.CurrentMs,

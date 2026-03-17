@@ -196,6 +196,7 @@ public sealed class GameLogic
     {
         switch (phase)
         {
+            case MatchPhase.Idle:
             case MatchPhase.PreMatch:
                 RedScore.Reset();
                 BlueScore.Reset();

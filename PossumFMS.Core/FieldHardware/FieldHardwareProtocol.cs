@@ -112,7 +112,7 @@ internal sealed class HubDeviceProtocolHandler : IFieldDeviceProtocolHandler
         if (arena.Phase == MatchPhase.PostMatch)
             return (128, 0, 128); // Purple
 
-        if (arena.IsMatchRunning && alliance is not null && gameLogic.IsHubStrictlyActive(alliance.Value))
+        if (arena.IsMatchInProgress && alliance is not null && gameLogic.IsHubStrictlyActive(alliance.Value))
         {
             return alliance == AllianceColor.Red
                 ? (255, 0, 0)

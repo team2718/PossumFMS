@@ -456,11 +456,12 @@
 				</button>
 				<button
 					onclick={() => fms.startMatch()}
-					disabled={phase !== 'PreMatch' || !blueReady || !redReady}
+					disabled={phase !== 'PreMatch' || !blueReady || !redReady || !!matchState?.arenaEstop}
 					class="h-14 min-w-44 rounded px-5 text-sm font-black disabled:cursor-not-allowed {phase ===
 						'PreMatch' &&
 					blueReady &&
-					redReady
+					redReady &&
+					!matchState?.arenaEstop
 						? 'bg-emerald-700 text-white hover:bg-emerald-600'
 						: 'bg-[repeating-linear-gradient(-45deg,#b9bec8_0px,#b9bec8_8px,#a9aeb8_8px,#a9aeb8_16px)] text-slate-500'}"
 				>
@@ -480,7 +481,7 @@
 				</button>
 				<button
 					onclick={() => fms.clearMatch()}
-					disabled={phase !== 'PostMatch' && phase !== 'PreMatch'}
+					disabled={(phase !== 'PostMatch' && phase !== 'PreMatch') || !!matchState?.arenaEstop}
 					class="h-14 min-w-44 rounded bg-slate-500 px-5 text-sm font-black text-white hover:bg-slate-400 disabled:cursor-not-allowed disabled:opacity-40"
 				>
 					Clear Match

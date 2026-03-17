@@ -29,6 +29,28 @@
 		blueStations.map((s) => s.teamNumber)
 	);
 
+	const teleopPeriodIndicator = $derived(
+		(() => {
+			if (matchState?.phase !== 'Teleop') return null;
+
+			const timeRemaining = Math.max(0, Math.ceil(matchState.timeRemaining));
+
+			if (timeRemaining > 130) return `1/6 :${(timeRemaining - 130).toString().padStart(2, '0')}`;
+			if (timeRemaining > 105) return `2/6 :${(timeRemaining - 105).toString().padStart(2, '0')}`;
+			if (timeRemaining > 80) return `3/6 :${(timeRemaining - 80).toString().padStart(2, '0')}`;
+			if (timeRemaining > 55) return `4/6 :${(timeRemaining - 55).toString().padStart(2, '0')}`;
+			if (timeRemaining > 30) return `5/6 :${(timeRemaining - 30).toString().padStart(2, '0')}`;
+			return `6/6 :${timeRemaining.toString().padStart(2, '0')}`;
+		})()
+	);
+
+	const redFuelCombined = $derived(matchState?.redBreakdown.fuelCombined ?? 0);
+	const blueFuelCombined = $derived(matchState?.blueBreakdown.fuelCombined ?? 0);
+	const redTowerCombined = $derived(matchState?.redBreakdown.towerCombined ?? 0);
+	const blueTowerCombined = $derived(matchState?.blueBreakdown.towerCombined ?? 0);
+	const blueHubActive = $derived(matchState?.hubActive?.blue ?? false);
+	const redHubActive = $derived(matchState?.hubActive?.red ?? false);
+
 	const matchPhaseText = $derived(
 		`${blueStations.filter((s) => s.robotLinked).length} / 6 : ${redStations.filter((s) => s.robotLinked).length}`
 	);
@@ -145,6 +167,21 @@
 <div class="relative h-screen w-full overflow-hidden bg-transparent text-white">
 	<div class="absolute inset-0 pointer-events-none">
 		<div class="absolute left-1/2 top-4 w-[95%] -translate-x-1/2 shadow-2xl shadow-black/70 md:w-[88%]">
+			<div class="relative">
+				<!-- Blue hub active indicator (left of panel, arrow pointing toward left screen edge) -->
+				<div class="absolute inset-y-0 right-full flex items-center pr-3 {blueHubActive ? '' : 'invisible'}">
+					<div class="flex items-center">
+						<div style="width:0;height:0;border-top:28px solid transparent;border-bottom:28px solid transparent;border-right:36px solid black"></div>
+						<div class="h-16 w-16 bg-[#fbf700]"></div>
+					</div>
+				</div>
+				<!-- Red hub active indicator (right of panel, arrow pointing toward right screen edge) -->
+				<div class="absolute inset-y-0 left-full flex items-center pl-3 {redHubActive ? '' : 'invisible'}">
+					<div class="flex items-center">
+						<div class="h-16 w-16 bg-[#fbf700]"></div>
+						<div style="width:0;height:0;border-top:28px solid transparent;border-bottom:28px solid transparent;border-left:36px solid black"></div>
+					</div>
+				</div>
 			<div class="grid grid-cols-[1fr_1fr_1fr_auto_auto_auto_1fr_1fr_1fr] overflow-hidden rounded-lg border border-black/30">
 				<!-- Blue Team 1 -->
 				<div class="flex items-center justify-between bg-[#004270] px-3 py-3 text-sm font-semibold md:text-5xl">
@@ -166,8 +203,13 @@
 					{blueScore}
 				</div>
 				<!-- Timer -->
-				<div class="flex items-center justify-center bg-white px-6 py-3 text-4xl font-black text-black md:text-6xl">
-					{matchState?.phase === 'AutoToTeleopTransition' ? '0:00' : matchState ? formatTime(matchState.timeRemaining) : '0:00'}
+				<div class="flex flex-col items-center justify-center bg-white px-6 py-3 text-black">
+					<div class="text-4xl font-black md:text-6xl">
+						{matchState?.phase === 'AutoToTeleopTransition' ? '0:00' : matchState ? formatTime(matchState.timeRemaining) : '0:00'}
+					</div>
+					<div class="-mt-1 text-sm font-black md:text-2xl {teleopPeriodIndicator ? '' : 'invisible'}">
+						{teleopPeriodIndicator ?? '\u00a0'}
+					</div>
 				</div>
 				<!-- Red Score -->
 				<div class="flex items-center justify-center bg-[#ec1d23] px-5 text-4xl font-black md:text-6xl">
@@ -187,6 +229,19 @@
 				<div class="flex items-center justify-between bg-[#850e12] px-3 py-3 text-sm font-semibold md:text-5xl">
 					<span>{redTeams[2] > 0 ? redTeams[2] : '----'}</span>
 					<span class="h-2 w-2 shrink-0 rounded-full {redStations[2]?.robotLinked ? 'bg-emerald-300' : 'bg-white/25'}"></span>
+				</div>
+			</div>
+			</div>
+			<div class="mt-2 grid grid-cols-1 gap-2 md:grid-cols-2">
+				<div class="rounded-lg border bg-[#003151]/90 px-4 py-2 text-sm font-semibold md:text-xl">
+					<span class="mr-4">Energized {Math.min(blueFuelCombined, 100)}/100{matchState?.rankingPoints.blue.energized ? ' ✓' : ''}</span>
+					<span class="mr-4">Supercharged {Math.min(blueFuelCombined, 360)}/360{matchState?.rankingPoints.blue.supercharged ? ' ✓' : ''}</span>
+					<span>Traversal {Math.min(blueTowerCombined, 50)}/50{matchState?.rankingPoints.blue.traversal ? ' ✓' : ''}</span>
+				</div>
+				<div class="rounded-lg text-right border bg-[#620a0c]/90 px-4 py-2 text-sm font-semibold md:text-xl">
+					<span class="mr-4">Energized {Math.min(redFuelCombined, 100)}/100{matchState?.rankingPoints.red.energized ? ' ✓' : ''}</span>
+					<span class="mr-4">Supercharged {Math.min(redFuelCombined, 360)}/360{matchState?.rankingPoints.red.supercharged ? ' ✓' : ''}</span>
+					<span>Traversal {Math.min(redTowerCombined, 50)}/50{matchState?.rankingPoints.red.traversal ? ' ✓' : ''}</span>
 				</div>
 			</div>
 		</div>

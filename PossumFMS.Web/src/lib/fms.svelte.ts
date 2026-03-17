@@ -44,6 +44,7 @@ export interface MatchState {
 	blueBreakdown: AllianceScoreBreakdown;
 	stationClimbs: StationClimbState[];
 	rankingPoints: { red: RankingPointBreakdown; blue: RankingPointBreakdown };
+	hubActive: { red: boolean; blue: boolean };
 	loopTiming: { currentMs: number; maxMs30s: number };
 	accessPoint: { status: string }; // "ACTIVE" | "CONFIGURING" | "ERROR"
 	stations: Station[]; // always 6: Red1, Red2, Red3, Blue1, Blue2, Blue3

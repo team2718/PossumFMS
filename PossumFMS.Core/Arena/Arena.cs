@@ -28,13 +28,21 @@ public sealed class Arena
     public int       MatchNumber { get; set; } = 1;
     public int       MatchRepeat { get; set; } = 0;
 
-    /// <summary>Time remaining in the current phase. Zero when Idle or Over.</summary>
+    /// <summary>Time remaining in the current phase. Zero when Idle or PostMatch.</summary>
     public TimeSpan TimeRemaining =>
         Phase is MatchPhase.Idle or MatchPhase.PostMatch
             ? TimeSpan.Zero
             : TimeSpan.FromTicks(Math.Max(0, (_phaseDuration - _phaseTimer.Elapsed).Ticks));
 
+    /// <summary>
+    /// True only in phases where robots should be enabled by DriverStationManager.
+    /// </summary>
     public bool IsMatchRunning => Phase is MatchPhase.Auto or MatchPhase.Teleop;
+
+    /// <summary>
+    /// True while a match is in progress, including the Auto→Teleop transition.
+    /// </summary>
+    public bool IsMatchInProgress => Phase is MatchPhase.Auto or MatchPhase.AutoToTeleopTransition or MatchPhase.Teleop;
 
     /// <summary>True if the last match ended via AbortMatch rather than running to completion.</summary>
     public bool WasAborted { get; private set; }
@@ -75,7 +83,7 @@ public sealed class Arena
 
     public void StartPreMatch()
     {
-        if (IsMatchRunning)
+        if (IsMatchInProgress)
             throw new InvalidOperationException("Cannot start pre-match while a match is running.");
 
         WasAborted = false;
@@ -92,7 +100,7 @@ public sealed class Arena
 
     public void AbortMatch()
     {
-        if (!IsMatchRunning)
+        if (!IsMatchInProgress)
             throw new InvalidOperationException("No match is running.");
 
         WasAborted = true;
@@ -101,7 +109,7 @@ public sealed class Arena
 
     public void ClearMatch()
     {
-        if (IsMatchRunning)
+        if (IsMatchInProgress)
             throw new InvalidOperationException("Cannot clear match while a match is running.");
 
         WasAborted = false;
@@ -133,12 +141,15 @@ public sealed class Arena
     public void TriggerArenaEstop()
     {
         ArenaEstop = true;
+
+        if (IsMatchInProgress)
+            AbortMatch();
     }
 
     /// <summary>Clears the arena e-stop. Only valid when match is not running.</summary>
     public void ResetArenaEstop()
     {
-        if (IsMatchRunning)
+        if (IsMatchInProgress)
             throw new InvalidOperationException("Cannot reset e-stop while match is running.");
 
         ArenaEstop = false;
