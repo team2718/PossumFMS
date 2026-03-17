@@ -90,7 +90,23 @@ public sealed class DriverStationManager : BackgroundService
     }
 
     public void Estop(AllianceStation station)  => Stations[station].Estop = true;
-    public void Astop(AllianceStation station)  => Stations[station].Astop = true;
+
+    public void Astop(AllianceStation station)
+    {
+        if (_arena.Phase != MatchPhase.Auto)
+            return;
+
+        Stations[station].Astop = true;
+    }
+
+    public void AstopAll()
+    {
+        if (_arena.Phase != MatchPhase.Auto)
+            return;
+
+        foreach (var ds in Stations.Values)
+            ds.Astop = true;
+    }
 
     public void ResetStops(AllianceStation station)
     {

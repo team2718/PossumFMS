@@ -6,6 +6,7 @@ using System.Net.Sockets;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization;
 using PossumFMS.Core.Arena;
+using PossumFMS.Core.DriverStation;
 
 namespace PossumFMS.Core.FieldHardware;
 
@@ -23,6 +24,7 @@ public sealed class FieldHardwareManager : BackgroundService
     private readonly ILogger<FieldHardwareManager> _logger;
     private readonly Arena.Arena _arena;
     private readonly GameLogic _gameLogic;
+    private readonly DriverStationManager _driverStationManager;
     private readonly FieldHardwareProtocol _protocol = new();
     private readonly int _listenPort;
     private readonly IPAddress _listenAddress;
@@ -33,11 +35,17 @@ public sealed class FieldHardwareManager : BackgroundService
 
     public IReadOnlyList<FieldDevice> Devices => _devices.Values.ToList();
 
-    public FieldHardwareManager(IConfiguration config, Arena.Arena arena, GameLogic gameLogic, ILogger<FieldHardwareManager> logger)
+    public FieldHardwareManager(
+        IConfiguration config,
+        Arena.Arena arena,
+        GameLogic gameLogic,
+        DriverStationManager driverStationManager,
+        ILogger<FieldHardwareManager> logger)
     {
         _logger = logger;
         _arena = arena;
         _gameLogic = gameLogic;
+        _driverStationManager = driverStationManager;
 
         var section = config.GetSection("FieldHardware");
         _listenPort = section.GetValue<int?>("ListenPort") ?? DefaultListenPort;
@@ -99,6 +107,7 @@ public sealed class FieldHardwareManager : BackgroundService
         _logger.LogInformation("Field device connected from {RemoteEndpoint}.", endpoint);
 
         client.NoDelay = true;
+        bool remoteClosedConnection = false;
 
         try
         {
@@ -108,13 +117,24 @@ public sealed class FieldHardwareManager : BackgroundService
             {
                 var heartbeat = await ReadBsonDocumentAsync(stream, serviceCt);
                 if (heartbeat is null)
+                {
+                    remoteClosedConnection = true;
                     break;
+                }
 
                 string? parseError = null;
                 try
                 {
-                    if (_protocol.ParseHeartbeat(device, heartbeat))
-                        _arena.TriggerArenaEstop();
+                    _protocol.ParseHeartbeat(device, heartbeat);
+
+                    if (device.LastHeartbeat is EstopHeartbeat estopHeartbeat)
+                    {
+                        if (estopHeartbeat.EstopActivated)
+                            _arena.TriggerArenaEstop();
+
+                        if (estopHeartbeat.AstopActivated)
+                            _driverStationManager.AstopAll();
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -141,42 +161,63 @@ public sealed class FieldHardwareManager : BackgroundService
         }
         catch (TimeoutException)
         {
-            if (device.Type == FieldDeviceType.Estop)
-                AbortMatchForEstopTimeout(device, endpoint);
-
-            _logger.LogWarning("Field device {Name} at {RemoteEndpoint} timed out after {TimeoutMs}ms.",
-                device.Name, endpoint, _clientTimeout.TotalMilliseconds);
+            AbortMatchForCriticalDeviceDisconnect(
+                device,
+                endpoint,
+                $"timed out after {_clientTimeout.TotalMilliseconds}ms");
         }
         catch (OperationCanceledException) when (serviceCt.IsCancellationRequested)
         {
         }
         catch (Exception ex)
         {
-            _logger.LogWarning("Field device {Name} at {RemoteEndpoint} disconnected with error: {Error}",
-                device.Name, endpoint, ex.Message);
+            AbortMatchForCriticalDeviceDisconnect(
+                device,
+                endpoint,
+                $"disconnected with error: {ex.Message}");
         }
         finally
         {
-            device.Status = FieldDeviceStatus.Disconnected;
-            _devices.TryRemove(deviceId, out _);
-            client.Dispose();
-
-            _logger.LogInformation("Field device {Name} at {RemoteEndpoint} disconnected.", device.Name, endpoint);
+            if (remoteClosedConnection && !serviceCt.IsCancellationRequested)
+            {
+                AbortMatchForCriticalDeviceDisconnect(
+                    device,
+                    endpoint,
+                    "closed the connection");
+            }
         }
+
+        device.Status = FieldDeviceStatus.Disconnected;
+        _devices.TryRemove(deviceId, out _);
+        client.Dispose();
+
+        _logger.LogInformation("Field device {Name} at {RemoteEndpoint} disconnected.", device.Name, endpoint);
     }
 
-    private void AbortMatchForEstopTimeout(FieldDevice device, string endpoint)
+    private void AbortMatchForCriticalDeviceDisconnect(FieldDevice device, string endpoint, string reason)
     {
+        if (device.Type is not (FieldDeviceType.Estop or FieldDeviceType.Hub))
+            return;
+
+        _logger.LogWarning(
+            "Field device {Name} ({Type}) at {RemoteEndpoint} {Reason}.",
+            device.Name,
+            device.Type,
+            endpoint,
+            reason);
+
         if (!_arena.IsMatchInProgress)
             return;
 
         try
         {
             _arena.AbortMatch();
-            _logger.LogError(
-                "Estop device {Name} at {RemoteEndpoint} timed out; match aborted immediately.",
+            _logger.LogWarning(
+                "Field device {Name} ({Type}) at {RemoteEndpoint} {Reason}; match aborted without asserting e-stop.",
                 device.Name,
-                endpoint);
+                device.Type,
+                endpoint,
+                reason);
         }
         catch (InvalidOperationException)
         {

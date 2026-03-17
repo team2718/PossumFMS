@@ -43,6 +43,27 @@
 	let configureSuccess = $state('');
 	let isConfiguring = $state(false);
 
+	type StationStatus = {
+		teamNumber: number;
+		estop: boolean;
+		astop: boolean;
+		bypassed: boolean;
+		wrongStation: string | boolean;
+		battery: number;
+		robotLinked: boolean;
+		dsLinked: boolean;
+		tripTimeMs: number;
+		missedPackets: number;
+		secondsSinceLastRobotLink: number;
+		wifi?: {
+			snr: number;
+			rxRateMbps: number;
+			txRateMbps: number;
+			bandwidthMbps: number;
+			radioLinked: boolean;
+		} | null;
+	};
+
 	function stationLabel(idx: number): string {
 		return idx < 3 ? `Red ${idx + 1}` : `Blue ${idx - 2}`;
 	}
@@ -210,9 +231,9 @@
 	</div>
 {/snippet}
 
-{#snippet stopButton(type: 'E' | 'A', active: boolean, onClick: () => void)}
+{#snippet stopButton(type: 'E' | 'A', active: boolean, stationIndex: number)}
 	<button
-		onclick={onClick}
+		onclick={() => (type === 'E' ? fms.estopStation(stationIndex) : fms.astopStation(stationIndex))}
 		class="mx-auto h-7 w-14 cursor-pointer rounded border border-rose-900 px-1 text-[10px] font-black tracking-wide text-white shadow-sm transition active:translate-y-px {active
 			? 'bg-rose-950'
 			: 'bg-rose-700 hover:bg-rose-600'}"
@@ -281,11 +302,19 @@
 	</div>
 {/snippet}
 
-{#snippet stationStatusCard(s: any, stationName: string, theme: 'blue' | 'red', estopBg: string, normalBorder: string, normalBg: string)}
-	<div class="mb-2 rounded border p-2 text-xs {s.estop ? estopBg : `${normalBorder} ${normalBg}`}">
+{#snippet stationStatusCard(s: StationStatus, stationNumber: number, alliance: 'blue' | 'red')}
+	<div
+		class="mb-2 rounded border p-2 text-xs {s.estop
+			? alliance === 'red'
+				? 'border-rose-400 bg-rose-100'
+				: 'border-rose-400 bg-rose-50'
+			: alliance === 'red'
+				? 'border-rose-200 bg-white'
+				: 'border-blue-200 bg-white'}"
+	>
 		<div class="mb-1.5 flex items-center justify-between">
-			<span class="font-black {theme === 'blue' ? 'text-blue-900' : 'text-rose-900'}"
-				>{stationName} — Team {s.teamNumber || '—'}</span
+			<span class="font-black {alliance === 'blue' ? 'text-blue-900' : 'text-rose-900'}"
+				>Station {stationNumber} — Team {s.teamNumber || '—'}</span
 			>
 			<div class="flex gap-1">
 				{#if s.estop}<span class="rounded bg-rose-700 px-1.5 py-0.5 text-[10px] font-bold text-white">E-STOP</span>{/if}
@@ -347,6 +376,85 @@
 				</div>
 			</div>
 		{/if}
+	</div>
+{/snippet}
+
+{#snippet scoreAlliancePanel(alliance: 'blue' | 'red', stationIndices: number[])}
+	{@const breakdown = alliance === 'blue' ? matchState?.blueBreakdown : matchState?.redBreakdown}
+	{@const allianceLabel = alliance === 'blue' ? 'Blue' : 'Red'}
+	<div
+		class="rounded border p-3 {alliance === 'blue'
+			? 'border-blue-200 bg-blue-50'
+			: 'border-rose-200 bg-rose-50'}"
+	>
+		<div class="mb-3 flex items-center justify-between">
+			<div
+				class="text-xs font-bold tracking-wider uppercase {alliance === 'blue'
+					? 'text-blue-800'
+					: 'text-rose-800'}"
+			>
+				{allianceLabel} Alliance
+			</div>
+			<div
+				class="rounded px-2 py-0.5 text-xs font-bold text-white {alliance === 'blue'
+					? 'bg-blue-700'
+					: 'bg-rose-700'}"
+			>
+				Total {breakdown?.total ?? 0}
+			</div>
+		</div>
+
+		<div
+			class="mb-2 rounded border bg-white p-2 {alliance === 'blue'
+				? 'border-blue-200'
+				: 'border-rose-200'}"
+		>
+			<div class="mb-2 flex items-center justify-between text-xs font-semibold text-slate-700">
+				<span>Auto Fuel</span>
+				<span>{breakdown?.autoFuelPoints ?? 0}</span>
+			</div>
+			{@render fuelAdjustmentButtons(allianceLabel as 'Red' | 'Blue', true)}
+		</div>
+
+		<div
+			class="mb-2 rounded border bg-white p-2 {alliance === 'blue'
+				? 'border-blue-200'
+				: 'border-rose-200'}"
+		>
+			<div class="mb-2 flex items-center justify-between text-xs font-semibold text-slate-700">
+				<span>Teleop Fuel</span>
+				<span>{breakdown?.teleopFuelPoints ?? 0}</span>
+			</div>
+			{@render fuelAdjustmentButtons(allianceLabel as 'Red' | 'Blue', false)}
+		</div>
+
+		<div
+			class="mb-2 rounded border bg-white p-2 text-xs {alliance === 'blue'
+				? 'border-blue-200'
+				: 'border-rose-200'}"
+		>
+			<div class="mb-1 font-semibold text-slate-700">Auto Tower Climb (15 pts each)</div>
+			{@render autoTowerClimbControls(stationIndices)}
+		</div>
+
+		<div
+			class="mb-2 rounded border bg-white p-2 text-xs {alliance === 'blue'
+				? 'border-blue-200'
+				: 'border-rose-200'}"
+		>
+			<div class="mb-1 font-semibold text-slate-700">Endgame Tower Level</div>
+			{@render endgameTowerLevelControls(stationIndices)}
+		</div>
+
+		<div
+			class="rounded border bg-white p-2 text-xs text-slate-700 {alliance === 'blue'
+				? 'border-blue-200'
+				: 'border-rose-200'}"
+		>
+			<div>Fuel Combined: <span class="font-bold">{breakdown?.fuelCombined ?? 0}</span></div>
+			<div>Tower Combined: <span class="font-bold">{breakdown?.towerCombined ?? 0}</span></div>
+			{@render rankingPointsSummary(alliance)}
+		</div>
 	</div>
 {/snippet}
 
@@ -416,8 +524,8 @@
 								{@render readinessStatusCell(s.radioLinked)}
 								{@render readinessStatusCell(s.rioLinked)}
 								{@render readinessStatusCell(s.robotLinked)}
-								{@render stopButton('E', s.estop, () => fms.estopStation(idx))}
-								{@render stopButton('A', s.astop, () => fms.astopStation(idx))}
+								{@render stopButton('E', s.estop, idx)}
+								{@render stopButton('A', s.astop, idx)}
 							</div>
 						{/each}
 					</div>
@@ -469,8 +577,8 @@
 								{@render readinessStatusCell(s.radioLinked)}
 								{@render readinessStatusCell(s.rioLinked)}
 								{@render readinessStatusCell(s.robotLinked)}
-								{@render stopButton('E', s.estop, () => fms.estopStation(idx))}
-								{@render stopButton('A', s.astop, () => fms.astopStation(idx))}
+								{@render stopButton('E', s.estop, idx)}
+								{@render stopButton('A', s.astop, idx)}
 							</div>
 						{/each}
 					</div>
@@ -614,86 +722,8 @@
 						</div>
 					{/if}
 					<div class="grid grid-cols-2 gap-3">
-						<div class="rounded border border-blue-200 bg-blue-50 p-3">
-							<div class="mb-3 flex items-center justify-between">
-								<div class="text-xs font-bold tracking-wider text-blue-800 uppercase">Blue Alliance</div>
-								<div class="rounded bg-blue-700 px-2 py-0.5 text-xs font-bold text-white">
-									Total {matchState?.blueBreakdown.total ?? 0}
-								</div>
-							</div>
-
-							<div class="mb-2 rounded border border-blue-200 bg-white p-2">
-								<div class="mb-2 flex items-center justify-between text-xs font-semibold text-slate-700">
-									<span>Auto Fuel</span>
-									<span>{matchState?.blueBreakdown.autoFuelPoints ?? 0}</span>
-								</div>
-								{@render fuelAdjustmentButtons('Blue', true)}
-							</div>
-
-							<div class="mb-2 rounded border border-blue-200 bg-white p-2">
-								<div class="mb-2 flex items-center justify-between text-xs font-semibold text-slate-700">
-									<span>Teleop Fuel</span>
-									<span>{matchState?.blueBreakdown.teleopFuelPoints ?? 0}</span>
-								</div>
-								{@render fuelAdjustmentButtons('Blue', false)}
-							</div>
-
-							<div class="mb-2 rounded border border-blue-200 bg-white p-2 text-xs">
-								<div class="mb-1 font-semibold text-slate-700">Auto Tower Climb (15 pts each)</div>
-								{@render autoTowerClimbControls(blueScoreStationIndices)}
-							</div>
-
-							<div class="mb-2 rounded border border-blue-200 bg-white p-2 text-xs">
-								<div class="mb-1 font-semibold text-slate-700">Endgame Tower Level</div>
-								{@render endgameTowerLevelControls(blueScoreStationIndices)}
-							</div>
-
-							<div class="rounded border border-blue-200 bg-white p-2 text-xs text-slate-700">
-								<div>Fuel Combined: <span class="font-bold">{matchState?.blueBreakdown.fuelCombined ?? 0}</span></div>
-								<div>Tower Combined: <span class="font-bold">{matchState?.blueBreakdown.towerCombined ?? 0}</span></div>
-								{@render rankingPointsSummary('blue')}
-							</div>
-						</div>
-						<div class="rounded border border-rose-200 bg-rose-50 p-3">
-							<div class="mb-3 flex items-center justify-between">
-								<div class="text-xs font-bold tracking-wider text-rose-800 uppercase">Red Alliance</div>
-								<div class="rounded bg-rose-700 px-2 py-0.5 text-xs font-bold text-white">
-									Total {matchState?.redBreakdown.total ?? 0}
-								</div>
-							</div>
-
-							<div class="mb-2 rounded border border-rose-200 bg-white p-2">
-								<div class="mb-2 flex items-center justify-between text-xs font-semibold text-slate-700">
-									<span>Auto Fuel</span>
-									<span>{matchState?.redBreakdown.autoFuelPoints ?? 0}</span>
-								</div>
-								{@render fuelAdjustmentButtons('Red', true)}
-							</div>
-
-							<div class="mb-2 rounded border border-rose-200 bg-white p-2">
-								<div class="mb-2 flex items-center justify-between text-xs font-semibold text-slate-700">
-									<span>Teleop Fuel</span>
-									<span>{matchState?.redBreakdown.teleopFuelPoints ?? 0}</span>
-								</div>
-								{@render fuelAdjustmentButtons('Red', false)}
-							</div>
-
-							<div class="mb-2 rounded border border-rose-200 bg-white p-2 text-xs">
-								<div class="mb-1 font-semibold text-slate-700">Auto Tower Climb (15 pts each)</div>
-								{@render autoTowerClimbControls(redScoreStationIndices)}
-							</div>
-
-							<div class="mb-2 rounded border border-rose-200 bg-white p-2 text-xs">
-								<div class="mb-1 font-semibold text-slate-700">Endgame Tower Level</div>
-								{@render endgameTowerLevelControls(redScoreStationIndices)}
-							</div>
-
-							<div class="rounded border border-rose-200 bg-white p-2 text-xs text-slate-700">
-								<div>Fuel Combined: <span class="font-bold">{matchState?.redBreakdown.fuelCombined ?? 0}</span></div>
-								<div>Tower Combined: <span class="font-bold">{matchState?.redBreakdown.towerCombined ?? 0}</span></div>
-								{@render rankingPointsSummary('red')}
-							</div>
-						</div>
+						{@render scoreAlliancePanel('blue', blueScoreStationIndices)}
+						{@render scoreAlliancePanel('red', redScoreStationIndices)}
 
 					</div>
 				</div>
@@ -707,11 +737,8 @@
 						{#each blueStations as s, i}
 							{@render stationStatusCard(
 								s,
-								`Station ${i + 1}`,
-								'blue',
-								'border-rose-400 bg-rose-50',
-								'border-blue-200',
-								'bg-white'
+								i + 1,
+								'blue'
 							)}
 						{/each}
 					</div>
@@ -724,11 +751,8 @@
 						{#each redStations as s, i}
 							{@render stationStatusCard(
 								s,
-								`Station ${3 - i}`,
-								'red',
-								'border-rose-400 bg-rose-100',
-								'border-rose-200',
-								'bg-white'
+								3 - i,
+								'red'
 							)}
 						{/each}
 					</div>

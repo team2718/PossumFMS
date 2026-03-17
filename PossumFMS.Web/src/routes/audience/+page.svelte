@@ -187,11 +187,19 @@
 {#snippet allianceTeamCell(
 	team: number,
 	linked: boolean,
-	bgClass: string,
-	position: 'left' | 'right'
+	alliance: 'blue' | 'red',
+	isMiddle: boolean
 )}
-	<div class="flex items-center justify-between {bgClass} px-3 py-3 text-sm font-semibold md:text-5xl">
-		{#if position === 'left'}
+	<div
+		class="flex items-center justify-between {alliance === 'blue'
+			? isMiddle
+				? 'bg-[#003151]'
+				: 'bg-[#004270]'
+			: isMiddle
+				? 'bg-[#620a0c]'
+				: 'bg-[#850e12]'} px-3 py-3 text-sm font-semibold md:text-5xl"
+	>
+		{#if alliance === 'blue'}
 			<span class="h-2 w-2 shrink-0 rounded-full {linked ? 'bg-emerald-300' : 'bg-white/25'}"></span>
 			<span>{team > 0 ? team : '----'}</span>
 		{:else}
@@ -204,11 +212,11 @@
 {#snippet rankingProgress(
 	alliance: 'red' | 'blue',
 	fuelCombined: number,
-	towerCombined: number,
-	align: 'left' | 'right'
+	towerCombined: number
 )}
 	<div
-		class="rounded-lg border {alliance === 'blue' ? 'bg-[#003151]/90' : 'bg-[#620a0c]/90'} {align === 'right'
+		class="rounded-lg border {alliance === 'blue' ? 'bg-[#003151]/90' : 'bg-[#620a0c]/90'} {alliance ===
+		'red'
 			? 'text-right'
 			: ''} px-4 py-2 text-sm font-semibold md:text-xl"
 	>
@@ -240,11 +248,11 @@
 				{@render hubIndicator('right', redHubActive)}
 			<div class="grid grid-cols-[1fr_1fr_1fr_auto_auto_auto_1fr_1fr_1fr] overflow-hidden rounded-lg border border-black/30">
 				<!-- Blue Team 1 -->
-				{@render allianceTeamCell(blueTeams[0], !!blueStations[0]?.robotLinked, 'bg-[#004270]', 'left')}
+				{@render allianceTeamCell(blueTeams[0], !!blueStations[0]?.robotLinked, 'blue', false)}
 				<!-- Blue Team 2 (middle) -->
-				{@render allianceTeamCell(blueTeams[1], !!blueStations[1]?.robotLinked, 'bg-[#003151]', 'left')}
+				{@render allianceTeamCell(blueTeams[1], !!blueStations[1]?.robotLinked, 'blue', true)}
 				<!-- Blue Team 3 -->
-				{@render allianceTeamCell(blueTeams[2], !!blueStations[2]?.robotLinked, 'bg-[#004270]', 'left')}
+				{@render allianceTeamCell(blueTeams[2], !!blueStations[2]?.robotLinked, 'blue', false)}
 				<!-- Blue Score -->
 				<div class="flex items-center justify-center bg-[#0066b3] px-5 text-4xl font-black md:text-6xl">
 					{blueScore}
@@ -263,16 +271,16 @@
 					{redScore}
 				</div>
 				<!-- Red Team 1 -->
-				{@render allianceTeamCell(redTeams[0], !!redStations[0]?.robotLinked, 'bg-[#850e12]', 'right')}
+				{@render allianceTeamCell(redTeams[0], !!redStations[0]?.robotLinked, 'red', false)}
 				<!-- Red Team 2 (middle) -->
-				{@render allianceTeamCell(redTeams[1], !!redStations[1]?.robotLinked, 'bg-[#620a0c]', 'right')}
+				{@render allianceTeamCell(redTeams[1], !!redStations[1]?.robotLinked, 'red', true)}
 				<!-- Red Team 3 -->
-				{@render allianceTeamCell(redTeams[2], !!redStations[2]?.robotLinked, 'bg-[#850e12]', 'right')}
+				{@render allianceTeamCell(redTeams[2], !!redStations[2]?.robotLinked, 'red', false)}
 			</div>
 			</div>
 			<div class="mt-2 grid grid-cols-1 gap-2 md:grid-cols-2">
-				{@render rankingProgress('blue', blueFuelCombined, blueTowerCombined, 'left')}
-				{@render rankingProgress('red', redFuelCombined, redTowerCombined, 'right')}
+				{@render rankingProgress('blue', blueFuelCombined, blueTowerCombined)}
+				{@render rankingProgress('red', redFuelCombined, redTowerCombined)}
 			</div>
 		</div>
 	</div>

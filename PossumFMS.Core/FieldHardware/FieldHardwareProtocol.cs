@@ -21,7 +21,7 @@ public sealed class FieldHardwareProtocol
             .ToDictionary(g => g.Key, g => g.First());
     }
 
-    public bool ParseHeartbeat(FieldDevice device, BsonDocument heartbeat)
+    public void ParseHeartbeat(FieldDevice device, BsonDocument heartbeat)
     {
         var name = BsonField.GetString(heartbeat, "name");
 
@@ -36,8 +36,6 @@ public sealed class FieldHardwareProtocol
 
         var parseResult = handler.Parse(heartbeat);
         device.ApplyHeartbeat(parseResult.Heartbeat);
-
-        return parseResult.TriggerArenaEstop;
     }
 
     public BsonDocument BuildReply(FieldDevice device, Arena.Arena arena, GameLogic gameLogic, string? parseError)
@@ -71,7 +69,7 @@ internal interface IFieldDeviceProtocolHandler
     BsonDocument BuildReply(FieldDevice device, Arena.Arena arena, GameLogic gameLogic);
 }
 
-internal readonly record struct DeviceHeartbeatParseResult(FieldDeviceHeartbeat Heartbeat, bool TriggerArenaEstop = false);
+internal readonly record struct DeviceHeartbeatParseResult(FieldDeviceHeartbeat Heartbeat);
 
 internal sealed class HubDeviceProtocolHandler : IFieldDeviceProtocolHandler
 {
@@ -164,7 +162,7 @@ internal sealed class EstopDeviceProtocolHandler : IFieldDeviceProtocolHandler
         var estop = BsonField.GetBoolean(heartbeat, "estop_activated")
             ?? false;
 
-        return new DeviceHeartbeatParseResult(new EstopHeartbeat(astop, estop, DateTime.UtcNow), estop);
+        return new DeviceHeartbeatParseResult(new EstopHeartbeat(astop, estop, DateTime.UtcNow));
     }
 
     public BsonDocument BuildReply(FieldDevice device, Arena.Arena arena, GameLogic gameLogic)
