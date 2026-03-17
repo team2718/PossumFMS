@@ -164,40 +164,87 @@
 	</style>
 </svelte:head>
 
+{#snippet hubIndicator(side: 'left' | 'right', active: boolean)}
+	<div
+		class="absolute inset-y-0 {side === 'left' ? 'right-full pr-3' : 'left-full pl-3'} flex items-center {active ? '' : 'invisible'}"
+	>
+		<div class="flex items-center">
+			{#if side === 'left'}
+				<div
+					style="width:0;height:0;border-top:28px solid transparent;border-bottom:28px solid transparent;border-right:36px solid black"
+				></div>
+				<div class="h-16 w-16 bg-[#fbf700]"></div>
+			{:else}
+				<div class="h-16 w-16 bg-[#fbf700]"></div>
+				<div
+					style="width:0;height:0;border-top:28px solid transparent;border-bottom:28px solid transparent;border-left:36px solid black"
+				></div>
+			{/if}
+		</div>
+	</div>
+{/snippet}
+
+{#snippet allianceTeamCell(
+	team: number,
+	linked: boolean,
+	bgClass: string,
+	position: 'left' | 'right'
+)}
+	<div class="flex items-center justify-between {bgClass} px-3 py-3 text-sm font-semibold md:text-5xl">
+		{#if position === 'left'}
+			<span class="h-2 w-2 shrink-0 rounded-full {linked ? 'bg-emerald-300' : 'bg-white/25'}"></span>
+			<span>{team > 0 ? team : '----'}</span>
+		{:else}
+			<span>{team > 0 ? team : '----'}</span>
+			<span class="h-2 w-2 shrink-0 rounded-full {linked ? 'bg-emerald-300' : 'bg-white/25'}"></span>
+		{/if}
+	</div>
+{/snippet}
+
+{#snippet rankingProgress(
+	alliance: 'red' | 'blue',
+	fuelCombined: number,
+	towerCombined: number,
+	align: 'left' | 'right'
+)}
+	<div
+		class="rounded-lg border {alliance === 'blue' ? 'bg-[#003151]/90' : 'bg-[#620a0c]/90'} {align === 'right'
+			? 'text-right'
+			: ''} px-4 py-2 text-sm font-semibold md:text-xl"
+	>
+		<span class="mr-4"
+			>Energized {Math.min(fuelCombined, 100)}/100{matchState?.rankingPoints[alliance].energized
+				? ' ✓'
+				: ''}</span
+		>
+		<span class="mr-4"
+			>Supercharged {Math.min(fuelCombined, 360)}/360{matchState?.rankingPoints[alliance].supercharged
+				? ' ✓'
+				: ''}</span
+		>
+		<span
+			>Traversal {Math.min(towerCombined, 50)}/50{matchState?.rankingPoints[alliance].traversal
+				? ' ✓'
+				: ''}</span
+		>
+	</div>
+{/snippet}
+
 <div class="relative h-screen w-full overflow-hidden bg-transparent text-white">
 	<div class="absolute inset-0 pointer-events-none">
 		<div class="absolute left-1/2 top-4 w-[95%] -translate-x-1/2 shadow-2xl shadow-black/70 md:w-[88%]">
 			<div class="relative">
 				<!-- Blue hub active indicator (left of panel, arrow pointing toward left screen edge) -->
-				<div class="absolute inset-y-0 right-full flex items-center pr-3 {blueHubActive ? '' : 'invisible'}">
-					<div class="flex items-center">
-						<div style="width:0;height:0;border-top:28px solid transparent;border-bottom:28px solid transparent;border-right:36px solid black"></div>
-						<div class="h-16 w-16 bg-[#fbf700]"></div>
-					</div>
-				</div>
+				{@render hubIndicator('left', blueHubActive)}
 				<!-- Red hub active indicator (right of panel, arrow pointing toward right screen edge) -->
-				<div class="absolute inset-y-0 left-full flex items-center pl-3 {redHubActive ? '' : 'invisible'}">
-					<div class="flex items-center">
-						<div class="h-16 w-16 bg-[#fbf700]"></div>
-						<div style="width:0;height:0;border-top:28px solid transparent;border-bottom:28px solid transparent;border-left:36px solid black"></div>
-					</div>
-				</div>
+				{@render hubIndicator('right', redHubActive)}
 			<div class="grid grid-cols-[1fr_1fr_1fr_auto_auto_auto_1fr_1fr_1fr] overflow-hidden rounded-lg border border-black/30">
 				<!-- Blue Team 1 -->
-				<div class="flex items-center justify-between bg-[#004270] px-3 py-3 text-sm font-semibold md:text-5xl">
-					<span class="h-2 w-2 shrink-0 rounded-full {blueStations[0]?.robotLinked ? 'bg-emerald-300' : 'bg-white/25'}"></span>
-					<span>{blueTeams[0] > 0 ? blueTeams[0] : '----'}</span>
-				</div>
+				{@render allianceTeamCell(blueTeams[0], !!blueStations[0]?.robotLinked, 'bg-[#004270]', 'left')}
 				<!-- Blue Team 2 (middle) -->
-				<div class="flex items-center justify-between bg-[#003151] px-3 py-3 text-4xl font-semibold md:text-5xl">
-					<span class="h-2 w-2 shrink-0 rounded-full {blueStations[1]?.robotLinked ? 'bg-emerald-300' : 'bg-white/25'}"></span>
-					<span>{blueTeams[1] > 0 ? blueTeams[1] : '----'}</span>
-				</div>
+				{@render allianceTeamCell(blueTeams[1], !!blueStations[1]?.robotLinked, 'bg-[#003151]', 'left')}
 				<!-- Blue Team 3 -->
-				<div class="flex items-center justify-between bg-[#004270] px-3 py-3 text-sm font-semibold md:text-5xl">
-					<span class="h-2 w-2 shrink-0 rounded-full {blueStations[2]?.robotLinked ? 'bg-emerald-300' : 'bg-white/25'}"></span>
-					<span>{blueTeams[2] > 0 ? blueTeams[2] : '----'}</span>
-				</div>
+				{@render allianceTeamCell(blueTeams[2], !!blueStations[2]?.robotLinked, 'bg-[#004270]', 'left')}
 				<!-- Blue Score -->
 				<div class="flex items-center justify-center bg-[#0066b3] px-5 text-4xl font-black md:text-6xl">
 					{blueScore}
@@ -216,33 +263,16 @@
 					{redScore}
 				</div>
 				<!-- Red Team 1 -->
-				<div class="flex items-center justify-between bg-[#850e12] px-3 py-3 text-sm font-semibold md:text-5xl">
-					<span>{redTeams[0] > 0 ? redTeams[0] : '----'}</span>
-					<span class="h-2 w-2 shrink-0 rounded-full {redStations[0]?.robotLinked ? 'bg-emerald-300' : 'bg-white/25'}"></span>
-				</div>
+				{@render allianceTeamCell(redTeams[0], !!redStations[0]?.robotLinked, 'bg-[#850e12]', 'right')}
 				<!-- Red Team 2 (middle) -->
-				<div class="flex items-center justify-between bg-[#620a0c] px-3 py-3 text-sm font-semibold md:text-5xl">
-					<span>{redTeams[1] > 0 ? redTeams[1] : '----'}</span>
-					<span class="h-2 w-2 shrink-0 rounded-full {redStations[1]?.robotLinked ? 'bg-emerald-300' : 'bg-white/25'}"></span>
-				</div>
+				{@render allianceTeamCell(redTeams[1], !!redStations[1]?.robotLinked, 'bg-[#620a0c]', 'right')}
 				<!-- Red Team 3 -->
-				<div class="flex items-center justify-between bg-[#850e12] px-3 py-3 text-sm font-semibold md:text-5xl">
-					<span>{redTeams[2] > 0 ? redTeams[2] : '----'}</span>
-					<span class="h-2 w-2 shrink-0 rounded-full {redStations[2]?.robotLinked ? 'bg-emerald-300' : 'bg-white/25'}"></span>
-				</div>
+				{@render allianceTeamCell(redTeams[2], !!redStations[2]?.robotLinked, 'bg-[#850e12]', 'right')}
 			</div>
 			</div>
 			<div class="mt-2 grid grid-cols-1 gap-2 md:grid-cols-2">
-				<div class="rounded-lg border bg-[#003151]/90 px-4 py-2 text-sm font-semibold md:text-xl">
-					<span class="mr-4">Energized {Math.min(blueFuelCombined, 100)}/100{matchState?.rankingPoints.blue.energized ? ' ✓' : ''}</span>
-					<span class="mr-4">Supercharged {Math.min(blueFuelCombined, 360)}/360{matchState?.rankingPoints.blue.supercharged ? ' ✓' : ''}</span>
-					<span>Traversal {Math.min(blueTowerCombined, 50)}/50{matchState?.rankingPoints.blue.traversal ? ' ✓' : ''}</span>
-				</div>
-				<div class="rounded-lg text-right border bg-[#620a0c]/90 px-4 py-2 text-sm font-semibold md:text-xl">
-					<span class="mr-4">Energized {Math.min(redFuelCombined, 100)}/100{matchState?.rankingPoints.red.energized ? ' ✓' : ''}</span>
-					<span class="mr-4">Supercharged {Math.min(redFuelCombined, 360)}/360{matchState?.rankingPoints.red.supercharged ? ' ✓' : ''}</span>
-					<span>Traversal {Math.min(redTowerCombined, 50)}/50{matchState?.rankingPoints.red.traversal ? ' ✓' : ''}</span>
-				</div>
+				{@render rankingProgress('blue', blueFuelCombined, blueTowerCombined, 'left')}
+				{@render rankingProgress('red', redFuelCombined, redTowerCombined, 'right')}
 			</div>
 		</div>
 	</div>

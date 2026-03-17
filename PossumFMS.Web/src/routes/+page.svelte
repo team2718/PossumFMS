@@ -184,6 +184,172 @@
 	}
 </script>
 
+{#snippet readinessHeaderRow()}
+	<div
+		class="grid grid-cols-[68px_1fr_48px_44px_44px_44px_44px_62px_62px] items-center gap-1 px-1 py-1 font-bold text-slate-600"
+	>
+		<div>Station</div>
+		<div>Team</div>
+		<div>Bypass</div>
+		<div>DS</div>
+		<div>Radio</div>
+		<div>RIO</div>
+		<div>Robot</div>
+		<div>E-Stop</div>
+		<div>A-Stop</div>
+	</div>
+{/snippet}
+
+{#snippet readinessStatusCell(online: boolean)}
+	<div
+		class="mx-auto flex h-7 w-10 items-center justify-center rounded font-bold text-white {online
+			? 'bg-emerald-600'
+			: 'bg-rose-700'}"
+	>
+		{online ? 'OK' : 'X'}
+	</div>
+{/snippet}
+
+{#snippet stopButton(type: 'E' | 'A', active: boolean, onClick: () => void)}
+	<button
+		onclick={onClick}
+		class="mx-auto h-7 w-14 cursor-pointer rounded border border-rose-900 px-1 text-[10px] font-black tracking-wide text-white shadow-sm transition active:translate-y-px {active
+			? 'bg-rose-950'
+			: 'bg-rose-700 hover:bg-rose-600'}"
+	>{active ? 'LOCK' : `${type}-Stop`}</button
+	>
+{/snippet}
+
+{#snippet fuelAdjustmentButtons(alliance: 'Red' | 'Blue', isAuto: boolean)}
+	<div class="flex flex-wrap gap-1">
+		{#each fuelAdjustments as delta}
+			<button
+				onclick={() => adjustFuelPoints(alliance, isAuto, delta)}
+				class="rounded px-2 py-1 text-xs font-bold text-white {delta > 0
+					? 'bg-emerald-700 hover:bg-emerald-600'
+					: 'bg-rose-700 hover:bg-rose-600'}"
+			>
+				{delta > 0 ? '+' : ''}{delta}
+			</button>
+		{/each}
+	</div>
+{/snippet}
+
+{#snippet autoTowerClimbControls(indices: number[])}
+	<div class="flex flex-wrap gap-3">
+		{#each indices as idx}
+			<label class="inline-flex items-center gap-1 text-slate-700">
+				<input
+					type="checkbox"
+					checked={matchState?.stationClimbs?.[idx]?.autoClimbed ?? false}
+					onchange={(e) => setAutoTowerClimb(idx, (e.currentTarget as HTMLInputElement).checked)}
+				/>
+				<span>{stationCode(idx)}</span>
+			</label>
+		{/each}
+	</div>
+{/snippet}
+
+{#snippet endgameTowerLevelControls(indices: number[])}
+	<div class="grid grid-cols-3 gap-2">
+		{#each indices as idx}
+			<div class="rounded border border-slate-200 bg-slate-50 px-2 py-1.5">
+				<div class="mb-1 text-[10px] font-semibold text-slate-500 uppercase">{stationCode(idx)}</div>
+				<select
+					value={matchState?.stationClimbs?.[idx]?.endgameLevel ?? 'None'}
+					onchange={(e) =>
+						setEndgameTowerLevel(idx, (e.currentTarget as HTMLSelectElement).value as TowerEndgameLevel)}
+					class="w-full rounded border border-slate-300 bg-white px-1 py-1 text-xs"
+				>
+					<option value="None">None</option>
+					<option value="L1">L1 (10)</option>
+					<option value="L2">L2 (20)</option>
+					<option value="L3">L3 (30)</option>
+				</select>
+			</div>
+		{/each}
+	</div>
+{/snippet}
+
+{#snippet rankingPointsSummary(alliance: 'red' | 'blue')}
+	<div class="mt-1 border-t border-slate-200 pt-1">
+		<div>Energized RP (100 Fuel): <span class="font-bold">{matchState?.rankingPoints[alliance].energized ? 'Yes' : 'No'}</span></div>
+		<div>Supercharged RP (360 Fuel): <span class="font-bold">{matchState?.rankingPoints[alliance].supercharged ? 'Yes' : 'No'}</span></div>
+		<div>Traversal RP (50 Tower): <span class="font-bold">{matchState?.rankingPoints[alliance].traversal ? 'Yes' : 'No'}</span></div>
+		<div>Win/Tie RP: <span class="font-bold">{matchState?.rankingPoints[alliance].winTie ?? 0}</span></div>
+		<div>Total RP: <span class="font-bold">{matchState?.rankingPoints[alliance].total ?? 0}</span></div>
+	</div>
+{/snippet}
+
+{#snippet stationStatusCard(s: any, stationName: string, theme: 'blue' | 'red', estopBg: string, normalBorder: string, normalBg: string)}
+	<div class="mb-2 rounded border p-2 text-xs {s.estop ? estopBg : `${normalBorder} ${normalBg}`}">
+		<div class="mb-1.5 flex items-center justify-between">
+			<span class="font-black {theme === 'blue' ? 'text-blue-900' : 'text-rose-900'}"
+				>{stationName} — Team {s.teamNumber || '—'}</span
+			>
+			<div class="flex gap-1">
+				{#if s.estop}<span class="rounded bg-rose-700 px-1.5 py-0.5 text-[10px] font-bold text-white">E-STOP</span>{/if}
+				{#if s.astop}<span class="rounded bg-orange-600 px-1.5 py-0.5 text-[10px] font-bold text-white">A-STOP</span>{/if}
+				{#if s.bypassed}<span class="rounded bg-slate-500 px-1.5 py-0.5 text-[10px] font-bold text-white">BYPASS</span>{/if}
+				{#if s.wrongStation}<span class="rounded bg-yellow-600 px-1.5 py-0.5 text-[10px] font-bold text-white">WRONG STN</span>{/if}
+			</div>
+		</div>
+		{#if s.wrongStation}
+			<div class="mb-1 rounded bg-yellow-50 px-1.5 py-1 text-[10px] font-semibold text-yellow-800">
+				Expected station: {s.wrongStation}
+			</div>
+		{/if}
+		<div class="mt-1.5 grid grid-cols-4 gap-1 text-slate-600">
+			<div class="rounded bg-slate-50 px-1.5 py-1">
+				<div class="text-[10px] text-slate-400">Battery</div>
+				<div class="font-semibold {s.battery < 11 && s.robotLinked ? 'text-yellow-600' : ''}">
+					{s.robotLinked ? s.battery.toFixed(2) + 'V' : '—'}
+				</div>
+			</div>
+			<div class="rounded bg-slate-50 px-1.5 py-1">
+				<div class="text-[10px] text-slate-400">Trip</div>
+				<div class="font-semibold">{s.dsLinked ? s.tripTimeMs + ' ms' : '—'}</div>
+			</div>
+			<div class="rounded bg-slate-50 px-1.5 py-1">
+				<div class="text-[10px] text-slate-400">Lost Pkts</div>
+				<div class="font-semibold {s.missedPackets > 0 ? 'text-yellow-600' : ''}">{s.missedPackets}</div>
+			</div>
+			<div class="rounded bg-slate-50 px-1.5 py-1">
+				<div class="text-[10px] text-slate-400">Last Robot Link</div>
+				<div class="font-semibold {s.secondsSinceLastRobotLink > 3 ? 'text-yellow-600' : ''}">
+					{formatLastRobotLink(s.secondsSinceLastRobotLink, s.robotLinked)}
+				</div>
+			</div>
+		</div>
+		{#if s.wifi}
+			<div class="mt-1 grid grid-cols-5 gap-1 text-slate-600">
+				<div class="rounded bg-slate-50 px-1.5 py-1">
+					<div class="text-[10px] text-slate-400">SNR</div>
+					<div class="font-semibold">{s.wifi.snr}</div>
+				</div>
+				<div class="rounded bg-slate-50 px-1.5 py-1">
+					<div class="text-[10px] text-slate-400">Rx Mbps</div>
+					<div class="font-semibold">{s.wifi.rxRateMbps.toFixed(1)}</div>
+				</div>
+				<div class="rounded bg-slate-50 px-1.5 py-1">
+					<div class="text-[10px] text-slate-400">Tx Mbps</div>
+					<div class="font-semibold">{s.wifi.txRateMbps.toFixed(1)}</div>
+				</div>
+				<div class="rounded bg-slate-50 px-1.5 py-1">
+					<div class="text-[10px] text-slate-400">BW Mbps</div>
+					<div class="font-semibold">{s.wifi.bandwidthMbps.toFixed(2)}</div>
+				</div>
+				<div class="rounded bg-slate-50 px-1.5 py-1">
+					<div class="text-[10px] text-slate-400">WiFi Link</div>
+					<div class="font-semibold {s.wifi.radioLinked ? 'text-emerald-700' : 'text-rose-700'}">
+						{s.wifi.radioLinked ? 'Linked' : 'Not Linked'}
+					</div>
+				</div>
+			</div>
+		{/if}
+	</div>
+{/snippet}
+
 <div class="min-h-screen bg-[#e5e7eb] text-slate-900">
 	<div class="border-b border-slate-300 bg-[#f2f4f8]">
 		<div class="mx-auto flex max-w-[1700px] items-end gap-1 px-3 pt-2 text-sm">
@@ -223,19 +389,7 @@
 						<span class="rounded-full bg-blue-700 px-3 py-0.5 text-sm font-bold text-white">0</span>
 					</div>
 					<div class="p-2 text-xs">
-						<div
-							class="grid grid-cols-[68px_1fr_48px_44px_44px_44px_44px_62px_62px] items-center gap-1 px-1 py-1 font-bold text-slate-600"
-						>
-							<div>Station</div>
-							<div>Team</div>
-							<div>Bypass</div>
-							<div>DS</div>
-							<div>Radio</div>
-							<div>RIO</div>
-							<div>Robot</div>
-							<div>E-Stop</div>
-							<div>A-Stop</div>
-						</div>
+						{@render readinessHeaderRow()}
 						{#each blueStations as s, i}
 							{@const idx = blueInputIndices[i]}
 							<div
@@ -258,46 +412,12 @@
 									onchange={() => fms.bypassStation(idx, !s.bypassed)}
 									class="mx-auto h-4 w-4 cursor-pointer"
 								/>
-								<div
-									class="mx-auto flex h-7 w-10 items-center justify-center rounded font-bold text-white {s.dsLinked
-										? 'bg-emerald-600'
-										: 'bg-rose-700'}"
-								>
-									{s.dsLinked ? 'OK' : 'X'}
-								</div>
-								<div
-									class="mx-auto flex h-7 w-10 items-center justify-center rounded font-bold text-white {s.radioLinked
-										? 'bg-emerald-600'
-										: 'bg-rose-700'}"
-								>
-									{s.radioLinked ? 'OK' : 'X'}
-								</div>
-								<div
-									class="mx-auto flex h-7 w-10 items-center justify-center rounded font-bold text-white {s.rioLinked
-										? 'bg-emerald-600'
-										: 'bg-rose-700'}"
-								>
-									{s.rioLinked ? 'OK' : 'X'}
-								</div>
-								<div
-									class="mx-auto flex h-7 w-10 items-center justify-center rounded font-bold text-white {s.robotLinked
-										? 'bg-emerald-600'
-										: 'bg-rose-700'}"
-								>
-									{s.robotLinked ? 'OK' : 'X'}
-								</div>
-								<button
-									onclick={() => fms.estopStation(idx)}
-									class="mx-auto h-7 w-14 cursor-pointer rounded border border-rose-900 px-1 text-[10px] font-black tracking-wide text-white shadow-sm transition active:translate-y-px {s.estop
-										? 'bg-rose-950'
-										: 'bg-rose-700 hover:bg-rose-600'}">{s.estop ? 'LOCK' : 'E-Stop'}</button
-								>
-								<button
-									onclick={() => fms.astopStation(idx)}
-									class="mx-auto h-7 w-14 cursor-pointer rounded border border-rose-900 px-1 text-[10px] font-black tracking-wide text-white shadow-sm transition active:translate-y-px {s.astop
-										? 'bg-rose-950'
-										: 'bg-rose-700 hover:bg-rose-600'}">{s.astop ? 'LOCK' : 'A-Stop'}</button
-								>
+								{@render readinessStatusCell(s.dsLinked)}
+								{@render readinessStatusCell(s.radioLinked)}
+								{@render readinessStatusCell(s.rioLinked)}
+								{@render readinessStatusCell(s.robotLinked)}
+								{@render stopButton('E', s.estop, () => fms.estopStation(idx))}
+								{@render stopButton('A', s.astop, () => fms.astopStation(idx))}
 							</div>
 						{/each}
 					</div>
@@ -322,19 +442,7 @@
 						>
 					</div>
 					<div class="p-2 text-xs">
-						<div
-							class="grid grid-cols-[68px_1fr_48px_44px_44px_44px_44px_62px_62px] items-center gap-1 px-1 py-1 font-bold text-slate-600"
-						>
-							<div>Station</div>
-							<div>Team</div>
-							<div>Bypass</div>
-							<div>DS</div>
-							<div>Radio</div>
-							<div>RIO</div>
-							<div>Robot</div>
-							<div>E-Stop</div>
-							<div>A-Stop</div>
-						</div>
+						{@render readinessHeaderRow()}
 						{#each redStations as s, i}
 							{@const idx = redInputIndices[i]}
 							<div
@@ -357,46 +465,12 @@
 									onchange={() => fms.bypassStation(idx, !s.bypassed)}
 									class="mx-auto h-4 w-4 cursor-pointer"
 								/>
-								<div
-									class="mx-auto flex h-7 w-10 items-center justify-center rounded font-bold text-white {s.dsLinked
-										? 'bg-emerald-600'
-										: 'bg-rose-700'}"
-								>
-									{s.dsLinked ? 'OK' : 'X'}
-								</div>
-								<div
-									class="mx-auto flex h-7 w-10 items-center justify-center rounded font-bold text-white {s.radioLinked
-										? 'bg-emerald-600'
-										: 'bg-rose-700'}"
-								>
-									{s.radioLinked ? 'OK' : 'X'}
-								</div>
-								<div
-									class="mx-auto flex h-7 w-10 items-center justify-center rounded font-bold text-white {s.rioLinked
-										? 'bg-emerald-600'
-										: 'bg-rose-700'}"
-								>
-									{s.rioLinked ? 'OK' : 'X'}
-								</div>
-								<div
-									class="mx-auto flex h-7 w-10 items-center justify-center rounded font-bold text-white {s.robotLinked
-										? 'bg-emerald-600'
-										: 'bg-rose-700'}"
-								>
-									{s.robotLinked ? 'OK' : 'X'}
-								</div>
-								<button
-									onclick={() => fms.estopStation(idx)}
-									class="mx-auto h-7 w-14 cursor-pointer rounded border border-rose-900 px-1 text-[10px] font-black tracking-wide text-white shadow-sm transition active:translate-y-px {s.estop
-										? 'bg-rose-950'
-										: 'bg-rose-700 hover:bg-rose-600'}">{s.estop ? 'LOCK' : 'E-Stop'}</button
-								>
-								<button
-									onclick={() => fms.astopStation(idx)}
-									class="mx-auto h-7 w-14 cursor-pointer rounded border border-rose-900 px-1 text-[10px] font-black tracking-wide text-white shadow-sm transition active:translate-y-px {s.astop
-										? 'bg-rose-950'
-										: 'bg-rose-700 hover:bg-rose-600'}">{s.astop ? 'LOCK' : 'A-Stop'}</button
-								>
+								{@render readinessStatusCell(s.dsLinked)}
+								{@render readinessStatusCell(s.radioLinked)}
+								{@render readinessStatusCell(s.rioLinked)}
+								{@render readinessStatusCell(s.robotLinked)}
+								{@render stopButton('E', s.estop, () => fms.estopStation(idx))}
+								{@render stopButton('A', s.astop, () => fms.astopStation(idx))}
 							</div>
 						{/each}
 					</div>
@@ -540,107 +614,6 @@
 						</div>
 					{/if}
 					<div class="grid grid-cols-2 gap-3">
-						<div class="rounded border border-rose-200 bg-rose-50 p-3">
-							<div class="mb-3 flex items-center justify-between">
-								<div class="text-xs font-bold tracking-wider text-rose-800 uppercase">Red Alliance</div>
-								<div class="rounded bg-rose-700 px-2 py-0.5 text-xs font-bold text-white">
-									Total {matchState?.redBreakdown.total ?? 0}
-								</div>
-							</div>
-
-							<div class="mb-2 rounded border border-rose-200 bg-white p-2">
-								<div class="mb-2 flex items-center justify-between text-xs font-semibold text-slate-700">
-									<span>Auto Fuel</span>
-									<span>{matchState?.redBreakdown.autoFuelPoints ?? 0}</span>
-								</div>
-								<div class="flex flex-wrap gap-1">
-									{#each fuelAdjustments as delta}
-										<button
-											onclick={() => adjustFuelPoints('Red', true, delta)}
-											class="rounded px-2 py-1 text-xs font-bold text-white {delta > 0
-												? 'bg-emerald-700 hover:bg-emerald-600'
-												: 'bg-rose-700 hover:bg-rose-600'}"
-										>
-											{delta > 0 ? '+' : ''}{delta}
-										</button>
-									{/each}
-								</div>
-							</div>
-
-							<div class="mb-2 rounded border border-rose-200 bg-white p-2">
-								<div class="mb-2 flex items-center justify-between text-xs font-semibold text-slate-700">
-									<span>Teleop Fuel</span>
-									<span>{matchState?.redBreakdown.teleopFuelPoints ?? 0}</span>
-								</div>
-								<div class="flex flex-wrap gap-1">
-									{#each fuelAdjustments as delta}
-										<button
-											onclick={() => adjustFuelPoints('Red', false, delta)}
-											class="rounded px-2 py-1 text-xs font-bold text-white {delta > 0
-												? 'bg-emerald-700 hover:bg-emerald-600'
-												: 'bg-rose-700 hover:bg-rose-600'}"
-										>
-											{delta > 0 ? '+' : ''}{delta}
-										</button>
-									{/each}
-								</div>
-							</div>
-
-							<div class="mb-2 rounded border border-rose-200 bg-white p-2 text-xs">
-								<div class="mb-1 font-semibold text-slate-700">Auto Tower Climb (15 pts each)</div>
-								<div class="flex flex-wrap gap-3">
-									{#each redScoreStationIndices as idx}
-										<label class="inline-flex items-center gap-1 text-slate-700">
-											<input
-												type="checkbox"
-												checked={matchState?.stationClimbs?.[idx]?.autoClimbed ?? false}
-												onchange={(e) =>
-														setAutoTowerClimb(idx, (e.currentTarget as HTMLInputElement).checked)}
-											/>
-											<span>{stationCode(idx)}</span>
-										</label>
-									{/each}
-								</div>
-							</div>
-
-							<div class="mb-2 rounded border border-rose-200 bg-white p-2 text-xs">
-								<div class="mb-1 font-semibold text-slate-700">Endgame Tower Level</div>
-								<div class="grid grid-cols-3 gap-2">
-									{#each redScoreStationIndices as idx}
-										<div class="rounded border border-slate-200 bg-slate-50 px-2 py-1.5">
-											<div class="mb-1 text-[10px] font-semibold text-slate-500 uppercase">{stationCode(idx)}</div>
-											<select
-												value={matchState?.stationClimbs?.[idx]?.endgameLevel ?? 'None'}
-												onchange={(e) =>
-														setEndgameTowerLevel(
-															idx,
-															(e.currentTarget as HTMLSelectElement).value as TowerEndgameLevel
-														)}
-												class="w-full rounded border border-slate-300 bg-white px-1 py-1 text-xs"
-											>
-												<option value="None">None</option>
-												<option value="L1">L1 (10)</option>
-												<option value="L2">L2 (20)</option>
-												<option value="L3">L3 (30)</option>
-											</select>
-										</div>
-									{/each}
-								</div>
-							</div>
-
-							<div class="rounded border border-rose-200 bg-white p-2 text-xs text-slate-700">
-								<div>Fuel Combined: <span class="font-bold">{matchState?.redBreakdown.fuelCombined ?? 0}</span></div>
-								<div>Tower Combined: <span class="font-bold">{matchState?.redBreakdown.towerCombined ?? 0}</span></div>
-								<div class="mt-1 border-t border-slate-200 pt-1">
-									<div>Energized RP (100 Fuel): <span class="font-bold">{matchState?.rankingPoints.red.energized ? 'Yes' : 'No'}</span></div>
-									<div>Supercharged RP (360 Fuel): <span class="font-bold">{matchState?.rankingPoints.red.supercharged ? 'Yes' : 'No'}</span></div>
-									<div>Traversal RP (50 Tower): <span class="font-bold">{matchState?.rankingPoints.red.traversal ? 'Yes' : 'No'}</span></div>
-									<div>Win/Tie RP: <span class="font-bold">{matchState?.rankingPoints.red.winTie ?? 0}</span></div>
-									<div>Total RP: <span class="font-bold">{matchState?.rankingPoints.red.total ?? 0}</span></div>
-								</div>
-							</div>
-						</div>
-
 						<div class="rounded border border-blue-200 bg-blue-50 p-3">
 							<div class="mb-3 flex items-center justify-between">
 								<div class="text-xs font-bold tracking-wider text-blue-800 uppercase">Blue Alliance</div>
@@ -654,18 +627,7 @@
 									<span>Auto Fuel</span>
 									<span>{matchState?.blueBreakdown.autoFuelPoints ?? 0}</span>
 								</div>
-								<div class="flex flex-wrap gap-1">
-									{#each fuelAdjustments as delta}
-										<button
-											onclick={() => adjustFuelPoints('Blue', true, delta)}
-											class="rounded px-2 py-1 text-xs font-bold text-white {delta > 0
-												? 'bg-emerald-700 hover:bg-emerald-600'
-												: 'bg-rose-700 hover:bg-rose-600'}"
-										>
-											{delta > 0 ? '+' : ''}{delta}
-										</button>
-									{/each}
-								</div>
+								{@render fuelAdjustmentButtons('Blue', true)}
 							</div>
 
 							<div class="mb-2 rounded border border-blue-200 bg-white p-2">
@@ -673,74 +635,66 @@
 									<span>Teleop Fuel</span>
 									<span>{matchState?.blueBreakdown.teleopFuelPoints ?? 0}</span>
 								</div>
-								<div class="flex flex-wrap gap-1">
-									{#each fuelAdjustments as delta}
-										<button
-											onclick={() => adjustFuelPoints('Blue', false, delta)}
-											class="rounded px-2 py-1 text-xs font-bold text-white {delta > 0
-												? 'bg-emerald-700 hover:bg-emerald-600'
-												: 'bg-rose-700 hover:bg-rose-600'}"
-										>
-											{delta > 0 ? '+' : ''}{delta}
-										</button>
-									{/each}
-								</div>
+								{@render fuelAdjustmentButtons('Blue', false)}
 							</div>
 
 							<div class="mb-2 rounded border border-blue-200 bg-white p-2 text-xs">
 								<div class="mb-1 font-semibold text-slate-700">Auto Tower Climb (15 pts each)</div>
-								<div class="flex flex-wrap gap-3">
-									{#each blueScoreStationIndices as idx}
-										<label class="inline-flex items-center gap-1 text-slate-700">
-											<input
-												type="checkbox"
-												checked={matchState?.stationClimbs?.[idx]?.autoClimbed ?? false}
-												onchange={(e) =>
-														setAutoTowerClimb(idx, (e.currentTarget as HTMLInputElement).checked)}
-											/>
-											<span>{stationCode(idx)}</span>
-										</label>
-									{/each}
-								</div>
+								{@render autoTowerClimbControls(blueScoreStationIndices)}
 							</div>
 
 							<div class="mb-2 rounded border border-blue-200 bg-white p-2 text-xs">
 								<div class="mb-1 font-semibold text-slate-700">Endgame Tower Level</div>
-								<div class="grid grid-cols-3 gap-2">
-									{#each blueScoreStationIndices as idx}
-										<div class="rounded border border-slate-200 bg-slate-50 px-2 py-1.5">
-											<div class="mb-1 text-[10px] font-semibold text-slate-500 uppercase">{stationCode(idx)}</div>
-											<select
-												value={matchState?.stationClimbs?.[idx]?.endgameLevel ?? 'None'}
-												onchange={(e) =>
-														setEndgameTowerLevel(
-															idx,
-															(e.currentTarget as HTMLSelectElement).value as TowerEndgameLevel
-														)}
-												class="w-full rounded border border-slate-300 bg-white px-1 py-1 text-xs"
-											>
-												<option value="None">None</option>
-												<option value="L1">L1 (10)</option>
-												<option value="L2">L2 (20)</option>
-												<option value="L3">L3 (30)</option>
-											</select>
-										</div>
-									{/each}
-								</div>
+								{@render endgameTowerLevelControls(blueScoreStationIndices)}
 							</div>
 
 							<div class="rounded border border-blue-200 bg-white p-2 text-xs text-slate-700">
 								<div>Fuel Combined: <span class="font-bold">{matchState?.blueBreakdown.fuelCombined ?? 0}</span></div>
 								<div>Tower Combined: <span class="font-bold">{matchState?.blueBreakdown.towerCombined ?? 0}</span></div>
-								<div class="mt-1 border-t border-slate-200 pt-1">
-									<div>Energized RP (100 Fuel): <span class="font-bold">{matchState?.rankingPoints.blue.energized ? 'Yes' : 'No'}</span></div>
-									<div>Supercharged RP (360 Fuel): <span class="font-bold">{matchState?.rankingPoints.blue.supercharged ? 'Yes' : 'No'}</span></div>
-									<div>Traversal RP (50 Tower): <span class="font-bold">{matchState?.rankingPoints.blue.traversal ? 'Yes' : 'No'}</span></div>
-									<div>Win/Tie RP: <span class="font-bold">{matchState?.rankingPoints.blue.winTie ?? 0}</span></div>
-									<div>Total RP: <span class="font-bold">{matchState?.rankingPoints.blue.total ?? 0}</span></div>
-								</div>
+								{@render rankingPointsSummary('blue')}
 							</div>
 						</div>
+						<div class="rounded border border-rose-200 bg-rose-50 p-3">
+							<div class="mb-3 flex items-center justify-between">
+								<div class="text-xs font-bold tracking-wider text-rose-800 uppercase">Red Alliance</div>
+								<div class="rounded bg-rose-700 px-2 py-0.5 text-xs font-bold text-white">
+									Total {matchState?.redBreakdown.total ?? 0}
+								</div>
+							</div>
+
+							<div class="mb-2 rounded border border-rose-200 bg-white p-2">
+								<div class="mb-2 flex items-center justify-between text-xs font-semibold text-slate-700">
+									<span>Auto Fuel</span>
+									<span>{matchState?.redBreakdown.autoFuelPoints ?? 0}</span>
+								</div>
+								{@render fuelAdjustmentButtons('Red', true)}
+							</div>
+
+							<div class="mb-2 rounded border border-rose-200 bg-white p-2">
+								<div class="mb-2 flex items-center justify-between text-xs font-semibold text-slate-700">
+									<span>Teleop Fuel</span>
+									<span>{matchState?.redBreakdown.teleopFuelPoints ?? 0}</span>
+								</div>
+								{@render fuelAdjustmentButtons('Red', false)}
+							</div>
+
+							<div class="mb-2 rounded border border-rose-200 bg-white p-2 text-xs">
+								<div class="mb-1 font-semibold text-slate-700">Auto Tower Climb (15 pts each)</div>
+								{@render autoTowerClimbControls(redScoreStationIndices)}
+							</div>
+
+							<div class="mb-2 rounded border border-rose-200 bg-white p-2 text-xs">
+								<div class="mb-1 font-semibold text-slate-700">Endgame Tower Level</div>
+								{@render endgameTowerLevelControls(redScoreStationIndices)}
+							</div>
+
+							<div class="rounded border border-rose-200 bg-white p-2 text-xs text-slate-700">
+								<div>Fuel Combined: <span class="font-bold">{matchState?.redBreakdown.fuelCombined ?? 0}</span></div>
+								<div>Tower Combined: <span class="font-bold">{matchState?.redBreakdown.towerCombined ?? 0}</span></div>
+								{@render rankingPointsSummary('red')}
+							</div>
+						</div>
+
 					</div>
 				</div>
 			{:else if activeTab === 'status'}
@@ -751,94 +705,14 @@
 							Blue Alliance
 						</div>
 						{#each blueStations as s, i}
-							<div
-								class="mb-2 rounded border p-2 text-xs {s.estop
-									? 'border-rose-400 bg-rose-50'
-									: 'border-blue-200 bg-white'}"
-							>
-								<div class="mb-1.5 flex items-center justify-between">
-									<span class="font-black text-blue-900"
-										>Station {i + 1} — Team {s.teamNumber || '—'}</span
-									>
-									<div class="flex gap-1">
-										{#if s.estop}<span
-												class="rounded bg-rose-700 px-1.5 py-0.5 text-[10px] font-bold text-white"
-												>E-STOP</span
-											>{/if}
-										{#if s.astop}<span
-												class="rounded bg-orange-600 px-1.5 py-0.5 text-[10px] font-bold text-white"
-												>A-STOP</span
-											>{/if}
-										{#if s.bypassed}<span
-												class="rounded bg-slate-500 px-1.5 py-0.5 text-[10px] font-bold text-white"
-												>BYPASS</span
-											>{/if}
-										{#if s.wrongStation}<span
-												class="rounded bg-yellow-600 px-1.5 py-0.5 text-[10px] font-bold text-white"
-												>WRONG STN</span
-											>{/if}
-									</div>
-								</div>
-								{#if s.wrongStation}
-									<div class="mb-1 rounded bg-yellow-50 px-1.5 py-1 text-[10px] font-semibold text-yellow-800">
-										Expected station: {s.wrongStation}
-									</div>
-								{/if}
-								<div class="mt-1.5 grid grid-cols-4 gap-1 text-slate-600">
-									<div class="rounded bg-slate-50 px-1.5 py-1">
-										<div class="text-[10px] text-slate-400">Battery</div>
-										<div
-											class="font-semibold {s.battery < 11 && s.robotLinked
-												? 'text-yellow-600'
-												: ''}"
-										>
-											{s.robotLinked ? s.battery.toFixed(2) + 'V' : '—'}
-										</div>
-									</div>
-									<div class="rounded bg-slate-50 px-1.5 py-1">
-										<div class="text-[10px] text-slate-400">Trip</div>
-										<div class="font-semibold">{s.dsLinked ? s.tripTimeMs + ' ms' : '—'}</div>
-									</div>
-									<div class="rounded bg-slate-50 px-1.5 py-1">
-										<div class="text-[10px] text-slate-400">Lost Pkts</div>
-										<div class="font-semibold {s.missedPackets > 0 ? 'text-yellow-600' : ''}">
-											{s.missedPackets}
-										</div>
-									</div>
-									<div class="rounded bg-slate-50 px-1.5 py-1">
-										<div class="text-[10px] text-slate-400">Last Robot Link</div>
-										<div class="font-semibold {s.secondsSinceLastRobotLink > 3 ? 'text-yellow-600' : ''}">
-											{formatLastRobotLink(s.secondsSinceLastRobotLink, s.robotLinked)}
-										</div>
-									</div>
-								</div>
-								{#if s.wifi}
-									<div class="mt-1 grid grid-cols-5 gap-1 text-slate-600">
-										<div class="rounded bg-slate-50 px-1.5 py-1">
-											<div class="text-[10px] text-slate-400">SNR</div>
-											<div class="font-semibold">{s.wifi.snr}</div>
-										</div>
-										<div class="rounded bg-slate-50 px-1.5 py-1">
-											<div class="text-[10px] text-slate-400">Rx Mbps</div>
-											<div class="font-semibold">{s.wifi.rxRateMbps.toFixed(1)}</div>
-										</div>
-										<div class="rounded bg-slate-50 px-1.5 py-1">
-											<div class="text-[10px] text-slate-400">Tx Mbps</div>
-											<div class="font-semibold">{s.wifi.txRateMbps.toFixed(1)}</div>
-										</div>
-										<div class="rounded bg-slate-50 px-1.5 py-1">
-											<div class="text-[10px] text-slate-400">BW Mbps</div>
-											<div class="font-semibold">{s.wifi.bandwidthMbps.toFixed(2)}</div>
-										</div>
-										<div class="rounded bg-slate-50 px-1.5 py-1">
-											<div class="text-[10px] text-slate-400">WiFi Link</div>
-											<div class="font-semibold {s.wifi.radioLinked ? 'text-emerald-700' : 'text-rose-700'}">
-												{s.wifi.radioLinked ? 'Linked' : 'Not Linked'}
-											</div>
-										</div>
-									</div>
-								{/if}
-							</div>
+							{@render stationStatusCard(
+								s,
+								`Station ${i + 1}`,
+								'blue',
+								'border-rose-400 bg-rose-50',
+								'border-blue-200',
+								'bg-white'
+							)}
 						{/each}
 					</div>
 
@@ -848,94 +722,14 @@
 							Red Alliance
 						</div>
 						{#each redStations as s, i}
-							<div
-								class="mb-2 rounded border p-2 text-xs {s.estop
-									? 'border-rose-400 bg-rose-100'
-									: 'border-rose-200 bg-white'}"
-							>
-								<div class="mb-1.5 flex items-center justify-between">
-									<span class="font-black text-rose-900"
-										>Station {3 - i} — Team {s.teamNumber || '—'}</span
-									>
-									<div class="flex gap-1">
-										{#if s.estop}<span
-												class="rounded bg-rose-700 px-1.5 py-0.5 text-[10px] font-bold text-white"
-												>E-STOP</span
-											>{/if}
-										{#if s.astop}<span
-												class="rounded bg-orange-600 px-1.5 py-0.5 text-[10px] font-bold text-white"
-												>A-STOP</span
-											>{/if}
-										{#if s.bypassed}<span
-												class="rounded bg-slate-500 px-1.5 py-0.5 text-[10px] font-bold text-white"
-												>BYPASS</span
-											>{/if}
-										{#if s.wrongStation}<span
-												class="rounded bg-yellow-600 px-1.5 py-0.5 text-[10px] font-bold text-white"
-												>WRONG STN</span
-											>{/if}
-									</div>
-								</div>
-								{#if s.wrongStation}
-									<div class="mb-1 rounded bg-yellow-50 px-1.5 py-1 text-[10px] font-semibold text-yellow-800">
-										Expected station: {s.wrongStation}
-									</div>
-								{/if}
-								<div class="mt-1.5 grid grid-cols-4 gap-1 text-slate-600">
-									<div class="rounded bg-slate-50 px-1.5 py-1">
-										<div class="text-[10px] text-slate-400">Battery</div>
-										<div
-											class="font-semibold {s.battery < 11 && s.robotLinked
-												? 'text-yellow-600'
-												: ''}"
-										>
-											{s.robotLinked ? s.battery.toFixed(2) + 'V' : '—'}
-										</div>
-									</div>
-									<div class="rounded bg-slate-50 px-1.5 py-1">
-										<div class="text-[10px] text-slate-400">Trip</div>
-										<div class="font-semibold">{s.dsLinked ? s.tripTimeMs + ' ms' : '—'}</div>
-									</div>
-									<div class="rounded bg-slate-50 px-1.5 py-1">
-										<div class="text-[10px] text-slate-400">Lost Pkts</div>
-										<div class="font-semibold {s.missedPackets > 0 ? 'text-yellow-600' : ''}">
-											{s.missedPackets}
-										</div>
-									</div>
-									<div class="rounded bg-slate-50 px-1.5 py-1">
-										<div class="text-[10px] text-slate-400">Last Robot Link</div>
-										<div class="font-semibold {s.secondsSinceLastRobotLink > 3 ? 'text-yellow-600' : ''}">
-											{formatLastRobotLink(s.secondsSinceLastRobotLink, s.robotLinked)}
-										</div>
-									</div>
-								</div>
-								{#if s.wifi}
-									<div class="mt-1 grid grid-cols-5 gap-1 text-slate-600">
-										<div class="rounded bg-slate-50 px-1.5 py-1">
-											<div class="text-[10px] text-slate-400">SNR</div>
-											<div class="font-semibold">{s.wifi.snr}</div>
-										</div>
-										<div class="rounded bg-slate-50 px-1.5 py-1">
-											<div class="text-[10px] text-slate-400">Rx Mbps</div>
-											<div class="font-semibold">{s.wifi.rxRateMbps.toFixed(1)}</div>
-										</div>
-										<div class="rounded bg-slate-50 px-1.5 py-1">
-											<div class="text-[10px] text-slate-400">Tx Mbps</div>
-											<div class="font-semibold">{s.wifi.txRateMbps.toFixed(1)}</div>
-										</div>
-										<div class="rounded bg-slate-50 px-1.5 py-1">
-											<div class="text-[10px] text-slate-400">BW Mbps</div>
-											<div class="font-semibold">{s.wifi.bandwidthMbps.toFixed(2)}</div>
-										</div>
-										<div class="rounded bg-slate-50 px-1.5 py-1">
-											<div class="text-[10px] text-slate-400">WiFi Link</div>
-											<div class="font-semibold {s.wifi.radioLinked ? 'text-emerald-700' : 'text-rose-700'}">
-												{s.wifi.radioLinked ? 'Linked' : 'Not Linked'}
-											</div>
-										</div>
-									</div>
-								{/if}
-							</div>
+							{@render stationStatusCard(
+								s,
+								`Station ${3 - i}`,
+								'red',
+								'border-rose-400 bg-rose-100',
+								'border-rose-200',
+								'bg-white'
+							)}
 						{/each}
 					</div>
 				</div>
