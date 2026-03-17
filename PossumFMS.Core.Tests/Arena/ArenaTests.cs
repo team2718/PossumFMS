@@ -171,20 +171,16 @@ public sealed class ArenaTests
     // ── Tick / phase transitions ───────────────────────────────────────────────
 
     [Fact]
-    public void Tick_WhenAutoExpires_TransitionsToAutoToTeleopTransition()
+    public void Tick_WhenAutoHasTimeRemaining_StaysInAuto()
     {
         var arena = new PossumFMS.Core.Arena.Arena();
         arena.StartPreMatch();
         arena.StartMatch();
 
-        // Advance internal stopwatch beyond 20 s by ticking many times — but we
-        // can't fast-forward the real clock, so instead we rely on the auto-tick
-        // logic when TimeRemaining == zero. We simulate that by starting auto
-        // and manually injecting a tick after the time window is truly elapsed.
-        // Since we can't manipulate Stopwatch internally, we verify Tick() does
-        // not throw in valid phases and transitions happen atomically.
+        // Immediately after StartMatch, Auto has ~20 s remaining, so Tick() should
+        // leave the phase unchanged (the transition fires only when TimeRemaining == 0).
         Assert.Equal(MatchPhase.Auto, arena.Phase);
-        arena.Tick(); // should be a no-op (time still remaining)
+        arena.Tick();
         Assert.Equal(MatchPhase.Auto, arena.Phase);
     }
 
@@ -242,17 +238,19 @@ public sealed class ArenaTests
 
     // ── IsMatchRunning / IsMatchInProgress ────────────────────────────────────
 
-    [Theory]
-    [InlineData(MatchPhase.Idle)]
-    [InlineData(MatchPhase.PreMatch)]
-    [InlineData(MatchPhase.PostMatch)]
-    public void IsMatchRunning_FalseOutsideAutoAndTeleop(MatchPhase _)
+    [Fact]
+    public void IsMatchRunning_FalseOutsideAutoAndTeleop()
     {
-        // We only test Idle/PreMatch directly since PostMatch requires AbortMatch
         var arena = new PossumFMS.Core.Arena.Arena();
+
         Assert.False(arena.IsMatchRunning); // Idle
+
         arena.StartPreMatch();
         Assert.False(arena.IsMatchRunning); // PreMatch
+
+        arena.StartMatch();
+        arena.AbortMatch();
+        Assert.False(arena.IsMatchRunning); // PostMatch
     }
 
     [Fact]
@@ -328,21 +326,11 @@ public sealed class ArenaTests
     {
         var arena = new PossumFMS.Core.Arena.Arena();
         arena.StartPreMatch();
-        arena.StartMatch();
-        // Manually set estop without aborting match via arena phase hack isn't possible,
-        // but TriggerArenaEstop while running aborts. So we verify the guard via PreMatch:
-        arena.AbortMatch();   // -> PostMatch
-        arena.ClearMatch();   // -> Idle
-        arena.StartPreMatch();
-        arena.StartMatch();   // -> Auto (no estop)
-        // Force estop flag set (it's a public set), then try reset while match running
-        arena.TriggerArenaEstop(); // this will abort, so let's test the guard differently
-        // After TriggerArenaEstop the match is already aborted (PostMatch). That means
-        // we can't easily test "reset while running" without reflection. 
-        // Instead, verify that after clearing we're fine:
-        arena.ClearMatch();
-        arena.ResetArenaEstop(); // Should not throw from Idle
-        Assert.False(arena.ArenaEstop);
+        arena.StartMatch(); // Auto — IsMatchInProgress is true
+
+        // ResetArenaEstop guards against being called while the match is in progress,
+        // regardless of whether the ArenaEstop flag is set.
+        Assert.Throws<InvalidOperationException>(() => arena.ResetArenaEstop());
     }
 
     // ── GameData ───────────────────────────────────────────────────────────────

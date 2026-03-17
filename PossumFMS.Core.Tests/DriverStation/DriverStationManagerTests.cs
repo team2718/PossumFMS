@@ -303,24 +303,21 @@ public sealed class DriverStationManagerTests
     [Fact]
     public void Astop_ClearsWhenArenaPhaseChangesToTeleop()
     {
-        // This replicates the OnArenaPhaseChanged handler: when phase == Teleop, astops clear.
-        // We simulate by hooking up the manager to a real Arena and firing PhaseChanged.
-        // Since StartMatch goes to Auto and we can't fast-forward time, we verify the
-        // handler is wired by inspecting that astops set in Auto are cleared by a phase transition
-        // to Teleop. We trigger Teleop by calling ClearMatch and verifying state.
-        
-        // We test the intent: astops set in Auto phase are reset on Teleop.
-        // The test below verifies the manager's ResetAllStops path covers the same effect.
+        // OnArenaPhaseChanged is the handler wired in ExecuteAsync.
+        // We call it directly (internal visibility) to test the auto-clear logic
+        // without needing to advance real time to reach the Teleop phase.
         var arena = new PossumFMS.Core.Arena.Arena();
         arena.StartPreMatch();
         arena.StartMatch(); // Auto
         var mgr = CreateManager(arena);
         mgr.AstopAll();
 
-        // Aborting and checking that astops still exist after abort (PostMatch, not Teleop):
-        arena.AbortMatch(); // PostMatch — no auto-clear expected
+        foreach (var ds in mgr.Stations.Values)
+            Assert.True(ds.Astop); // confirm astops are set before the transition
+
+        mgr.OnArenaPhaseChanged(MatchPhase.Teleop);
 
         foreach (var ds in mgr.Stations.Values)
-            Assert.True(ds.Astop); // should still be set (PostMatch doesn't clear them)
+            Assert.False(ds.Astop); // handler must clear all astops when Teleop begins
     }
 }

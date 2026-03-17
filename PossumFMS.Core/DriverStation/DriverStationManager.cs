@@ -162,7 +162,7 @@ public sealed class DriverStationManager : BackgroundService
         return Task.CompletedTask;
     }
 
-    private void OnArenaPhaseChanged(MatchPhase phase)
+    internal void OnArenaPhaseChanged(MatchPhase phase)
     {
         if (phase != MatchPhase.Teleop) return;
 

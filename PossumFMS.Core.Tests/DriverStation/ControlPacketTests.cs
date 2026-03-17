@@ -273,29 +273,7 @@ public sealed class ControlPacketTests
         Assert.Equal(0x06, buf[3]); // 0x02 (auto) | 0x04 (enabled)
     }
 
-    [Fact]
-    public void ControlByte_EnabledTeleop_ExactValue0x04()
-    {
-        // Teleop: auto bit clear, enabled bit set.
-        // We cannot fast-forward time to reach Teleop from Auto, but we can verify
-        // the control byte for non-auto, enabled by checking that:
-        //   - auto bit (0x02) is clear in any non-Auto phase
-        //   - enabled bit (0x04) is set when IsMatchRunning && !estop && !astop && !bypassed
-        // Cheesy Arena tests: dsConn.Auto=false, dsConn.Enabled=true → 0x04.
-        // That state (enabled without auto) is equivalent to our Teleop phase.
-        // Since we can't reach Teleop in a unit test without real time passing,
-        // we assert the bit pattern by confirming Auto=false gives no 0x02 bit.
-        var (mgr, arena, buf, ds) = Setup();
-        arena.StartPreMatch();
-        arena.StartMatch(); // Auto
 
-        // In Auto the byte is 0x06. Clear auto bit by inspecting the non-auto path:
-        // This test documents the Teleop value rather than triggering phase change.
-        mgr.EncodeControlPacket(buf, ds);
-        Assert.True(IsAuto(buf[3]));   // confirms we're in Auto (0x02 set)
-        Assert.True(IsEnabled(buf[3])); // confirms enabled (0x04 set)
-        Assert.Equal(0x06, buf[3]);    // combined = 0x06 in Auto
-    }
 
     [Fact]
     public void ControlByte_EstopOnly_ExactValue0x80()

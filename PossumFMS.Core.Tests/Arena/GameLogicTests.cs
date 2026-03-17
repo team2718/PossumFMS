@@ -485,8 +485,12 @@ public sealed class GameLogicTests
     // ── ShiftAutoWinnerAlliance after Teleop ───────────────────────────────────
 
     [Fact]
-    public void ShiftAutoWinnerAlliance_WhenRedHasMoreAutoFuel_IsRed()
+    public void AutoFuelScores_IndependentlyTracked_ReadyForShiftWinnerDetermination()
     {
+        // ShiftAutoWinnerAlliance is determined when the Teleop phase begins (cannot be
+        // triggered in a unit test without real time passing). This test verifies that
+        // the auto fuel scores that feed into that determination are accumulated correctly
+        // and independently for each alliance.
         var (arena, logic) = Create();
         arena.StartPreMatch();
         arena.StartMatch(); // Auto
@@ -494,13 +498,7 @@ public sealed class GameLogicTests
         logic.AdjustFuelPoints(AllianceColor.Red, isAuto: true, delta: 10);
         logic.AdjustFuelPoints(AllianceColor.Blue, isAuto: true, delta: 5);
 
-        // Manually invoke phase change to Teleop to determine winner
-        // We do this by clearing and checking the result via a new match start
-        // Since we can't directly trigger Teleop, we exercise the logic by verifying
-        // that Red has more auto fuel, which means _shiftAutoWinnerAlliance will be Red
-        // once Teleop begins. We verify the scores are correct now.
         Assert.Equal(10, logic.RedScore.AutoFuelPoints);
         Assert.Equal(5, logic.BlueScore.AutoFuelPoints);
-        Assert.True(logic.RedScore.AutoFuelPoints > logic.BlueScore.AutoFuelPoints);
     }
 }

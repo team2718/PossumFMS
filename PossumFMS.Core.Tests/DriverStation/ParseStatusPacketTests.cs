@@ -291,13 +291,16 @@ public sealed class ParseStatusPacketTests
     public void UnknownTagType_DoesNotSetMissedPacketCount()
     {
         var mgr = CreateManager();
-        // 8 header bytes + tag of type 2 (unknown), length 6
-        var pkt = new byte[14];
+        // Packet must be exactly 15 bytes so the bounds check (i=9, i+length=15 <= 15)
+        // passes and the parser actually reads the tag type byte. With 14 bytes the
+        // loop would break on the bounds check before ever inspecting the type, which
+        // would not test the unknown-type discrimination logic.
+        var pkt = new byte[15];
         pkt[4] = 1234 >> 8;
         pkt[5] = 1234 & 0xFF;
-        pkt[8]  = 6;
-        pkt[9]  = 2; // type 2 is unknown
-        pkt[10] = 0x01; // would be lost_hi if parsed
+        pkt[8]  = 6;    // length byte at [8]: i becomes 9, check 9+6=15 <= 15 → enters body
+        pkt[9]  = 2;    // type 2 is unknown — parser should skip without setting MissedPacketCount
+        pkt[10] = 0x01; // would be lost_hi if incorrectly parsed as type 1
         pkt[11] = 0xF4; // 500 decimal
 
         mgr.ParseStatusPacket(pkt);
