@@ -85,7 +85,7 @@ public sealed class DriverStationManager : BackgroundService
 
         var ds = Stations[station];
         ds.TeamNumber = teamNumber;
-        ds.WpaKey     = teamNumber == 0 ? string.Empty : wpaKey;
+        ds.WpaKey     = "possum2718";
         TeamAssignmentsChanged?.Invoke();
     }
 

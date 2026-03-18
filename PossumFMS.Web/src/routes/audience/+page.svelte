@@ -47,30 +47,14 @@
 	const blueHubActive = $derived(matchState?.hubActive?.blue ?? false);
 	const redHubActive = $derived(matchState?.hubActive?.red ?? false);
 
-	const matchPhaseText = $derived(
-		`${blueStations.filter((s) => s.robotLinked).length} / 6 : ${redStations.filter((s) => s.robotLinked).length}`
-	);
-
-	// -------------------------------------------------------------------------
-	// Sound effects
-	//
-	// Audio files belong in PossumFMS.Web/static/sounds/.
-	// They will be served at /sounds/<filename>.
-	//
-	// Expected files:
-	//   match-start.wav   — played when Auto begins
-	//   auto-end.wav      — played when Auto ends (AutoToTeleopTransition)
-	//   teleop-start.wav  — played when Teleop begins
-	//   match-end.wav     — played when Teleop ends normally (PostMatch)
-	//   match-abort.wav   — played when a match is aborted (PostMatch via abort)
-	// -------------------------------------------------------------------------
-
 	const soundFiles = [
 		'/sounds/match-start.wav',
 		'/sounds/auto-end.wav',
 		'/sounds/teleop-start.wav',
 		'/sounds/match-end.wav',
-		'/sounds/match-abort.wav'
+		'/sounds/match-abort.wav',
+		'/sounds/auto-end-carter.wav',
+		'/sounds/match-abort-carter.wav'
 	] as const;
 
 	type SoundFile = (typeof soundFiles)[number];
@@ -89,8 +73,6 @@
 		audio.currentTime = 0;
 		audio.play().catch(() => {
 			// Browsers may block autoplay until the user interacts with the page.
-			// This is silently ignored — the operator simply needs to click anything
-			// on the audience page before the first match.
 		});
 	}
 
@@ -132,13 +114,13 @@
 				playSound('/sounds/match-start.wav');
 				break;
 			case 'AutoToTeleopTransition':
-				playSound('/sounds/auto-end.wav');
+				playSound('/sounds/auto-end-carter.wav');
 				break;
 			case 'Teleop':
 				playSound('/sounds/teleop-start.wav');
 				break;
 			case 'PostMatch':
-				playSound(aborted ? '/sounds/match-abort.wav' : '/sounds/match-end.wav');
+				playSound(aborted ? '/sounds/match-abort-carter.wav' : '/sounds/match-end.wav');
 				break;
 		}
 

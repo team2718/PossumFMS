@@ -129,29 +129,32 @@ public sealed class FieldHardwareManager : BackgroundService
 
                     if (device.LastHeartbeat is EstopHeartbeat estopHeartbeat)
                     {
-                        if (estopHeartbeat.EstopActivated)
+                        if (estopHeartbeat.EstopActivated) {
+                            _logger.LogWarning("E-Stop triggered by {DeviceName}", device.Name);
                             _arena.TriggerArenaEstop();
+                        }
 
-                        if (estopHeartbeat.AstopActivated)
+                        if (estopHeartbeat.AstopActivated) {
+                            _logger.LogWarning("A-Stop triggered by {DeviceName}", device.Name);
                             _driverStationManager.AstopAll();
+                        }
+                    }
+
+                    if (device.LastHeartbeat is HubHeartbeat hub)
+                    {
+                        if (hub.FuelDelta > 0)
+                        {
+                            var alliance = string.Equals(hub.Alliance, "red", StringComparison.OrdinalIgnoreCase)
+                                ? AllianceColor.Red
+                                : AllianceColor.Blue;
+                            _gameLogic.ScoreFuel(alliance, hub.FuelDelta);
+                        }
                     }
                 }
                 catch (Exception ex)
                 {
                     parseError = ex.Message;
                     _logger.LogWarning("Invalid field hardware packet from {RemoteEndpoint}: {Error}", endpoint, ex.Message);
-                }
-
-                // Credit newly-scored fuel to GameLogic. IsHubActive gates inactive-period scoring.
-                if (parseError is null && device.LastHeartbeat is HubHeartbeat hub)
-                {
-                    if (hub.FuelDelta > 0)
-                    {
-                        var alliance = string.Equals(hub.Alliance, "red", StringComparison.OrdinalIgnoreCase)
-                            ? AllianceColor.Red
-                            : AllianceColor.Blue;
-                        _gameLogic.ScoreFuel(alliance, hub.FuelDelta);
-                    }
                 }
 
                 device.LastSeen = DateTime.UtcNow;

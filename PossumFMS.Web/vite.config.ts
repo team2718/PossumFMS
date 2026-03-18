@@ -8,7 +8,7 @@ export default defineConfig({
 		proxy: {
 			// Forward SignalR hub and its WebSocket negotiation to the .NET backend
 			'/fmshub': {
-				target: 'http://localhost:5000',
+				target: 'http://localhost:80',
 				ws: true,
 				changeOrigin: true
 			}

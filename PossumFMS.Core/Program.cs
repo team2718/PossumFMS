@@ -18,6 +18,11 @@ if (!isPrimaryInstance)
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.WebHost.ConfigureKestrel(serverOptions => 
+{
+    serverOptions.Listen(System.Net.IPAddress.Any, 80);
+});
+
 // Central field state machine
 builder.Services.AddSingleton<Arena>();
 
