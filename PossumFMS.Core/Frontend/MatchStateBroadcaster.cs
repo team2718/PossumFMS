@@ -60,6 +60,7 @@ public sealed class MatchStateBroadcaster(
         wasAborted    = arena.WasAborted,
         redScore      = gameLogic.RedScore.Total,
         blueScore     = gameLogic.BlueScore.Total,
+        currentTeleopPeriod = gameLogic.CurrentTeleopPeriod.ToString(),
         redBreakdown  = new
         {
             autoFuelPoints = gameLogic.RedScore.AutoFuelPoints,

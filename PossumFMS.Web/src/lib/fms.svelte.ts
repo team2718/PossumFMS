@@ -40,6 +40,7 @@ export interface MatchState {
 	wasAborted: boolean;
 	redScore: number;
 	blueScore: number;
+	currentTeleopPeriod: string; // e.g. "TransitionShift", "Shift1", "Shift2", "Shift3", "Shift4", "EndGame", "NotStarted"
 	redBreakdown: AllianceScoreBreakdown;
 	blueBreakdown: AllianceScoreBreakdown;
 	stationClimbs: StationClimbState[];

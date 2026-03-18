@@ -54,7 +54,9 @@
 		'/sounds/match-end.wav',
 		'/sounds/match-abort.wav',
 		'/sounds/auto-end-carter.wav',
-		'/sounds/match-abort-carter.wav'
+		'/sounds/match-abort-carter.wav',
+		'/sounds/alliance_shift.wav',
+		'/sounds/steam_whistle.wav'
 	] as const;
 
 	type SoundFile = (typeof soundFiles)[number];
@@ -125,6 +127,53 @@
 		}
 
 		prevPhase = phase;
+	});
+
+	// Track TeleopPeriod transitions to fire the right sound for shift changes.
+	// prevTeleopPeriod is a plain (non-reactive) variable so reading it inside $effect
+	// does not add it as a dependency — only matchState changes trigger the effect.
+	let prevTeleopPeriod: string | null = null;
+	let teleopPeriodInitialized = false;
+
+	$effect(() => {
+		const teleopPeriod = matchState?.currentTeleopPeriod ?? null;
+
+		if (teleopPeriod === null || matchState?.phase !== 'Teleop') return;
+
+		// First state received — snapshot current period without playing anything.
+		if (!teleopPeriodInitialized) {
+			prevTeleopPeriod = teleopPeriod;
+			teleopPeriodInitialized = true;
+			return;
+		}
+
+		if (teleopPeriod === prevTeleopPeriod) return;
+
+		// Determine which sound to play based on the transition
+		const soundToPlay = (() => {
+			// Shift 4 → EndGame transition
+			if (prevTeleopPeriod === 'Shift4' && teleopPeriod === 'EndGame') {
+				return '/sounds/steam_whistle.wav';
+			}
+
+			// All other shifts (TransitionShift → Shift1, Shift1 → Shift2, Shift2 → Shift3, Shift3 → Shift4)
+			if (
+				(prevTeleopPeriod === 'TransitionShift' && teleopPeriod === 'Shift1') ||
+				(prevTeleopPeriod === 'Shift1' && teleopPeriod === 'Shift2') ||
+				(prevTeleopPeriod === 'Shift2' && teleopPeriod === 'Shift3') ||
+				(prevTeleopPeriod === 'Shift3' && teleopPeriod === 'Shift4')
+			) {
+				return '/sounds/alliance_shift.wav';
+			}
+
+			return null;
+		})();
+
+		if (soundToPlay) {
+			playSound(soundToPlay);
+		}
+
+		prevTeleopPeriod = teleopPeriod;
 	});
 </script>
 
