@@ -74,7 +74,7 @@ public sealed class DriverStationManagerTests
 
         mgr.AssignTeam(AllianceStations.Red2, 0);
 
-        Assert.Equal(string.Empty, mgr[AllianceStations.Red2].WpaKey);
+        Assert.Equal("possum2718", mgr[AllianceStations.Red2].WpaKey);
         Assert.Equal(0, mgr[AllianceStations.Red2].TeamNumber);
     }
 
@@ -100,13 +100,13 @@ public sealed class DriverStationManagerTests
     }
 
     [Fact]
-    public void AssignTeam_ZeroWithoutKey_KeyIsEmpty()
+    public void AssignTeam_ZeroWithoutKey_KeyIsDefault()
     {
         var mgr = CreateManager();
 
         mgr.AssignTeam(AllianceStations.Blue1, 0);
 
-        Assert.Equal(string.Empty, mgr[AllianceStations.Blue1].WpaKey);
+        Assert.Equal("possum2718", mgr[AllianceStations.Blue1].WpaKey);
     }
 
     [Fact]

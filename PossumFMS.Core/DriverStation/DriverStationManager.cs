@@ -83,9 +83,13 @@ public sealed class DriverStationManager : BackgroundService
         if (teamNumber < 0)
             throw new ArgumentOutOfRangeException(nameof(teamNumber), "Team number cannot be negative.");
 
+        // if wpaKey is empty, set it to "possum2718" as a default until we get a radio programming setup
+        if (string.IsNullOrEmpty(wpaKey))
+            wpaKey = "possum2718";
+
         var ds = Stations[station];
         ds.TeamNumber = teamNumber;
-        ds.WpaKey     = "possum2718";
+        ds.WpaKey     = wpaKey;
         TeamAssignmentsChanged?.Invoke();
     }
 
