@@ -134,9 +134,17 @@ public sealed class FieldHardwareManager : BackgroundService
                         if (estopHeartbeat.EstopActivated) {
                             _logger.LogWarning("E-Stop triggered by {DeviceName} for {Alliance} {Station}", device.Name, estopHeartbeat.Alliance, estopHeartbeat.Station);
                             
-                            if (estopHeartbeat.Station == 0 || estopHeartbeat.Alliance == "field")
+                            if (estopHeartbeat.Alliance == "field")
                             {
                                 _arena.TriggerArenaEstop();
+                            }
+                            else if (estopHeartbeat.Station == 0)
+                            {
+                                // If station is 0, treat it as an estop for all stations on that alliance.
+                                var alliance = estopHeartbeat.Alliance == "red" ? AllianceColor.Red : AllianceColor.Blue;
+                                _driverStationManager.Estop(new AllianceStation(alliance, StationPosition.One));
+                                _driverStationManager.Estop(new AllianceStation(alliance, StationPosition.Two));
+                                _driverStationManager.Estop(new AllianceStation(alliance, StationPosition.Three));
                             }
                             else
                             {
@@ -151,9 +159,17 @@ public sealed class FieldHardwareManager : BackgroundService
                         if (estopHeartbeat.AstopActivated) {
                             _logger.LogWarning("A-Stop triggered by {DeviceName} for {Alliance} {Station}", device.Name, estopHeartbeat.Alliance, estopHeartbeat.Station);
                             
-                            if (estopHeartbeat.Station == 0 || estopHeartbeat.Alliance == "field")
+                            if (estopHeartbeat.Alliance == "field")
                             {
                                 _driverStationManager.AstopAll();
+                            }
+                            else if (estopHeartbeat.Station == 0)
+                            {
+                                // If station is 0, treat it as an astop for all stations on that alliance.
+                                var alliance = estopHeartbeat.Alliance == "red" ? AllianceColor.Red : AllianceColor.Blue;
+                                _driverStationManager.Astop(new AllianceStation(alliance, StationPosition.One));
+                                _driverStationManager.Astop(new AllianceStation(alliance, StationPosition.Two));
+                                _driverStationManager.Astop(new AllianceStation(alliance, StationPosition.Three));
                             }
                             else
                             {
