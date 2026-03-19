@@ -58,9 +58,11 @@ export interface EstopDeviceHeartbeat {
 export type FieldDeviceHeartbeat = HubDeviceHeartbeat | EstopDeviceHeartbeat;
 
 export interface FieldDeviceDiagnostics {
+	id: number;
 	name: string;
 	type: string;
 	status: string;
+	bypassed: boolean;
 	lastSeenUtc: string;
 	secondsSinceLastSeen: number;
 	lastReplyTimeMs: number;
@@ -213,6 +215,10 @@ class FmsConnection {
 	/** Set or clear the bypass flag on a station */
 	bypassStation(stationIndex: number, bypassed: boolean) {
 		this.hub?.invoke('BypassStation', stationIndex, bypassed);
+	}
+	/** Set or clear the bypass flag on a field device */
+	bypassFieldDevice(deviceId: number, bypassed: boolean) {
+		this.hub?.invoke('BypassFieldDevice', deviceId, bypassed);
 	}
 	/** Manually push current team assignments to the access point */
 	configureAccessPoint() {

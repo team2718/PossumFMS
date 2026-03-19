@@ -61,7 +61,9 @@
 				: 'bg-slate-200 text-slate-700';
 	}
 
-	function deviceSpecificValues(device: FieldDeviceDiagnostics): Array<{ label: string; value: string }> {
+	function deviceSpecificValues(
+		device: FieldDeviceDiagnostics
+	): Array<{ label: string; value: string }> {
 		if (!device.heartbeat) return [{ label: 'Values', value: 'No parsed heartbeat yet' }];
 
 		if (device.heartbeat.kind === 'Hub') {
@@ -203,6 +205,29 @@
 	const fieldDevices = $derived(matchState?.fieldDevices ?? []);
 	const fuelAdjustments = [10, 5, 1, -1, -5, -10];
 
+	function isEstopHardwareMappedToStation(
+		device: FieldDeviceDiagnostics,
+		stationIndex: number
+	): boolean {
+		if (device.bypassed || device.status !== 'Connected') return false;
+		if (!device.heartbeat || device.heartbeat.kind !== 'Estop') return false;
+
+		const stationAlliance = stationIndex < 3 ? 'red' : 'blue';
+		const stationNumber = stationIndex < 3 ? stationIndex + 1 : stationIndex - 2;
+
+		const deviceAlliance = device.heartbeat.field.toLowerCase();
+		const deviceStation = device.heartbeat.station;
+
+		if (deviceAlliance === 'field') return true;
+		if (deviceAlliance !== stationAlliance) return false;
+
+		return deviceStation === 0 || deviceStation === stationNumber;
+	}
+
+	function hasActiveEstopHardware(stationIndex: number): boolean {
+		return fieldDevices.some((device) => isEstopHardwareMappedToStation(device, stationIndex));
+	}
+
 	// A station is ready if it is bypassed, OR if both DS and robot are linked — and it has no active e-stop.
 	const blueReady = $derived(
 		blueStations.every((s) => (s.bypassed || (s.dsLinked && s.robotLinked)) && !s.estop)
@@ -234,7 +259,9 @@
 			await fms.setAutoTowerClimb(stationIndex, climbed);
 		} catch (error) {
 			scoreWarning =
-				error instanceof Error ? error.message : 'Failed to update auto tower climb. Please try again.';
+				error instanceof Error
+					? error.message
+					: 'Failed to update auto tower climb. Please try again.';
 		}
 	}
 
@@ -244,15 +271,18 @@
 			await fms.setEndgameTowerLevel(stationIndex, level);
 		} catch (error) {
 			scoreWarning =
-				error instanceof Error ? error.message : 'Failed to update endgame tower level. Please try again.';
+				error instanceof Error
+					? error.message
+					: 'Failed to update endgame tower level. Please try again.';
 		}
 	}
 </script>
 
 {#snippet readinessHeaderRow()}
 	<div
-		class="grid grid-cols-[68px_1fr_48px_44px_44px_44px_44px_62px_62px] items-center gap-1 px-1 py-1 font-bold text-slate-600"
+		class="grid grid-cols-[68px_66px_1fr_48px_44px_44px_44px_44px_62px_62px] items-center gap-1 px-1 py-1 text-center font-bold text-slate-600"
 	>
+		<div>E-Stop HW</div>
 		<div>Station</div>
 		<div>Team</div>
 		<div>Bypass</div>
@@ -280,8 +310,7 @@
 		onclick={() => (type === 'E' ? fms.estopStation(stationIndex) : fms.astopStation(stationIndex))}
 		class="mx-auto h-7 w-14 cursor-pointer rounded border border-rose-900 px-1 text-[10px] font-black tracking-wide text-white shadow-sm transition active:translate-y-px {active
 			? 'bg-rose-950'
-			: 'bg-rose-700 hover:bg-rose-600'}"
-	>{active ? 'LOCK' : `${type}-Stop`}</button
+			: 'bg-rose-700 hover:bg-rose-600'}">{active ? 'LOCK' : `${type}-Stop`}</button
 	>
 {/snippet}
 
@@ -319,11 +348,16 @@
 	<div class="grid grid-cols-3 gap-2">
 		{#each indices as idx}
 			<div class="rounded border border-slate-200 bg-slate-50 px-2 py-1.5">
-				<div class="mb-1 text-[10px] font-semibold text-slate-500 uppercase">{stationCode(idx)}</div>
+				<div class="mb-1 text-[10px] font-semibold text-slate-500 uppercase">
+					{stationCode(idx)}
+				</div>
 				<select
 					value={matchState?.stationClimbs?.[idx]?.endgameLevel ?? 'None'}
 					onchange={(e) =>
-						setEndgameTowerLevel(idx, (e.currentTarget as HTMLSelectElement).value as TowerEndgameLevel)}
+						setEndgameTowerLevel(
+							idx,
+							(e.currentTarget as HTMLSelectElement).value as TowerEndgameLevel
+						)}
 					class="w-full rounded border border-slate-300 bg-white px-1 py-1 text-xs"
 				>
 					<option value="None">None</option>
@@ -338,11 +372,27 @@
 
 {#snippet rankingPointsSummary(alliance: 'red' | 'blue')}
 	<div class="mt-1 border-t border-slate-200 pt-1">
-		<div>Energized RP (100 Fuel): <span class="font-bold">{matchState?.rankingPoints[alliance].energized ? 'Yes' : 'No'}</span></div>
-		<div>Supercharged RP (360 Fuel): <span class="font-bold">{matchState?.rankingPoints[alliance].supercharged ? 'Yes' : 'No'}</span></div>
-		<div>Traversal RP (50 Tower): <span class="font-bold">{matchState?.rankingPoints[alliance].traversal ? 'Yes' : 'No'}</span></div>
-		<div>Win/Tie RP: <span class="font-bold">{matchState?.rankingPoints[alliance].winTie ?? 0}</span></div>
-		<div>Total RP: <span class="font-bold">{matchState?.rankingPoints[alliance].total ?? 0}</span></div>
+		<div>
+			Energized RP (100 Fuel): <span class="font-bold"
+				>{matchState?.rankingPoints[alliance].energized ? 'Yes' : 'No'}</span
+			>
+		</div>
+		<div>
+			Supercharged RP (360 Fuel): <span class="font-bold"
+				>{matchState?.rankingPoints[alliance].supercharged ? 'Yes' : 'No'}</span
+			>
+		</div>
+		<div>
+			Traversal RP (50 Tower): <span class="font-bold"
+				>{matchState?.rankingPoints[alliance].traversal ? 'Yes' : 'No'}</span
+			>
+		</div>
+		<div>
+			Win/Tie RP: <span class="font-bold">{matchState?.rankingPoints[alliance].winTie ?? 0}</span>
+		</div>
+		<div>
+			Total RP: <span class="font-bold">{matchState?.rankingPoints[alliance].total ?? 0}</span>
+		</div>
 	</div>
 {/snippet}
 
@@ -361,10 +411,20 @@
 				>Station {stationNumber} — Team {s.teamNumber || '—'}</span
 			>
 			<div class="flex gap-1">
-				{#if s.estop}<span class="rounded bg-rose-700 px-1.5 py-0.5 text-[10px] font-bold text-white">E-STOP</span>{/if}
-				{#if s.astop}<span class="rounded bg-orange-600 px-1.5 py-0.5 text-[10px] font-bold text-white">A-STOP</span>{/if}
-				{#if s.bypassed}<span class="rounded bg-slate-500 px-1.5 py-0.5 text-[10px] font-bold text-white">BYPASS</span>{/if}
-				{#if s.wrongStation}<span class="rounded bg-yellow-600 px-1.5 py-0.5 text-[10px] font-bold text-white">WRONG STN</span>{/if}
+				{#if s.estop}<span
+						class="rounded bg-rose-700 px-1.5 py-0.5 text-[10px] font-bold text-white">E-STOP</span
+					>{/if}
+				{#if s.astop}<span
+						class="rounded bg-orange-600 px-1.5 py-0.5 text-[10px] font-bold text-white"
+						>A-STOP</span
+					>{/if}
+				{#if s.bypassed}<span
+						class="rounded bg-slate-500 px-1.5 py-0.5 text-[10px] font-bold text-white">BYPASS</span
+					>{/if}
+				{#if s.wrongStation}<span
+						class="rounded bg-yellow-600 px-1.5 py-0.5 text-[10px] font-bold text-white"
+						>WRONG STN</span
+					>{/if}
 			</div>
 		</div>
 		{#if s.wrongStation}
@@ -385,7 +445,9 @@
 			</div>
 			<div class="rounded bg-slate-50 px-1.5 py-1">
 				<div class="text-[10px] text-slate-400">Lost Pkts</div>
-				<div class="font-semibold {s.missedPackets > 0 ? 'text-yellow-600' : ''}">{s.missedPackets}</div>
+				<div class="font-semibold {s.missedPackets > 0 ? 'text-yellow-600' : ''}">
+					{s.missedPackets}
+				</div>
 			</div>
 			<div class="rounded bg-slate-50 px-1.5 py-1">
 				<div class="text-[10px] text-slate-400">Last Robot Link</div>
@@ -430,7 +492,9 @@
 			Samples {device.replyTimeStats.sampleCount}
 		</div>
 		<div class="text-[10px] leading-tight text-slate-600">
-			Avg {device.replyTimeStats.avgMs.toFixed(1)} ms · StdDev {device.replyTimeStats.stdDevMs.toFixed(1)} ms
+			Avg {device.replyTimeStats.avgMs.toFixed(1)} ms · StdDev {device.replyTimeStats.stdDevMs.toFixed(
+				1
+			)} ms
 		</div>
 		<div class="text-[10px] leading-tight text-slate-600">
 			Min {device.replyTimeStats.minMs} ms · Max {device.replyTimeStats.maxMs} ms
@@ -568,8 +632,9 @@
 						{#each blueStations as s, i}
 							{@const idx = blueInputIndices[i]}
 							<div
-								class="mt-1 grid grid-cols-[68px_1fr_48px_44px_44px_44px_44px_62px_62px] items-center gap-1 rounded border border-blue-200 bg-white/75 px-1.5 py-1.5"
+								class="mt-1 grid grid-cols-[68px_66px_1fr_48px_44px_44px_44px_44px_62px_62px] items-center gap-1 rounded border border-blue-200 bg-white/75 px-1.5 py-1.5"
 							>
+								{@render readinessStatusCell(hasActiveEstopHardware(idx))}
 								<div class="text-center font-bold text-blue-900">Station {i + 1}</div>
 								<div class="flex items-center gap-1">
 									<input
@@ -621,8 +686,9 @@
 						{#each redStations as s, i}
 							{@const idx = redInputIndices[i]}
 							<div
-								class="mt-1 grid grid-cols-[68px_1fr_48px_44px_44px_44px_44px_62px_62px] items-center gap-1 rounded border border-rose-200 bg-white/75 px-1.5 py-1.5"
+								class="mt-1 grid grid-cols-[68px_66px_1fr_48px_44px_44px_44px_44px_62px_62px] items-center gap-1 rounded border border-rose-200 bg-white/75 px-1.5 py-1.5"
 							>
+								{@render readinessStatusCell(hasActiveEstopHardware(idx))}
 								<div class="text-center font-bold text-rose-900">Station {3 - i}</div>
 								<div class="flex items-center gap-1">
 									<input
@@ -678,12 +744,12 @@
 						{/if}
 						<span class="text-slate-600">FMS AP Status:</span>
 						<span
-							class="rounded px-2 py-0.5 text-xs font-bold {matchState.accessPoint.status === 'ACTIVE'
+							class="rounded px-2 py-0.5 text-xs font-bold {matchState.accessPoint.status ===
+							'ACTIVE'
 								? 'bg-emerald-100 text-emerald-800'
 								: matchState.accessPoint.status === 'CONFIGURING'
 									? 'bg-yellow-100 text-yellow-800'
-									: 'bg-rose-100 text-rose-800'}"
-						>{matchState.accessPoint.status}</span
+									: 'bg-rose-100 text-rose-800'}">{matchState.accessPoint.status}</span
 						>
 					</div>
 				{/if}
@@ -792,14 +858,15 @@
 			{#if activeTab === 'score'}
 				<div class="p-3">
 					{#if scoreWarning}
-						<div class="mb-3 rounded border border-rose-300 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">
+						<div
+							class="mb-3 rounded border border-rose-300 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700"
+						>
 							{scoreWarning}
 						</div>
 					{/if}
 					<div class="grid grid-cols-2 gap-3">
 						{@render scoreAlliancePanel('blue', blueScoreStationIndices)}
 						{@render scoreAlliancePanel('red', redScoreStationIndices)}
-
 					</div>
 				</div>
 			{:else if activeTab === 'status'}
@@ -810,11 +877,7 @@
 							Blue Alliance
 						</div>
 						{#each blueStations as s, i}
-							{@render stationStatusCard(
-								s,
-								i + 1,
-								'blue'
-							)}
+							{@render stationStatusCard(s, i + 1, 'blue')}
 						{/each}
 					</div>
 
@@ -824,19 +887,12 @@
 							Red Alliance
 						</div>
 						{#each redStations as s, i}
-							{@render stationStatusCard(
-								s,
-								3 - i,
-								'red'
-							)}
+							{@render stationStatusCard(s, 3 - i, 'red')}
 						{/each}
 					</div>
 				</div>
 			{:else if activeTab === 'options'}
 				<div class="p-4">
-					<div class="mb-3 text-xs font-bold tracking-wider text-slate-500 uppercase">
-						Arena Control
-					</div>
 					<div class="flex flex-wrap gap-3">
 						{#if matchState?.arenaEstop}
 							<div
@@ -844,7 +900,7 @@
 							>
 								<span class="font-bold text-rose-700">Arena E-Stop is ACTIVE</span>
 								<button
-								onclick={() => fms.resetArenaEstop()}
+									onclick={() => fms.resetArenaEstop()}
 									class="rounded bg-yellow-500 px-3 py-1.5 text-sm font-bold text-slate-900 hover:bg-yellow-400"
 									>Reset E-Stop</button
 								>
@@ -855,26 +911,26 @@
 			{:else if activeTab === 'field'}
 				<div class="p-3">
 					<div class="mb-3 flex items-center justify-between">
-						<div class="text-xs font-bold tracking-wider text-slate-500 uppercase">
-							Field Device Diagnostics
-						</div>
 						<div class="text-xs text-slate-600">
 							Connected devices: <span class="font-bold">{fieldDevices.length}</span>
 						</div>
 					</div>
 
 					{#if fieldDevices.length === 0}
-						<div class="rounded border border-slate-200 bg-slate-50 px-3 py-6 text-center text-sm text-slate-500">
+						<div
+							class="rounded border border-slate-200 bg-slate-50 px-3 py-6 text-center text-sm text-slate-500"
+						>
 							No field devices connected.
 						</div>
 					{:else}
 						<div class="overflow-x-auto rounded border border-slate-200">
-							<table class="min-w-[1400px] divide-y divide-slate-200 text-left text-xs">
+							<table class="min-w-[1460px] divide-y divide-slate-200 text-left text-xs">
 								<thead class="bg-slate-100 text-slate-600">
 									<tr>
 										<th class="px-2 py-2 font-semibold">Name</th>
 										<th class="px-2 py-2 font-semibold">Type</th>
 										<th class="px-2 py-2 font-semibold">Status</th>
+										<th class="px-2 py-2 font-semibold">Bypass</th>
 										<th class="px-2 py-2 font-semibold">Last Reply Time</th>
 										<th class="px-2 py-2 font-semibold">Last Seen</th>
 										<th class="px-2 py-2 font-semibold">Device-Specific Values</th>
@@ -886,9 +942,19 @@
 											<td class="px-2 py-2 font-semibold text-slate-900">{device.name}</td>
 											<td class="px-2 py-2 text-slate-700">{device.type}</td>
 											<td class="px-2 py-2">
-												<span class="rounded px-2 py-0.5 text-[10px] font-bold {statusBadgeClasses(device.status)}"
-													>{device.status}</span
+												<span
+													class="rounded px-2 py-0.5 text-[10px] font-bold {statusBadgeClasses(
+														device.status
+													)}">{device.status}</span
 												>
+											</td>
+											<td class="px-2 py-2">
+												<input
+													type="checkbox"
+													checked={device.bypassed}
+													onchange={() => fms.bypassFieldDevice(device.id, !device.bypassed)}
+													class="h-4 w-4 cursor-pointer"
+												/>
 											</td>
 											<td class="px-2 py-2">{@render fieldDeviceReplyTimeCell(device)}</td>
 											<td class="px-2 py-2 text-[11px] text-slate-700">

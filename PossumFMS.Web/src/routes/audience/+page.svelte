@@ -218,17 +218,9 @@
 				: 'bg-[#004270]'
 			: isMiddle
 				? 'bg-[#620a0c]'
-				: 'bg-[#850e12]'} px-3 py-3 text-sm font-semibold md:text-5xl"
+				: 'bg-[#850e12]'} px-3 py-3 text-sm font-semibold md:text-4xl"
 	>
-		{#if alliance === 'blue'}
-			<span class="h-2 w-2 shrink-0 rounded-full {linked ? 'bg-emerald-300' : 'bg-white/25'}"
-			></span>
-			<span>{team > 0 ? team : '----'}</span>
-		{:else}
-			<span>{team > 0 ? team : '----'}</span>
-			<span class="h-2 w-2 shrink-0 rounded-full {linked ? 'bg-emerald-300' : 'bg-white/25'}"
-			></span>
-		{/if}
+		<span>{team > 0 ? team : '----'}</span>
 	</div>
 {/snippet}
 
@@ -237,21 +229,19 @@
 		class="rounded-lg {alliance === 'blue' ? 'bg-[#003151]/90' : 'bg-[#620a0c]/90'} {alliance ===
 		'red'
 			? 'text-right'
-			: ''} px-4 py-2 text-sm font-semibold md:text-xl shadow-md shadow-black/70"
+			: ''} px-4 py-2 text-sm font-semibold shadow-md shadow-black/70 md:text-xl"
 	>
-		<span class="mr-4 {matchState?.rankingPoints[alliance].energized
+		<span
+			class="mr-4 {matchState?.rankingPoints[alliance].energized
 				? 'text-teal-400'
-				: 'text-slate-400'}"
-			>Energized {Math.min(fuelCombined, 100)}/100</span
+				: 'text-slate-400'}">Energized {Math.min(fuelCombined, 100)}/100</span
 		>
-		<span class="mr-4 {matchState?.rankingPoints[alliance].supercharged
+		<span
+			class="mr-4 {matchState?.rankingPoints[alliance].supercharged
 				? 'text-teal-400'
-				: 'text-slate-400'}"
-			>Supercharged {Math.min(fuelCombined, 360)}/360</span
+				: 'text-slate-400'}">Supercharged {Math.min(fuelCombined, 360)}/360</span
 		>
-		<span class="{matchState?.rankingPoints[alliance].traversal
-				? 'text-teal-400'
-				: 'text-slate-400'}"
+		<span class={matchState?.rankingPoints[alliance].traversal ? 'text-teal-400' : 'text-slate-400'}
 			>Traversal {Math.min(towerCombined, 50)}/50</span
 		>
 	</div>

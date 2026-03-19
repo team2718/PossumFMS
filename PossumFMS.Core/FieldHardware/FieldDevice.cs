@@ -30,6 +30,7 @@ public sealed record EstopHeartbeat(string Alliance, int Station, bool AstopActi
 /// </summary>
 public sealed class FieldDevice(TcpClient client)
 {
+    public int Id { get; set; }
     public string Name { get; private set; } = "unknown";
     public FieldDeviceType Type { get; private set; } = FieldDeviceType.Unknown;
     public IPEndPoint? RemoteEndpoint => Client.Client.RemoteEndPoint as IPEndPoint;
@@ -43,6 +44,7 @@ public sealed class FieldDevice(TcpClient client)
     public int ReplyTimeMaxMs { get; private set; }
     public double ReplyTimeAverageMs { get; private set; }
     public double ReplyTimeStdDevMs { get; private set; }
+    public bool Bypassed { get; set; }
 
     private double _replyTimeM2;
 

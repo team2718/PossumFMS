@@ -139,13 +139,15 @@ public sealed class MatchStateBroadcaster(
             };
         }),
         fieldDevices  = fieldHardwareManager.Devices
-            .OrderBy(d => d.Name, StringComparer.OrdinalIgnoreCase)
-            .ThenBy(d => d.Type)
+            .OrderBy(d => d.Type)
+            .ThenBy(d => d.Name, StringComparer.OrdinalIgnoreCase)
             .Select(d => new
             {
+                id = d.Id,
                 name = d.Name,
                 type = d.Type.ToString(),
                 status = d.Status.ToString(),
+                bypassed = d.Bypassed,
                 lastSeenUtc = d.LastSeen,
                 secondsSinceLastSeen = Math.Max(0, (nowUtc - d.LastSeen).TotalSeconds),
                 lastReplyTimeMs = d.LastReplyTimeMs,

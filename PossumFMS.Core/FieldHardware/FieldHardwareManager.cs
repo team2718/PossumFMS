@@ -102,7 +102,10 @@ public sealed class FieldHardwareManager : BackgroundService
     private async Task HandleClientAsync(TcpClient client, CancellationToken serviceCt)
     {
         var deviceId = Interlocked.Increment(ref _nextDeviceId);
-        var device = new FieldDevice(client);
+        var device = new FieldDevice(client)
+        {
+            Id = deviceId,
+        };
         _devices[deviceId] = device;
 
         var endpoint = device.RemoteEndpoint?.ToString() ?? "unknown";
@@ -129,8 +132,12 @@ public sealed class FieldHardwareManager : BackgroundService
                 {
                     _protocol.ParseHeartbeat(device, heartbeat);
 
+                    if (device.Bypassed)
+                        continue;
+
                     if (device.LastHeartbeat is EstopHeartbeat estopHeartbeat)
                     {
+
                         if (estopHeartbeat.EstopActivated) {
                             _logger.LogWarning("E-Stop triggered by {DeviceName} for {Alliance} {Station}", device.Name, estopHeartbeat.Alliance, estopHeartbeat.Station);
                             
@@ -239,8 +246,20 @@ public sealed class FieldHardwareManager : BackgroundService
         _logger.LogInformation("Field device {Name} at {RemoteEndpoint} disconnected.", device.Name, endpoint);
     }
 
+    public bool SetBypass(int deviceId, bool bypassed)
+    {
+        if (!_devices.TryGetValue(deviceId, out var device))
+            return false;
+
+        device.Bypassed = bypassed;
+        return true;
+    }
+
     private void AbortMatchForCriticalDeviceDisconnect(FieldDevice device, string endpoint, string reason)
     {
+        if (device.Bypassed)
+            return;
+        
         if (device.Type is not (FieldDeviceType.Estop or FieldDeviceType.Hub))
             return;
 

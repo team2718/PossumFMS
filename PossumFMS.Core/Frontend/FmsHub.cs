@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.SignalR;
 using PossumFMS.Core.Arena;
 using PossumFMS.Core.DriverStation;
+using PossumFMS.Core.FieldHardware;
 using PossumFMS.Core.Network;
 
 namespace PossumFMS.Core.Frontend;
@@ -16,6 +17,7 @@ public sealed class FmsHub(
     Arena.Arena arena,
     GameLogic gameLogic,
     DriverStationManager dsManager,
+    FieldHardwareManager fieldHardwareManager,
     AccessPointManager apManager,
     MatchStateBroadcaster broadcaster,
     ILogger<FmsHub> logger) : Hub
@@ -234,6 +236,17 @@ public sealed class FmsHub(
         logger.LogInformation("{Action} bypass on {Station} by {Client}.",
             bypassed ? "Set" : "Clear", station, Context.ConnectionId);
         dsManager.SetBypass(station, bypassed);
+        await BroadcastMatchState();
+    }
+
+    public async Task BypassFieldDevice(int deviceId, bool bypassed)
+    {
+        logger.LogInformation("{Action} field device bypass on device {DeviceId} by {Client}.",
+            bypassed ? "Set" : "Clear", deviceId, Context.ConnectionId);
+
+        if (!fieldHardwareManager.SetBypass(deviceId, bypassed))
+            throw new HubException($"No field device found with id {deviceId}.");
+
         await BroadcastMatchState();
     }
 

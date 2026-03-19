@@ -51,6 +51,15 @@ public sealed class FieldHardwareProtocol
             };
         }
 
+        if (device.Bypassed)
+        {
+            return new BsonDocument
+            {
+                { "accepted", true },
+                { "bypassed", true },
+            };
+        }
+
         if (!_handlersByType.TryGetValue(device.Type, out var handler))
         {
             return new BsonDocument

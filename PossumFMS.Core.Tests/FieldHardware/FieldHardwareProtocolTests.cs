@@ -277,6 +277,21 @@ public sealed class FieldHardwareProtocolTests : IDisposable
         Assert.Equal("some error", reply["error"].AsString);
     }
 
+    [Fact]
+    public void BuildReply_WhenDeviceBypassed_ReturnsBypassedAcknowledgement()
+    {
+        var arena = new PossumFMS.Core.Arena.Arena();
+        var logic = new GameLogic(arena);
+        MakeHubDevice("red");
+        _device.Bypassed = true;
+
+        var reply = _protocol.BuildReply(_device, arena, logic, null);
+
+        Assert.True(reply["accepted"].AsBoolean);
+        Assert.True(reply["bypassed"].AsBoolean);
+        Assert.False(reply.Contains("led_r"));
+    }
+
     // ── BuildReply — Hub LED colors ────────────────────────────────────────────
 
     private FieldDevice MakeHubDevice(string alliance)
