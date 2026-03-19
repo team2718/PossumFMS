@@ -1,6 +1,11 @@
 ﻿<script lang="ts">
 	import { fms } from '$lib/fms.svelte';
-	import type { FieldDeviceDiagnostics, TowerEndgameLevel } from '$lib/fms.svelte';
+	import type {
+		FieldDeviceDiagnostics,
+		LogSeverity,
+		RecentLogEntry,
+		TowerEndgameLevel
+	} from '$lib/fms.svelte';
 
 	// Connect to the FMS hub when the page loads
 	$effect(() => {
@@ -44,6 +49,12 @@
 		return timestamp.toLocaleString();
 	}
 
+	function formatLogTimestamp(value: string): string {
+		const timestamp = new Date(value);
+		if (Number.isNaN(timestamp.getTime())) return value;
+		return timestamp.toLocaleString();
+	}
+
 	function formatAgo(seconds: number): string {
 		if (seconds < 1) return '<1s ago';
 		if (seconds < 60) return `${Math.round(seconds)}s ago`;
@@ -59,6 +70,20 @@
 			: status === 'Error'
 				? 'bg-rose-100 text-rose-800'
 				: 'bg-slate-200 text-slate-700';
+	}
+
+	function logEntryClasses(level: LogSeverity): string {
+		return level === 'Critical'
+			? 'border-red-950 bg-red-950 text-white'
+			: level === 'Error'
+				? 'border-rose-300 bg-rose-100 text-rose-950'
+				: level === 'Warning'
+					? 'border-amber-300 bg-amber-100 text-amber-950'
+					: level === 'Information'
+						? 'border-sky-200 bg-sky-50 text-sky-950'
+						: level === 'Debug'
+							? 'border-slate-300 bg-slate-100 text-slate-900'
+							: 'border-slate-200 bg-white text-slate-700';
 	}
 
 	function deviceSpecificValues(
@@ -238,10 +263,47 @@
 
 	let activeTab = $state('status');
 	let scoreWarning = $state('');
+	let logSearch = $state('');
+	const logSeverityOptions: LogSeverity[] = [
+		'Trace',
+		'Debug',
+		'Information',
+		'Warning',
+		'Error',
+		'Critical'
+	];
+	let selectedLogSeverities = $state<LogSeverity[]>(['Warning', 'Error', 'Critical']);
 
 	function stationCode(idx: number): string {
 		return idx < 3 ? `Red${idx + 1}` : `Blue${idx - 2}`;
 	}
+
+	function toggleLogSeverity(level: LogSeverity, enabled: boolean) {
+		if (enabled) {
+			if (!selectedLogSeverities.includes(level)) {
+				selectedLogSeverities = [...selectedLogSeverities, level];
+			}
+			return;
+		}
+
+		selectedLogSeverities = selectedLogSeverities.filter((value) => value !== level);
+	}
+
+	const filteredLogEntries = $derived.by(() => {
+		const selectedLevels = new Set(selectedLogSeverities);
+		const keyword = logSearch.trim().toLowerCase();
+
+		return [...fms.logEntries]
+			.reverse()
+			.filter((entry: RecentLogEntry) => {
+				if (!selectedLevels.has(entry.level)) return false;
+
+				if (!keyword) return true;
+
+				const haystack = `${entry.level} ${entry.category} ${entry.message}`.toLowerCase();
+				return haystack.includes(keyword);
+			});
+	});
 
 	async function adjustFuelPoints(alliance: 'Red' | 'Blue', isAuto: boolean, delta: number) {
 		scoreWarning = '';
@@ -853,6 +915,14 @@
 						? 'border-b-2 border-blue-600 font-semibold text-blue-700'
 						: 'text-slate-500 hover:text-slate-800'}">Options</button
 				>
+				<button
+					onclick={() => {
+						activeTab = 'log';
+					}}
+					class="mr-6 pb-2 {activeTab === 'log'
+						? 'border-b-2 border-blue-600 font-semibold text-blue-700'
+						: 'text-slate-500 hover:text-slate-800'}">Log</button
+				>
 			</div>
 
 			{#if activeTab === 'score'}
@@ -969,6 +1039,70 @@
 						</div>
 					{/if}
 				</div>
+				{:else if activeTab === 'log'}
+					<div class="p-3">
+						<div class="mb-3 flex flex-wrap items-end justify-between gap-3 rounded border border-slate-200 bg-slate-50 p-3">
+							<div class="min-w-[260px] flex-1">
+								<label for="log-search" class="mb-1 block text-xs font-semibold text-slate-600"
+									>Search Logs</label
+								>
+								<input
+									id="log-search"
+									type="text"
+									bind:value={logSearch}
+									placeholder="Keyword, category, or message"
+									class="w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm"
+								/>
+							</div>
+
+							<div>
+								<div class="mb-1 text-xs font-semibold text-slate-600">Severity Filters</div>
+								<div class="flex flex-wrap gap-2">
+									{#each logSeverityOptions as level}
+										<label class="inline-flex items-center gap-1 px-2 py-1 text-xs text-slate-700">
+											<input
+												type="checkbox"
+												checked={selectedLogSeverities.includes(level)}
+												onchange={(e) =>
+													toggleLogSeverity(level, (e.currentTarget as HTMLInputElement).checked)}
+											/>
+											<span>{level}</span>
+										</label>
+									{/each}
+								</div>
+							</div>
+
+							<!-- <div class="text-xs text-slate-600">
+								<div>Total buffered: <span class="font-bold text-slate-900">{fms.logEntries.length}</span></div>
+								<div>Visible: <span class="font-bold text-slate-900">{filteredLogEntries.length}</span></div>
+							</div> -->
+						</div>
+
+						{#if selectedLogSeverities.length === 0}
+							<div class="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900">
+								Select at least one severity level to display log entries.
+							</div>
+						{:else if filteredLogEntries.length === 0}
+							<div class="rounded border border-slate-200 bg-slate-50 px-3 py-6 text-center text-sm text-slate-500">
+								No log entries match the current filters.
+							</div>
+						{:else}
+							<div class="space-y-2">
+								{#each filteredLogEntries as entry}
+									<div class="rounded border px-3 py-2 shadow-sm {logEntryClasses(entry.level)}">
+										<div class="mb-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-semibold uppercase tracking-wide opacity-90">
+											<span>{entry.level}</span>
+											<span>{formatLogTimestamp(entry.timestampUtc)}</span>
+											<span class="normal-case tracking-normal">{entry.category}</span>
+										</div>
+										<div class="whitespace-pre-wrap break-words font-mono text-[12px] leading-5">
+											{entry.message}
+										</div>
+									</div>
+								{/each}
+							</div>
+						{/if}
+					</div>
 			{/if}
 		</div>
 	</main>

@@ -121,12 +121,29 @@ export interface RankingPointBreakdown {
 	total: number;
 }
 
+export type LogSeverity =
+	| 'Trace'
+	| 'Debug'
+	| 'Information'
+	| 'Warning'
+	| 'Error'
+	| 'Critical';
+
+export interface RecentLogEntry {
+	id: number;
+	timestampUtc: string;
+	level: LogSeverity;
+	category: string;
+	message: string;
+}
+
 // Using a class is the recommended Svelte 5 pattern for shared reactive state.
 // Class fields declared with $state() are properly tracked as reactive signals
 // when accessed from any component that imports this module.
 class FmsConnection {
 	matchState = $state<MatchState | null>(null);
 	connected = $state(false);
+	logEntries = $state<RecentLogEntry[]>([]);
 
 	private hub: signalR.HubConnection | null = null;
 
@@ -145,6 +162,14 @@ class FmsConnection {
 			this.matchState = s;
 		});
 
+		this.hub.on('RecentLogs', (entries: RecentLogEntry[]) => {
+			this.logEntries = this.mergeLogs(entries);
+		});
+
+		this.hub.on('LogEntry', (entry: RecentLogEntry) => {
+			this.logEntries = this.mergeLogs([entry]);
+		});
+
 		this.hub.onclose(() => {
 			this.connected = false;
 		});
@@ -153,16 +178,27 @@ class FmsConnection {
 		});
 		this.hub.onreconnected(() => {
 			this.connected = true;
-			this.hub!.invoke('RequestMatchState');
+			void Promise.all([this.hub!.invoke('RequestMatchState'), this.hub!.invoke('RequestRecentLogs')]);
 		});
 
 		this.hub
 			.start()
 			.then(() => {
 				this.connected = true;
-				return this.hub!.invoke('RequestMatchState');
+				return Promise.all([this.hub!.invoke('RequestMatchState'), this.hub!.invoke('RequestRecentLogs')]);
 			})
 			.catch(console.error);
+	}
+
+	private mergeLogs(entries: RecentLogEntry[]): RecentLogEntry[] {
+		const merged = new Map<number, RecentLogEntry>();
+
+		for (const entry of this.logEntries) merged.set(entry.id, entry);
+		for (const entry of entries) merged.set(entry.id, entry);
+
+		return Array.from(merged.values())
+			.sort((left, right) => left.id - right.id)
+			.slice(-100);
 	}
 
 	// --- Hub method wrappers (mirror FmsHub.cs on the backend) ---

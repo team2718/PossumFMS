@@ -19,6 +19,7 @@ public sealed class FmsHub(
     DriverStationManager dsManager,
     FieldHardwareManager fieldHardwareManager,
     AccessPointManager apManager,
+    RecentLogStore recentLogStore,
     MatchStateBroadcaster broadcaster,
     ILogger<FmsHub> logger) : Hub
 {
@@ -253,6 +254,9 @@ public sealed class FmsHub(
     // ── State push ─────────────────────────────────────────────────────────────
 
     public Task RequestMatchState() => BroadcastMatchState();
+
+    public Task RequestRecentLogs() =>
+        Clients.Caller.SendAsync("RecentLogs", recentLogStore.GetEntries());
 
     private Task BroadcastMatchState() => broadcaster.BroadcastAsync();
 

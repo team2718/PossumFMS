@@ -44,6 +44,10 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<FieldHardwareManag
 // Frontend SignalR hub
 builder.Services.AddSignalR();
 
+builder.Services.AddSingleton<RecentLogStore>();
+builder.Services.AddSingleton<ILoggerProvider, RecentLogBufferLoggerProvider>();
+builder.Services.AddHostedService<RecentLogBroadcaster>();
+
 // Match-state broadcaster
 builder.Services.AddSingleton<MatchStateBroadcaster>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<MatchStateBroadcaster>());
