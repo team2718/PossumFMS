@@ -179,7 +179,7 @@ public sealed class FieldDeviceTests : IDisposable
     [Fact]
     public void ApplyHeartbeat_Estop_SetsTypeToEstop()
     {
-        var heartbeat = new EstopHeartbeat(false, false, DateTime.UtcNow);
+        var heartbeat = new EstopHeartbeat("red", 1, false, false, DateTime.UtcNow);
 
         _device.ApplyHeartbeat(heartbeat);
 
@@ -227,7 +227,7 @@ public sealed class FieldDeviceTests : IDisposable
     public void EstopHeartbeat_StoresAllProperties()
     {
         var now = DateTime.UtcNow;
-        var hb  = new EstopHeartbeat(true, false, now);
+        var hb  = new EstopHeartbeat("red", 1, true, false, now);
 
         Assert.True(hb.AstopActivated);
         Assert.False(hb.EstopActivated);

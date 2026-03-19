@@ -1,6 +1,6 @@
 ﻿<script lang="ts">
 	import { fms } from '$lib/fms.svelte';
-	import type { TowerEndgameLevel } from '$lib/fms.svelte';
+	import type { FieldDeviceDiagnostics, TowerEndgameLevel } from '$lib/fms.svelte';
 
 	// Connect to the FMS hub when the page loads
 	$effect(() => {
@@ -36,6 +36,49 @@
 
 		const wholeSeconds = Math.max(0, Math.round(secondsSinceLink));
 		return `${wholeSeconds} ${wholeSeconds === 1 ? 'second' : 'seconds'} ago`;
+	}
+
+	function formatTimestamp(value: string): string {
+		const timestamp = new Date(value);
+		if (Number.isNaN(timestamp.getTime())) return '—';
+		return timestamp.toLocaleString();
+	}
+
+	function formatAgo(seconds: number): string {
+		if (seconds < 1) return '<1s ago';
+		if (seconds < 60) return `${Math.round(seconds)}s ago`;
+		if (seconds < 3600) return `${Math.floor(seconds / 60)}m ${Math.round(seconds % 60)}s ago`;
+		const hours = Math.floor(seconds / 3600);
+		const minutes = Math.round((seconds % 3600) / 60);
+		return `${hours}h ${minutes}m ago`;
+	}
+
+	function statusBadgeClasses(status: string): string {
+		return status === 'Connected'
+			? 'bg-emerald-100 text-emerald-800'
+			: status === 'Error'
+				? 'bg-rose-100 text-rose-800'
+				: 'bg-slate-200 text-slate-700';
+	}
+
+	function deviceSpecificValues(device: FieldDeviceDiagnostics): Array<{ label: string; value: string }> {
+		if (!device.heartbeat) return [{ label: 'Values', value: 'No parsed heartbeat yet' }];
+
+		if (device.heartbeat.kind === 'Hub') {
+			return [
+				{ label: 'Alliance', value: device.heartbeat.alliance.toUpperCase() },
+				{ label: 'Fuel Delta', value: String(device.heartbeat.fuelDelta) },
+				{ label: 'Heartbeat', value: formatTimestamp(device.heartbeat.receivedUtc) }
+			];
+		}
+
+		return [
+			{ label: 'Field', value: device.heartbeat.field.toUpperCase() },
+			{ label: 'Station', value: String(device.heartbeat.station) },
+			{ label: 'A-Stop', value: device.heartbeat.astopActivated ? 'Active' : 'Clear' },
+			{ label: 'E-Stop', value: device.heartbeat.estopActivated ? 'Active' : 'Clear' },
+			{ label: 'Heartbeat', value: formatTimestamp(device.heartbeat.receivedUtc) }
+		];
 	}
 
 	// Assign the team from the input field, or 0 if the field is blank
@@ -157,6 +200,7 @@
 	const redInputIndices = [2, 1, 0];
 	const redScoreStationIndices = [0, 1, 2];
 	const blueScoreStationIndices = [3, 4, 5];
+	const fieldDevices = $derived(matchState?.fieldDevices ?? []);
 	const fuelAdjustments = [10, 5, 1, -1, -5, -10];
 
 	// A station is ready if it is bypassed, OR if both DS and robot are linked — and it has no active e-stop.
@@ -376,6 +420,29 @@
 				</div>
 			</div>
 		{/if}
+	</div>
+{/snippet}
+
+{#snippet fieldDeviceReplyTimeCell(device: FieldDeviceDiagnostics)}
+	<div class="space-y-1">
+		<div class="font-semibold text-slate-800">{device.lastReplyTimeMs} ms</div>
+		<div class="text-[10px] leading-tight text-slate-600">
+			Samples {device.replyTimeStats.sampleCount}
+		</div>
+		<div class="text-[10px] leading-tight text-slate-600">
+			Avg {device.replyTimeStats.avgMs.toFixed(1)} ms · StdDev {device.replyTimeStats.stdDevMs.toFixed(1)} ms
+		</div>
+		<div class="text-[10px] leading-tight text-slate-600">
+			Min {device.replyTimeStats.minMs} ms · Max {device.replyTimeStats.maxMs} ms
+		</div>
+	</div>
+{/snippet}
+
+{#snippet fieldDeviceSpecificValuesCell(device: FieldDeviceDiagnostics)}
+	<div class="space-y-0.5 text-[11px] text-slate-700">
+		{#each deviceSpecificValues(device) as metric}
+			<div><span class="font-semibold">{metric.label}:</span> {metric.value}</div>
+		{/each}
 	</div>
 {/snippet}
 
@@ -706,6 +773,14 @@
 				>
 				<button
 					onclick={() => {
+						activeTab = 'field';
+					}}
+					class="mr-6 pb-2 {activeTab === 'field'
+						? 'border-b-2 border-blue-600 font-semibold text-blue-700'
+						: 'text-slate-500 hover:text-slate-800'}">Field</button
+				>
+				<button
+					onclick={() => {
 						activeTab = 'options';
 					}}
 					class="mr-6 pb-2 {activeTab === 'options'
@@ -776,6 +851,57 @@
 							</div>
 						{/if}
 					</div>
+				</div>
+			{:else if activeTab === 'field'}
+				<div class="p-3">
+					<div class="mb-3 flex items-center justify-between">
+						<div class="text-xs font-bold tracking-wider text-slate-500 uppercase">
+							Field Device Diagnostics
+						</div>
+						<div class="text-xs text-slate-600">
+							Connected devices: <span class="font-bold">{fieldDevices.length}</span>
+						</div>
+					</div>
+
+					{#if fieldDevices.length === 0}
+						<div class="rounded border border-slate-200 bg-slate-50 px-3 py-6 text-center text-sm text-slate-500">
+							No field devices connected.
+						</div>
+					{:else}
+						<div class="overflow-x-auto rounded border border-slate-200">
+							<table class="min-w-[1400px] divide-y divide-slate-200 text-left text-xs">
+								<thead class="bg-slate-100 text-slate-600">
+									<tr>
+										<th class="px-2 py-2 font-semibold">Name</th>
+										<th class="px-2 py-2 font-semibold">Type</th>
+										<th class="px-2 py-2 font-semibold">Status</th>
+										<th class="px-2 py-2 font-semibold">Last Reply Time</th>
+										<th class="px-2 py-2 font-semibold">Last Seen</th>
+										<th class="px-2 py-2 font-semibold">Device-Specific Values</th>
+									</tr>
+								</thead>
+								<tbody class="divide-y divide-slate-200 bg-white">
+									{#each fieldDevices as device}
+										<tr class="align-top">
+											<td class="px-2 py-2 font-semibold text-slate-900">{device.name}</td>
+											<td class="px-2 py-2 text-slate-700">{device.type}</td>
+											<td class="px-2 py-2">
+												<span class="rounded px-2 py-0.5 text-[10px] font-bold {statusBadgeClasses(device.status)}"
+													>{device.status}</span
+												>
+											</td>
+											<td class="px-2 py-2">{@render fieldDeviceReplyTimeCell(device)}</td>
+											<td class="px-2 py-2 text-[11px] text-slate-700">
+												<div>{formatTimestamp(device.lastSeenUtc)}</div>
+												<div class="text-slate-500">{formatAgo(device.secondsSinceLastSeen)}</div>
+											</td>
+											<td class="px-2 py-2">{@render fieldDeviceSpecificValuesCell(device)}</td>
+										</tr>
+									{/each}
+								</tbody>
+							</table>
+						</div>
+					{/if}
 				</div>
 			{/if}
 		</div>

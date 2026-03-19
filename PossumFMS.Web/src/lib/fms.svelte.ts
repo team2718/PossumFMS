@@ -31,6 +31,43 @@ export interface Station {
 	wifi: WifiStatus | null;
 }
 
+export interface FieldDeviceReplyTimeStats {
+	sampleCount: number;
+	minMs: number;
+	maxMs: number;
+	avgMs: number;
+	stdDevMs: number;
+}
+
+export interface HubDeviceHeartbeat {
+	kind: 'Hub';
+	receivedUtc: string;
+	alliance: string;
+	fuelDelta: number;
+}
+
+export interface EstopDeviceHeartbeat {
+	kind: 'Estop';
+	receivedUtc: string;
+	field: string;
+	station: number;
+	astopActivated: boolean;
+	estopActivated: boolean;
+}
+
+export type FieldDeviceHeartbeat = HubDeviceHeartbeat | EstopDeviceHeartbeat;
+
+export interface FieldDeviceDiagnostics {
+	name: string;
+	type: string;
+	status: string;
+	lastSeenUtc: string;
+	secondsSinceLastSeen: number;
+	lastReplyTimeMs: number;
+	replyTimeStats: FieldDeviceReplyTimeStats;
+	heartbeat: FieldDeviceHeartbeat | null;
+}
+
 export interface MatchState {
 	phase: string; // e.g. "Idle", "PreMatch", "MatchRunning", "MatchOver"
 	matchType: string; // e.g. "Practice", "Qualification", "Playoff"
@@ -49,6 +86,7 @@ export interface MatchState {
 	loopTiming: { currentMs: number; maxMs30s: number };
 	accessPoint: { status: string }; // "ACTIVE" | "CONFIGURING" | "ERROR"
 	stations: Station[]; // always 6: Red1, Red2, Red3, Blue1, Blue2, Blue3
+	fieldDevices: FieldDeviceDiagnostics[];
 }
 
 export interface TeamAssignment {

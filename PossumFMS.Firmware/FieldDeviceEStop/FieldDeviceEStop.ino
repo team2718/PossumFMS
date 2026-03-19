@@ -92,13 +92,11 @@ void loop() {
         lastHeartbeatMs = now;
         sendHeartbeat(estopped, astopped);
         if (estopped) {
-            Serial.println("EStop sent!");
+            Serial.println("Attempting to send E-Stop!");
         }
         if (astopped) {
-            Serial.println("AStop sent!");
+            Serial.println("Attempting to send A-Stop!");
         }
-        estopped = false;
-        astopped = false;
         receiveReply();
     }
 }
@@ -186,6 +184,16 @@ void receiveReply() {
     if (!accepted) {
         String err = dec.getString("error", "(no error field)");
         Serial.printf("[ESTOP] Server rejected message: %s\n", err.c_str());
+        return;
     }
-    // Nothing further to act on for the e-stop device.
+    
+    // Heartbeat was accepted and read successfully. Clear the latched button states.
+    if (estopped) {
+        Serial.println("E-Stop accepted by server.");
+    }
+    if (astopped) {
+        Serial.println("A-Stop accepted by server.");
+    }
+    estopped = false;
+    astopped = false;
 }

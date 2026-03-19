@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.SignalR;
 using PossumFMS.Core.Arena;
 using PossumFMS.Core.DriverStation;
+using PossumFMS.Core.FieldHardware;
 using PossumFMS.Core.Network;
 
 namespace PossumFMS.Core.Frontend;
@@ -20,7 +21,8 @@ public sealed class MatchStateBroadcaster(
     Arena.Arena         arena,
     GameLogic            gameLogic,
     DriverStationManager dsManager,
-    AccessPointManager   apManager) : BackgroundService
+    AccessPointManager   apManager,
+    FieldHardwareManager fieldHardwareManager) : BackgroundService
 {
     private static readonly TimeSpan BroadcastInterval = TimeSpan.FromMilliseconds(200);
 
@@ -49,6 +51,7 @@ public sealed class MatchStateBroadcaster(
         var redWins = gameLogic.RedScore.Total > gameLogic.BlueScore.Total;
         var blueWins = gameLogic.BlueScore.Total > gameLogic.RedScore.Total;
         var tie = gameLogic.RedScore.Total == gameLogic.BlueScore.Total;
+        var nowUtc = DateTime.UtcNow;
 
         return new
         {
@@ -135,7 +138,52 @@ public sealed class MatchStateBroadcaster(
                 },
             };
         }),
+        fieldDevices  = fieldHardwareManager.Devices
+            .OrderBy(d => d.Name, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(d => d.Type)
+            .Select(d => new
+            {
+                name = d.Name,
+                type = d.Type.ToString(),
+                status = d.Status.ToString(),
+                lastSeenUtc = d.LastSeen,
+                secondsSinceLastSeen = Math.Max(0, (nowUtc - d.LastSeen).TotalSeconds),
+                lastReplyTimeMs = d.LastReplyTimeMs,
+                replyTimeStats = new
+                {
+                    sampleCount = d.ReplySampleCount,
+                    minMs = d.ReplyTimeMinMs,
+                    maxMs = d.ReplyTimeMaxMs,
+                    avgMs = d.ReplyTimeAverageMs,
+                    stdDevMs = d.ReplyTimeStdDevMs,
+                },
+                heartbeat = BuildHeartbeatDiagnostics(d.LastHeartbeat),
+            }),
     };
+    }
+
+    private static object? BuildHeartbeatDiagnostics(FieldDeviceHeartbeat? heartbeat)
+    {
+        return heartbeat switch
+        {
+            HubHeartbeat hub => new
+            {
+                kind = "Hub",
+                receivedUtc = hub.ReceivedUtc,
+                alliance = hub.Alliance,
+                fuelDelta = hub.FuelDelta,
+            },
+            EstopHeartbeat estop => new
+            {
+                kind = "Estop",
+                receivedUtc = estop.ReceivedUtc,
+                field = estop.Alliance,
+                station = estop.Station,
+                astopActivated = estop.AstopActivated,
+                estopActivated = estop.EstopActivated,
+            },
+            _ => null,
+        };
     }
 
     internal static object BuildRankingPointBreakdown(int fuelCombined, int towerCombined, bool winsMatch, bool tiedMatch)

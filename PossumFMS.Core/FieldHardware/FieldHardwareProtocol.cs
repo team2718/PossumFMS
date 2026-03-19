@@ -31,6 +31,8 @@ public sealed class FieldHardwareProtocol
 
         device.UpdateIdentity(name, type);
 
+        device.UpdateLastReplyTime(BsonField.GetInt32(heartbeat, "last_reply_time_ms") ?? 0);
+
         if (!_handlersByType.TryGetValue(device.Type, out var handler))
             throw new InvalidOperationException($"Unsupported device type '{type}'.");
 
@@ -157,13 +159,21 @@ internal sealed class EstopDeviceProtocolHandler : IFieldDeviceProtocolHandler
 
     public DeviceHeartbeatParseResult Parse(BsonDocument heartbeat)
     {
+        var alliance = BsonField.GetString(heartbeat, "field")?.ToLowerInvariant();
+        if (alliance is not ("red" or "blue" or "field"))
+            throw new InvalidOperationException("E-stop heartbeat must include alliance as 'red', 'blue', or 'field'.");
+
+        var station = BsonField.GetInt32(heartbeat, "station_number") ?? 0;
+        if (station < 0 || station > 3)
+            throw new InvalidOperationException("E-stop heartbeat must include station_number between 0 and 3.");
+
         var astop = BsonField.GetBoolean(heartbeat, "astop_activated")
             ?? false;
 
         var estop = BsonField.GetBoolean(heartbeat, "estop_activated")
             ?? false;
 
-        return new DeviceHeartbeatParseResult(new EstopHeartbeat(astop, estop, DateTime.UtcNow));
+        return new DeviceHeartbeatParseResult(new EstopHeartbeat(alliance, station, astop, estop, DateTime.UtcNow));
     }
 
     public BsonDocument BuildReply(FieldDevice device, Arena.Arena arena, GameLogic gameLogic)

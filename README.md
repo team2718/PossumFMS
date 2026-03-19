@@ -5,6 +5,7 @@ FMS for the 2026 FRC game REBUILT, built by Team 2718.
 This repository contains:
 - `PossumFMS.Core`: .NET 10 backend that manages match state, Driver Station communication, field hardware, and SignalR updates.
 - `PossumFMS.Web`: Svelte web frontend used to operate and monitor the FMS.
+- `PossumFMS.Firmware`: Arduino firmware for the ESP32 field hardware
 
 ## Architecture Overview
 
