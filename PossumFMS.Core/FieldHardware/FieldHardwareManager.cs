@@ -21,6 +21,8 @@ public sealed class FieldHardwareManager : BackgroundService
     private const int MaxBsonPacketSizeBytes = 1024 * 1024;
 
     private readonly ConcurrentDictionary<int, FieldDevice> _devices = new();
+    private readonly Lock _hubHeartbeatDeduplicationLock = new();
+    private readonly Dictionary<string, int> _lastAcceptedHubHeartbeatIdsByName = new(StringComparer.OrdinalIgnoreCase);
     private readonly ILogger<FieldHardwareManager> _logger;
     private readonly Arena.Arena _arena;
     private readonly GameLogic _gameLogic;
@@ -130,19 +132,43 @@ public sealed class FieldHardwareManager : BackgroundService
                     if (device.LastHeartbeat is EstopHeartbeat estopHeartbeat)
                     {
                         if (estopHeartbeat.EstopActivated) {
-                            _logger.LogWarning("E-Stop triggered by {DeviceName}", device.Name);
-                            _arena.TriggerArenaEstop();
+                            _logger.LogWarning("E-Stop triggered by {DeviceName} for {Alliance} {Station}", device.Name, estopHeartbeat.Alliance, estopHeartbeat.Station);
+                            
+                            if (estopHeartbeat.Station == 0 || estopHeartbeat.Alliance == "field")
+                            {
+                                _arena.TriggerArenaEstop();
+                            }
+                            else
+                            {
+                                var station = new AllianceStation(
+                                    estopHeartbeat.Alliance == "red" ? AllianceColor.Red : AllianceColor.Blue,
+                                    (StationPosition)estopHeartbeat.Station);
+
+                                _driverStationManager.Estop(station);
+                            }
                         }
 
                         if (estopHeartbeat.AstopActivated) {
-                            _logger.LogWarning("A-Stop triggered by {DeviceName}", device.Name);
-                            _driverStationManager.AstopAll();
+                            _logger.LogWarning("A-Stop triggered by {DeviceName} for {Alliance} {Station}", device.Name, estopHeartbeat.Alliance, estopHeartbeat.Station);
+                            
+                            if (estopHeartbeat.Station == 0 || estopHeartbeat.Alliance == "field")
+                            {
+                                _driverStationManager.AstopAll();
+                            }
+                            else
+                            {
+                                var station = new AllianceStation(
+                                    estopHeartbeat.Alliance == "red" ? AllianceColor.Red : AllianceColor.Blue,
+                                    (StationPosition)estopHeartbeat.Station);
+
+                                _driverStationManager.Astop(station);
+                            }
                         }
                     }
 
                     if (device.LastHeartbeat is HubHeartbeat hub)
                     {
-                        if (hub.FuelDelta > 0)
+                        if (hub.FuelDelta > 0 && TryAcceptHubHeartbeat(device.Name, hub.HeartbeatId))
                         {
                             var alliance = string.Equals(hub.Alliance, "red", StringComparison.OrdinalIgnoreCase)
                                 ? AllianceColor.Red
@@ -224,6 +250,21 @@ public sealed class FieldHardwareManager : BackgroundService
         }
         catch (InvalidOperationException)
         {
+        }
+    }
+
+    private bool TryAcceptHubHeartbeat(string deviceName, int heartbeatId)
+    {
+        lock (_hubHeartbeatDeduplicationLock)
+        {
+            if (_lastAcceptedHubHeartbeatIdsByName.TryGetValue(deviceName, out var lastAcceptedHeartbeatId)
+                && lastAcceptedHeartbeatId == heartbeatId)
+            {
+                return false;
+            }
+
+            _lastAcceptedHubHeartbeatIdsByName[deviceName] = heartbeatId;
+            return true;
         }
     }
 

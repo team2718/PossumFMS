@@ -19,7 +19,7 @@ public enum FieldDeviceStatus
 
 public abstract record FieldDeviceHeartbeat(DateTime ReceivedUtc);
 
-public sealed record HubHeartbeat(string Alliance, int FuelDelta, DateTime ReceivedUtc)
+public sealed record HubHeartbeat(string Alliance, int FuelDelta, int HeartbeatId, DateTime ReceivedUtc)
     : FieldDeviceHeartbeat(ReceivedUtc);
 
 public sealed record EstopHeartbeat(string Alliance, int Station, bool AstopActivated, bool EstopActivated, DateTime ReceivedUtc)

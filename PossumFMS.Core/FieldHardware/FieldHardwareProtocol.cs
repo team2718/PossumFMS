@@ -81,11 +81,15 @@ internal sealed class HubDeviceProtocolHandler : IFieldDeviceProtocolHandler
     {
         var alliance = BsonField.GetString(heartbeat, "alliance")?.ToLowerInvariant();
         var fuelDelta = BsonField.GetInt32(heartbeat, "fuel_delta") ?? 0;
+        var heartbeatId = BsonField.GetInt32(heartbeat, "heartbeat_id");
 
         if (alliance is not ("red" or "blue"))
             throw new InvalidOperationException("Hub heartbeat must include alliance as 'red' or 'blue'.");
 
-        return new DeviceHeartbeatParseResult(new HubHeartbeat(alliance, fuelDelta, DateTime.UtcNow));
+        if (heartbeatId is null)
+            throw new InvalidOperationException("Hub heartbeat must include heartbeat_id.");
+
+        return new DeviceHeartbeatParseResult(new HubHeartbeat(alliance, fuelDelta, heartbeatId.Value, DateTime.UtcNow));
     }
 
     public BsonDocument BuildReply(FieldDevice device, Arena.Arena arena, GameLogic gameLogic)
@@ -98,6 +102,7 @@ internal sealed class HubDeviceProtocolHandler : IFieldDeviceProtocolHandler
         return new BsonDocument
         {
             { "accepted", true },
+            { "accepted_heartbeat_id", hubHeartbeat?.HeartbeatId ?? 0 },
             { "flashing_status", flashingStatus },
             { "led_r", r},
             { "led_g", g},
@@ -159,13 +164,16 @@ internal sealed class EstopDeviceProtocolHandler : IFieldDeviceProtocolHandler
 
     public DeviceHeartbeatParseResult Parse(BsonDocument heartbeat)
     {
-        var alliance = BsonField.GetString(heartbeat, "field")?.ToLowerInvariant();
+        var alliance = BsonField.GetString(heartbeat, "alliance")?.ToLowerInvariant();
         if (alliance is not ("red" or "blue" or "field"))
             throw new InvalidOperationException("E-stop heartbeat must include alliance as 'red', 'blue', or 'field'.");
 
-        var station = BsonField.GetInt32(heartbeat, "station_number") ?? 0;
+        var station = BsonField.GetInt32(heartbeat, "station") ?? 0;
         if (station < 0 || station > 3)
-            throw new InvalidOperationException("E-stop heartbeat must include station_number between 0 and 3.");
+            throw new InvalidOperationException("E-stop heartbeat must include station between 0 and 3.");
+
+        if (alliance == "field" && station != 0)
+            throw new InvalidOperationException("E-stop heartbeat with alliance 'field' must use station 0.");
 
         var astop = BsonField.GetBoolean(heartbeat, "astop_activated")
             ?? false;

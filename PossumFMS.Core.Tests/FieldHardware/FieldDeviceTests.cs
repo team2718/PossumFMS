@@ -169,7 +169,7 @@ public sealed class FieldDeviceTests : IDisposable
     [Fact]
     public void ApplyHeartbeat_Hub_SetsTypeToHub()
     {
-        var heartbeat = new HubHeartbeat("red", 5, DateTime.UtcNow);
+        var heartbeat = new HubHeartbeat("red", 5, 123, DateTime.UtcNow);
 
         _device.ApplyHeartbeat(heartbeat);
 
@@ -189,7 +189,7 @@ public sealed class FieldDeviceTests : IDisposable
     [Fact]
     public void ApplyHeartbeat_StoresHeartbeat()
     {
-        var heartbeat = new HubHeartbeat("blue", 3, DateTime.UtcNow);
+        var heartbeat = new HubHeartbeat("blue", 3, 456, DateTime.UtcNow);
 
         _device.ApplyHeartbeat(heartbeat);
 
@@ -199,8 +199,8 @@ public sealed class FieldDeviceTests : IDisposable
     [Fact]
     public void ApplyHeartbeat_ReplacesLastHeartbeat()
     {
-        var first  = new HubHeartbeat("red",  1, DateTime.UtcNow);
-        var second = new HubHeartbeat("blue", 2, DateTime.UtcNow);
+        var first  = new HubHeartbeat("red",  1, 100, DateTime.UtcNow);
+        var second = new HubHeartbeat("blue", 2, 101, DateTime.UtcNow);
 
         _device.ApplyHeartbeat(first);
         _device.ApplyHeartbeat(second);
@@ -214,10 +214,11 @@ public sealed class FieldDeviceTests : IDisposable
     public void HubHeartbeat_StoresAllProperties()
     {
         var now = DateTime.UtcNow;
-        var hb  = new HubHeartbeat("red", 10, now);
+        var hb  = new HubHeartbeat("red", 10, 321, now);
 
         Assert.Equal("red", hb.Alliance);
         Assert.Equal(10,    hb.FuelDelta);
+        Assert.Equal(321,   hb.HeartbeatId);
         Assert.Equal(now,   hb.ReceivedUtc);
     }
 

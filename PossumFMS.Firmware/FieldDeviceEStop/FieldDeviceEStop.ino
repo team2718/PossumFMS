@@ -26,9 +26,13 @@ const char* FMS_HOST      = "192.168.1.167";
 const uint16_t FMS_PORT   = 1678;
 
 const char* DEVICE_NAME   = "estop_1";   // unique label shown in FMS
+const char* ALLIANCE_NAME = "field";
+const int STATION_NUMBER  = 0;
 
 const uint32_t HEARTBEAT_INTERVAL_MS = 50;
-const uint32_t DEBOUNCE_MS           = 50;
+const uint32_t REPLY_TIMEOUT_MS = 50;
+const uint32_t INITIAL_REPLY_TIMEOUT_MS = 500;
+const uint32_t REPLY_BODY_TIMEOUT_MS = 200;
 
 // GPIO pins (active-low with internal pull-up)
 const int ESTOP_PIN = 15;
@@ -42,6 +46,9 @@ WiFiClient client;
 
 volatile boolean estopped = false;
 volatile boolean astopped = false;
+
+uint32_t lastReplyTimeMs = 0;
+bool hasReceivedReplySinceConnect = false;
 
 void ARDUINO_ISR_ATTR estopBtnCallback() {
     estopped = true;
@@ -90,14 +97,14 @@ void loop() {
     
     if (now - lastHeartbeatMs >= HEARTBEAT_INTERVAL_MS) {
         lastHeartbeatMs = now;
-        sendHeartbeat(estopped, astopped);
+        uint32_t sentAtMs = sendHeartbeat(estopped, astopped);
         if (estopped) {
             Serial.println("Attempting to send E-Stop!");
         }
         if (astopped) {
             Serial.println("Attempting to send A-Stop!");
         }
-        receiveReply();
+        receiveReply(sentAtMs);
     }
 }
 
@@ -120,34 +127,46 @@ void connectWifi() {
 //  FMS TCP helpers
 // =============================================================================
 void connectFms() {
-    Serial.printf("[ESTOP] Connecting to FMS %s:%d…\n", FMS_HOST, FMS_PORT);
+    client.stop();
+    Serial.printf("[ESTOP] Connecting to FMS %s:%d\n", FMS_HOST, FMS_PORT);
     while (!client.connect(FMS_HOST, FMS_PORT)) {
-        Serial.println("[ESTOP] FMS connection failed – retrying in 1 s…");
+        Serial.println("[ESTOP] FMS connection failed - retrying in 1 s.");
         delay(1000);
     }
+    client.setNoDelay(true);
+    lastReplyTimeMs = 0;
+    hasReceivedReplySinceConnect = false;
     Serial.println("[ESTOP] FMS connected.");
 }
 
 // ── Build and send an e-stop heartbeat ───────────────────────────────────────
-void sendHeartbeat(bool estopActivated, bool astopActivated) {
+uint32_t sendHeartbeat(bool estopActivated, bool astopActivated) {
     BsonEncoder enc;
     enc.begin();
     enc.addString("name",             DEVICE_NAME);
     enc.addString("type",             "estop");
+    enc.addInt32 ("last_reply_time_ms", (int32_t)lastReplyTimeMs);
+    enc.addString("alliance",         ALLIANCE_NAME);
+    enc.addInt32 ("station",          STATION_NUMBER);
     enc.addBool  ("estop_activated",  estopActivated);
     enc.addBool  ("astop_activated",  astopActivated);
     enc.end();
 
+    uint32_t sentAtMs = millis();
     client.write(enc.buf, enc.length());
+    return sentAtMs;
 }
 
 // ── Read and parse the server reply ──────────────────────────────────────────
 // E-stop reply only has: accepted (bool) — and error (string) on failure.
-void receiveReply() {
-    // Wait up to 50 ms for at least the 4-byte length header.
+void receiveReply(uint32_t sentAtMs) {
+    uint32_t replyTimeoutMs = hasReceivedReplySinceConnect
+        ? REPLY_TIMEOUT_MS
+        : INITIAL_REPLY_TIMEOUT_MS;
+
     uint32_t start = millis();
     while (client.available() < 4) {
-        if (millis() - start > 50) {
+        if (millis() - start > replyTimeoutMs) {
             Serial.println("[ESTOP] Reply timeout.");
             return;
         }
@@ -171,7 +190,7 @@ void receiveReply() {
     int remaining = docLen - 4;
     start = millis();
     while (client.available() < remaining) {
-        if (millis() - start > 200) {
+        if (millis() - start > REPLY_BODY_TIMEOUT_MS) {
             Serial.println("[ESTOP] Reply body timeout.");
             return;
         }
@@ -188,6 +207,9 @@ void receiveReply() {
     }
     
     // Heartbeat was accepted and read successfully. Clear the latched button states.
+    lastReplyTimeMs = millis() - sentAtMs;
+    hasReceivedReplySinceConnect = true;
+
     if (estopped) {
         Serial.println("E-Stop accepted by server.");
     }
