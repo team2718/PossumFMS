@@ -228,6 +228,17 @@ public sealed class ControlPacketTests
         Assert.False(IsEnabled(buf[3]));
     }
 
+    [Fact]
+    public void ControlByte_WhenFreePracticeEnabled_AllBitsClear()
+    {
+        var (mgr, arena, buf, ds) = Setup();
+        arena.SetFreePracticeEnabled(true);
+
+        mgr.EncodeControlPacket(buf, ds);
+
+        Assert.Equal(0, buf[3]);
+    }
+
     // ── Exact combined control byte values (aligned to Cheesy Arena) ──────────
     //
     // Cheesy Arena Go test asserts exact byte values for specific flag combinations:

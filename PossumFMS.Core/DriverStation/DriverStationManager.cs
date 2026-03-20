@@ -366,6 +366,7 @@ public sealed class DriverStationManager : BackgroundService
     private void SendControlPackets()
     {
         if (_udpSocket is null) return;
+        if (!IsDriverStationCommunicationEnabled()) return;
 
         foreach (var ds in Stations.Values)
         {
@@ -418,7 +419,7 @@ public sealed class DriverStationManager : BackgroundService
         buf[2] = 0; // protocol version
 
         bool estop   = ds.Estop || _arena.ArenaEstop;
-        bool enabled = !estop && !ds.Astop && _arena.IsMatchRunning && !ds.Bypassed;
+        bool enabled = !estop && !ds.Astop && _arena.IsMatchRunning && !ds.Bypassed && IsDriverStationCommunicationEnabled();
         bool auto    = _arena.Phase == MatchPhase.Auto;
 
         byte control = 0;
@@ -561,7 +562,7 @@ public sealed class DriverStationManager : BackgroundService
                 teamNumber, ds.Station, remoteIp);
 
             // Send current game data if already set (e.g., DS reconnects after auto).
-            if (_arena.GameData.Length > 0)
+            if (IsDriverStationCommunicationEnabled() && _arena.GameData.Length > 0)
                 await SendGameDataAsync(ds.Station, _arena.GameData, ct);
 
             // ── TCP read loop ──────────────────────────────────────────────────
@@ -617,6 +618,9 @@ public sealed class DriverStationManager : BackgroundService
 
     private void OnGameDataChanged(string data)
     {
+        if (!IsDriverStationCommunicationEnabled())
+            return;
+
         foreach (var station in Stations.Keys)
             _ = SendGameDataAsync(station, data, _ct);
     }
@@ -627,6 +631,9 @@ public sealed class DriverStationManager : BackgroundService
     /// </summary>
     public async Task SendGameDataAsync(AllianceStation station, string gameData, CancellationToken ct = default)
     {
+        if (!IsDriverStationCommunicationEnabled())
+            return;
+
         var ds = Stations[station];
         if (ds.TcpClient?.GetStream() is not { } stream) return;
 
@@ -662,6 +669,8 @@ public sealed class DriverStationManager : BackgroundService
 
     private static Task<bool> ReadExactAsync(NetworkStream stream, byte[] buf, CancellationToken ct) =>
         ReadExactAsync(stream, buf.AsMemory(), ct);
+
+    internal bool IsDriverStationCommunicationEnabled() => !_arena.FreePracticeEnabled;
 
     private static void SpinUntil(Stopwatch sw, TimeSpan target)
     {

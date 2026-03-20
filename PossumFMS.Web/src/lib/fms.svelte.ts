@@ -72,6 +72,7 @@ export interface FieldDeviceDiagnostics {
 
 export interface MatchState {
 	phase: string; // e.g. "Idle", "PreMatch", "MatchRunning", "MatchOver"
+	freePracticeEnabled: boolean;
 	matchType: string; // e.g. "Practice", "Qualification", "Playoff"
 	matchNumber: number;
 	timeRemaining: number; // seconds
@@ -259,6 +260,10 @@ class FmsConnection {
 	/** Manually push current team assignments to the access point */
 	configureAccessPoint() {
 		return this.invoke('ConfigureAccessPoint');
+	}
+	/** Toggle idle-only Free Practice mode, which suppresses DS communication. */
+	setFreePracticeEnabled(enabled: boolean) {
+		return this.invoke('SetFreePracticeEnabled', enabled);
 	}
 	/** Adjust alliance fuel score in Auto or Teleop. Delta may be positive or negative. */
 	adjustFuelPoints(alliance: 'Red' | 'Blue', isAuto: boolean, delta: number) {

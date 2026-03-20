@@ -299,6 +299,16 @@ public sealed class DriverStationManagerTests
         Assert.Equal(0.0, max);
     }
 
+    [Fact]
+    public void IsDriverStationCommunicationEnabled_WhenFreePracticeEnabled_ReturnsFalse()
+    {
+        var arena = new PossumFMS.Core.Arena.Arena();
+        var mgr = CreateManager(arena);
+        arena.SetFreePracticeEnabled(true);
+
+        Assert.False(mgr.IsDriverStationCommunicationEnabled());
+    }
+
     // ── Astop auto-clear on Teleop ─────────────────────────────────────────────
 
     [Fact]

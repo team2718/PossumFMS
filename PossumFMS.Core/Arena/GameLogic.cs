@@ -69,6 +69,9 @@ public sealed class GameLogic
     /// </summary>
     public bool IsHubActive(AllianceColor alliance)
     {
+        if (_arena.Phase == MatchPhase.Idle)
+            return true;
+
         // Both hubs always active during Auto and the brief transition before Teleop.
         if (_arena.Phase is MatchPhase.Auto or MatchPhase.AutoToTeleopTransition)
             return true;
@@ -85,6 +88,9 @@ public sealed class GameLogic
 
     public bool IsHubStrictlyActive(AllianceColor alliance)
     {
+        // if (_arena.Phase == MatchPhase.Idle)
+        //     return true;
+
         if (_arena.Phase is MatchPhase.Auto or MatchPhase.AutoToTeleopTransition)
             return true;
 
@@ -226,15 +232,16 @@ public sealed class GameLogic
     /// <summary>
     /// Records fuel scored by <paramref name="alliance"/>'s hub.
     /// Silently no-ops when the hub is inactive for the current period.
+    /// Idle-phase fuel is treated as teleop fuel for free-practice and field-test use.
     /// </summary>
     public void ScoreFuel(AllianceColor alliance, int count)
     {
         if (count <= 0) return;
         if (!IsHubActive(alliance)) return;
 
-        if (_arena.Phase == MatchPhase.Auto)
+        if (_arena.Phase is MatchPhase.Auto or MatchPhase.AutoToTeleopTransition)
             AdjustFuelPoints(alliance, isAuto: true, count);
-        else if (_arena.Phase == MatchPhase.Teleop)
+        else if (_arena.Phase is MatchPhase.Teleop or MatchPhase.Idle)
             AdjustFuelPoints(alliance, isAuto: false, count);
     }
 

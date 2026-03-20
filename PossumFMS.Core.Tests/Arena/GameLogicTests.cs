@@ -52,12 +52,12 @@ public sealed class GameLogicTests
     // ── Hub active / inactive (non-Teleop phases) ──────────────────────────────
 
     [Fact]
-    public void IsHubActive_WhenIdle_ReturnsFalse()
+    public void IsHubActive_WhenIdle_ReturnsTrue()
     {
         var (_, logic) = Create();
 
-        Assert.False(logic.IsHubActive(AllianceColor.Red));
-        Assert.False(logic.IsHubActive(AllianceColor.Blue));
+        Assert.True(logic.IsHubActive(AllianceColor.Red));
+        Assert.True(logic.IsHubActive(AllianceColor.Blue));
     }
 
     [Fact]
@@ -82,12 +82,12 @@ public sealed class GameLogicTests
     }
 
     [Fact]
-    public void IsHubStrictlyActive_WhenIdle_ReturnsFalse()
+    public void IsHubStrictlyActive_WhenIdle_ReturnsTrue()
     {
         var (_, logic) = Create();
 
-        Assert.False(logic.IsHubStrictlyActive(AllianceColor.Red));
-        Assert.False(logic.IsHubStrictlyActive(AllianceColor.Blue));
+        Assert.True(logic.IsHubStrictlyActive(AllianceColor.Red));
+        Assert.True(logic.IsHubStrictlyActive(AllianceColor.Blue));
     }
 
     [Fact]
@@ -190,9 +190,35 @@ public sealed class GameLogicTests
     }
 
     [Fact]
-    public void ScoreFuel_WhenHubInactive_IsNoOp()
+    public void ScoreFuel_WhenIdle_AddsToTeleopFuelPoints()
     {
-        var (_, logic) = Create(); // Idle — hubs inactive
+        var (_, logic) = Create();
+
+        logic.ScoreFuel(AllianceColor.Red, 10);
+
+        Assert.Equal(0, logic.RedScore.AutoFuelPoints);
+        Assert.Equal(10, logic.RedScore.TeleopFuelPoints);
+    }
+
+    [Fact]
+    public void ScoreFuel_WhenPreMatch_IsNoOp()
+    {
+        var (arena, logic) = Create();
+        arena.StartPreMatch();
+
+        logic.ScoreFuel(AllianceColor.Red, 10);
+
+        Assert.Equal(0, logic.RedScore.AutoFuelPoints);
+        Assert.Equal(0, logic.RedScore.TeleopFuelPoints);
+    }
+
+    [Fact]
+    public void ScoreFuel_WhenPostMatch_IsNoOp()
+    {
+        var (arena, logic) = Create();
+        arena.StartPreMatch();
+        arena.StartMatch();
+        arena.AbortMatch();
 
         logic.ScoreFuel(AllianceColor.Red, 10);
 

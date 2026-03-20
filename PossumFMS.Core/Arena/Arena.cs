@@ -21,6 +21,7 @@ public sealed class Arena
     // ── State ──────────────────────────────────────────────────────────────────
 
     public MatchPhase Phase { get; private set; } = MatchPhase.Idle;
+    public bool FreePracticeEnabled { get; private set; }
 
     // ── Match metadata (encoded in every control packet) ───────────────────────
 
@@ -83,6 +84,9 @@ public sealed class Arena
 
     public void StartPreMatch()
     {
+        if (FreePracticeEnabled)
+            throw new InvalidOperationException("Cannot start pre-match while Free Practice is enabled.");
+
         if (IsMatchInProgress)
             throw new InvalidOperationException("Cannot start pre-match while a match is running.");
 
@@ -114,6 +118,14 @@ public sealed class Arena
 
         WasAborted = false;
         TransitionTo(MatchPhase.Idle, TimeSpan.Zero);
+    }
+
+    public void SetFreePracticeEnabled(bool enabled)
+    {
+        if (Phase != MatchPhase.Idle)
+            throw new InvalidOperationException("Free Practice can only be changed while the arena is idle.");
+
+        FreePracticeEnabled = enabled;
     }
 
     /// <summary>

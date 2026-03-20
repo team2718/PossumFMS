@@ -21,7 +21,27 @@ public sealed class ArenaTests
         Assert.False(arena.IsMatchInProgress);
         Assert.False(arena.WasAborted);
         Assert.False(arena.ArenaEstop);
+        Assert.False(arena.FreePracticeEnabled);
         Assert.Equal(string.Empty, arena.GameData);
+    }
+
+    [Fact]
+    public void SetFreePracticeEnabled_FromIdle_UpdatesState()
+    {
+        var arena = new PossumFMS.Core.Arena.Arena();
+
+        arena.SetFreePracticeEnabled(true);
+
+        Assert.True(arena.FreePracticeEnabled);
+    }
+
+    [Fact]
+    public void SetFreePracticeEnabled_WhenNotIdle_Throws()
+    {
+        var arena = new PossumFMS.Core.Arena.Arena();
+        arena.StartPreMatch();
+
+        Assert.Throws<InvalidOperationException>(() => arena.SetFreePracticeEnabled(true));
     }
 
     // ── StartPreMatch ──────────────────────────────────────────────────────────
@@ -61,6 +81,15 @@ public sealed class ArenaTests
         var arena = new PossumFMS.Core.Arena.Arena();
         arena.StartPreMatch();
         arena.StartMatch(); // now in Auto
+
+        Assert.Throws<InvalidOperationException>(() => arena.StartPreMatch());
+    }
+
+    [Fact]
+    public void StartPreMatch_WhenFreePracticeEnabled_Throws()
+    {
+        var arena = new PossumFMS.Core.Arena.Arena();
+        arena.SetFreePracticeEnabled(true);
 
         Assert.Throws<InvalidOperationException>(() => arena.StartPreMatch());
     }

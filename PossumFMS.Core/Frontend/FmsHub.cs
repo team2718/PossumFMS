@@ -107,6 +107,17 @@ public sealed class FmsHub(
         await BroadcastMatchState();
     }
 
+    public async Task SetFreePracticeEnabled(bool enabled)
+    {
+        logger.LogInformation(
+            "SetFreePracticeEnabled requested by {Client}: Enabled={Enabled}.",
+            Context.ConnectionId,
+            enabled);
+
+        arena.SetFreePracticeEnabled(enabled);
+        await BroadcastMatchState();
+    }
+
     // ── Scoring ───────────────────────────────────────────────────────────────
 
     public async Task AdjustFuelPoints(string alliance, bool isAuto, int delta)

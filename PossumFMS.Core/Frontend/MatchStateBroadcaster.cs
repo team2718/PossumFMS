@@ -56,6 +56,7 @@ public sealed class MatchStateBroadcaster(
         return new
         {
         phase         = arena.Phase.ToString(),
+        freePracticeEnabled = arena.FreePracticeEnabled,
         matchType     = arena.MatchType.ToString(),
         matchNumber   = arena.MatchNumber,
         timeRemaining = arena.TimeRemaining.TotalSeconds,
