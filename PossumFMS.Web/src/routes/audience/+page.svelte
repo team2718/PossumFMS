@@ -214,11 +214,11 @@
 	<div
 		class="flex items-center justify-between {alliance === 'blue'
 			? isMiddle
-				? 'bg-[#003151]'
-				: 'bg-[#004270]'
+				? 'alliance-blue-bg-dark'
+				: 'alliance-blue-bg-darker'
 			: isMiddle
-				? 'bg-[#620a0c]'
-				: 'bg-[#850e12]'} px-3 py-3 text-sm font-semibold md:text-4xl"
+				? 'alliance-red-bg-dark'
+				: 'alliance-red-bg-darker'} px-3 py-3 text-sm font-semibold md:text-4xl"
 	>
 		<span>{team > 0 ? team : '----'}</span>
 	</div>
@@ -226,23 +226,24 @@
 
 {#snippet rankingProgress(alliance: 'red' | 'blue', fuelCombined: number, towerCombined: number)}
 	<div
-		class="rounded-lg {alliance === 'blue' ? 'bg-[#003151]/90' : 'bg-[#620a0c]/90'} {alliance ===
-		'red'
-			? 'text-right'
-			: ''} px-4 py-2 text-sm font-semibold shadow-md shadow-black/70 md:text-xl"
+		class="rounded-lg {alliance === 'blue'
+			? 'alliance-blue-bg-dark-transparent'
+			: 'alliance-red-bg-dark-transparent text-right'} px-4 py-2 text-sm font-semibold shadow-md shadow-black/70 md:text-xl"
 	>
 		<span
 			class="mr-4 {matchState?.rankingPoints[alliance].energized
-				? 'text-teal-400'
-				: 'text-slate-400'}">Energized {Math.min(fuelCombined, 100)}/100</span
+				? 'text-white-glow'
+				: 'text-slate-300'}">Energized {Math.min(fuelCombined, 100)}/100</span
 		>
 		<span
 			class="mr-4 {matchState?.rankingPoints[alliance].supercharged
-				? 'text-teal-400'
-				: 'text-slate-400'}">Supercharged {Math.min(fuelCombined, 360)}/360</span
+				? 'text-white-glow'
+				: 'text-slate-300'}">Supercharged {Math.min(fuelCombined, 360)}/360</span
 		>
-		<span class={matchState?.rankingPoints[alliance].traversal ? 'text-teal-400' : 'text-slate-400'}
-			>Traversal {Math.min(towerCombined, 50)}/50</span
+		<span
+			class={matchState?.rankingPoints[alliance].traversal
+				? 'text-white-glow'
+				: 'text-slate-300'}>Traversal {Math.min(towerCombined, 50)}/50</span
 		>
 	</div>
 {/snippet}
@@ -256,7 +257,7 @@
 				<!-- Red hub active indicator (right of panel, arrow pointing toward right screen edge) -->
 				{@render hubIndicator('right', redHubActive)}
 				<div
-					class="grid grid-cols-[1fr_1fr_1fr_auto_auto_auto_1fr_1fr_1fr] overflow-hidden rounded-lg border border-black/30 shadow-md shadow-black/70"
+					class="grid grid-cols-[1fr_1fr_1fr_1fr_1fr_1fr_1fr_1fr_1fr] overflow-hidden rounded-lg border border-black/30 shadow-md shadow-black/70"
 				>
 					<!-- Blue Team 1 -->
 					{@render allianceTeamCell(blueTeams[0], !!blueStations[0]?.robotLinked, 'blue', false)}
@@ -266,7 +267,7 @@
 					{@render allianceTeamCell(blueTeams[2], !!blueStations[2]?.robotLinked, 'blue', false)}
 					<!-- Blue Score -->
 					<div
-						class="flex items-center justify-center bg-[#0066b3] px-5 text-4xl font-black md:text-6xl"
+						class="alliance-blue-bg flex items-center justify-center px-5 text-4xl font-black md:text-6xl"
 					>
 						{blueScore}
 					</div>
@@ -289,7 +290,7 @@
 					</div>
 					<!-- Red Score -->
 					<div
-						class="flex items-center justify-center bg-[#ec1d23] px-5 text-4xl font-black md:text-6xl"
+						class="alliance-red-bg flex items-center justify-center px-5 text-4xl font-black md:text-6xl"
 					>
 						{redScore}
 					</div>

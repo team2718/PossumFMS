@@ -1,3 +1,97 @@
 @import 'tailwindcss';
 @plugin '@tailwindcss/forms';
 @plugin '@tailwindcss/typography';
+
+:root {
+	--color-primary: #1ca5a5;
+	--color-secondary: #1f7ec6;
+	--color-tertiary: #a51c1c;
+	--color-neutral: #F8F9FA;
+    --color-highlight: #bb1fc6;
+}
+
+.app-neutral-bg {
+	background-color: var(--color-neutral);
+}
+
+.brand-secondary-bg {
+	background-color: var(--color-secondary);
+}
+
+.brand-secondary-text {
+	color: var(--color-secondary);
+}
+
+.brand-secondary-border {
+	border-color: var(--color-secondary);
+}
+
+.alliance-blue-bg {
+	background-color: var(--color-primary);
+}
+
+.alliance-red-bg {
+	background-color: var(--color-tertiary);
+}
+
+.alliance-blue-text {
+	color: color-mix(in srgb, var(--color-primary) 70%, black);
+}
+
+.alliance-red-text {
+	color: color-mix(in srgb, var(--color-tertiary) 70%, black);
+}
+
+.alliance-blue-bg-soft {
+	background-color: color-mix(in srgb, var(--color-primary) 25%, white);
+}
+
+.alliance-red-bg-soft {
+	background-color: color-mix(in srgb, var(--color-tertiary) 30%, white);
+}
+
+.alliance-blue-border {
+	border-color: var(--color-primary);
+}
+
+.alliance-red-border {
+	border-color: var(--color-tertiary);
+}
+
+.alliance-blue-border-soft {
+	border-color: color-mix(in srgb, var(--color-primary) 35%, white);
+}
+
+.alliance-red-border-soft {
+	border-color: color-mix(in srgb, var(--color-tertiary) 35%, white);
+}
+
+.alliance-blue-bg-dark {
+	background-color: color-mix(in srgb, var(--color-primary) 85%, black);
+}
+
+.alliance-blue-bg-darker {
+	background-color: color-mix(in srgb, var(--color-primary) 70%, black);
+}
+
+.alliance-red-bg-dark {
+	background-color: color-mix(in srgb, var(--color-tertiary) 85%, black);
+}
+
+.alliance-red-bg-darker {
+	background-color: color-mix(in srgb, var(--color-tertiary) 70%, black);
+}
+
+.alliance-red-bg-dark-transparent {
+    background-color: rgb(from color-mix(in srgb, var(--color-tertiary) 85%, black) r g b / 0.8);
+}
+
+.alliance-blue-bg-dark-transparent {
+    background-color: rgb(from color-mix(in srgb, var(--color-primary) 85%, black) r g b / 0.8);
+}
+
+/* white softly glowing text, for use on dark backgrounds */
+.text-white-glow {
+    color: white;
+    text-shadow: 0 0 5px white;
+}

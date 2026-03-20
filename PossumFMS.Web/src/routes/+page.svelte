@@ -342,7 +342,7 @@
 
 {#snippet readinessHeaderRow()}
 	<div
-		class="grid grid-cols-[68px_66px_1fr_48px_44px_44px_44px_44px_62px_62px] items-center gap-1 px-1 py-1 text-center font-bold text-slate-600"
+		class="grid grid-cols-[68px_66px_1fr_48px_44px_44px_44px_44px_80px] items-center gap-1 px-1 py-1 text-center font-bold text-slate-600"
 	>
 		<div>E-Stop HW</div>
 		<div>Station</div>
@@ -353,7 +353,7 @@
 		<div>RIO</div>
 		<div>Robot</div>
 		<div>E-Stop</div>
-		<div>A-Stop</div>
+		<!-- <div>A-Stop</div> -->
 	</div>
 {/snippet}
 
@@ -462,14 +462,14 @@
 	<div
 		class="mb-2 rounded border p-2 text-xs {s.estop
 			? alliance === 'red'
-				? 'border-rose-400 bg-rose-100'
-				: 'border-rose-400 bg-rose-50'
+				? 'alliance-red-border-soft alliance-red-bg-soft'
+				: 'alliance-red-border-soft alliance-red-bg-soft'
 			: alliance === 'red'
-				? 'border-rose-200 bg-white'
-				: 'border-blue-200 bg-white'}"
+				? 'alliance-red-border-soft bg-white'
+				: 'alliance-blue-border-soft bg-white'}"
 	>
 		<div class="mb-1.5 flex items-center justify-between">
-			<span class="font-black {alliance === 'blue' ? 'text-blue-900' : 'text-rose-900'}"
+			<span class="font-black {alliance === 'blue' ? 'alliance-blue-text' : 'alliance-red-text'}"
 				>Station {stationNumber} — Team {s.teamNumber || '—'}</span
 			>
 			<div class="flex gap-1">
@@ -577,21 +577,21 @@
 	{@const allianceLabel = alliance === 'blue' ? 'Blue' : 'Red'}
 	<div
 		class="rounded border p-3 {alliance === 'blue'
-			? 'border-blue-200 bg-blue-50'
-			: 'border-rose-200 bg-rose-50'}"
+			? 'alliance-blue-border-soft alliance-blue-bg-soft'
+			: 'alliance-red-border-soft alliance-red-bg-soft'}"
 	>
 		<div class="mb-3 flex items-center justify-between">
 			<div
 				class="text-xs font-bold tracking-wider uppercase {alliance === 'blue'
-					? 'text-blue-800'
-					: 'text-rose-800'}"
+					? 'alliance-blue-text'
+					: 'alliance-red-text'}"
 			>
 				{allianceLabel} Alliance
 			</div>
 			<div
 				class="rounded px-2 py-0.5 text-xs font-bold text-white {alliance === 'blue'
-					? 'bg-blue-700'
-					: 'bg-rose-700'}"
+					? 'alliance-blue-bg'
+					: 'alliance-red-bg'}"
 			>
 				Total {breakdown?.total ?? 0}
 			</div>
@@ -599,8 +599,8 @@
 
 		<div
 			class="mb-2 rounded border bg-white p-2 {alliance === 'blue'
-				? 'border-blue-200'
-				: 'border-rose-200'}"
+				? 'alliance-blue-border-soft'
+				: 'alliance-red-border-soft'}"
 		>
 			<div class="mb-2 flex items-center justify-between text-xs font-semibold text-slate-700">
 				<span>Auto Fuel</span>
@@ -611,8 +611,8 @@
 
 		<div
 			class="mb-2 rounded border bg-white p-2 {alliance === 'blue'
-				? 'border-blue-200'
-				: 'border-rose-200'}"
+				? 'alliance-blue-border-soft'
+				: 'alliance-red-border-soft'}"
 		>
 			<div class="mb-2 flex items-center justify-between text-xs font-semibold text-slate-700">
 				<span>Teleop Fuel</span>
@@ -623,8 +623,8 @@
 
 		<div
 			class="mb-2 rounded border bg-white p-2 text-xs {alliance === 'blue'
-				? 'border-blue-200'
-				: 'border-rose-200'}"
+				? 'alliance-blue-border-soft'
+				: 'alliance-red-border-soft'}"
 		>
 			<div class="mb-1 font-semibold text-slate-700">Auto Tower Climb (15 pts each)</div>
 			{@render autoTowerClimbControls(stationIndices)}
@@ -641,8 +641,8 @@
 
 		<div
 			class="rounded border bg-white p-2 text-xs text-slate-700 {alliance === 'blue'
-				? 'border-blue-200'
-				: 'border-rose-200'}"
+				? 'alliance-blue-border-soft'
+				: 'alliance-red-border-soft'}"
 		>
 			<div>Fuel Combined: <span class="font-bold">{breakdown?.fuelCombined ?? 0}</span></div>
 			<div>Tower Combined: <span class="font-bold">{breakdown?.towerCombined ?? 0}</span></div>
@@ -651,11 +651,12 @@
 	</div>
 {/snippet}
 
-<div class="min-h-screen bg-[#e5e7eb] text-slate-900">
-	<div class="border-b border-slate-300 bg-[#f2f4f8]">
+<div class="app-neutral-bg min-h-screen text-slate-900">
+	<div class="app-neutral-bg border-b border-slate-300">
 		<div class="mx-auto flex max-w-[1700px] items-end gap-1 px-3 pt-2 text-sm">
 			<div
-				class="rounded-t-md border border-b-0 border-slate-300 bg-white px-4 py-2 font-bold text-slate-900 shadow-[inset_0_3px_0_0_#1d4ed8]"
+				class="rounded-t-md border border-b-0 border-slate-300 bg-white px-4 py-2 font-bold text-slate-900"
+				style="box-shadow: inset 0 3px 0 0 var(--color-secondary);"
 			>
 				Match Play
 			</div>
@@ -677,27 +678,24 @@
 		<div class="overflow-x-auto rounded border border-slate-300 bg-white shadow-sm">
 			<div class="grid min-w-[1200px] grid-cols-[1fr_170px_1fr]">
 				<!-- Blue Alliance -->
-				<div class="border-r border-slate-300 bg-[#dfeafc]">
-					<div class="flex items-center justify-between border-b border-blue-200 px-3 py-2">
-						<div class="flex items-center gap-2">
-							<span
-								class="rounded px-2 py-0.5 text-xs font-bold text-white {blueReady
-									? 'bg-emerald-700'
-									: 'bg-rose-700'}">{blueReady ? 'READY' : 'NOT READY'}</span
-							>
-							<span class="text-sm font-bold tracking-wide text-blue-900">BLUE ALLIANCE</span>
-						</div>
-						<span class="rounded-full bg-blue-700 px-3 py-0.5 text-sm font-bold text-white">0</span>
+				<div class="alliance-blue-bg-soft border-r border-slate-300">
+					<div class="alliance-blue-border-soft flex items-center justify-between border-b px-3 py-2">
+						<span class="alliance-blue-text text-sm font-bold tracking-wide">BLUE ALLIANCE</span>
+						<span
+							class="rounded px-2 py-0.5 text-xs font-bold text-white {blueReady
+								? 'bg-emerald-700'
+								: 'bg-rose-700'}">{blueReady ? 'READY' : 'NOT READY'}</span
+						>
 					</div>
 					<div class="p-2 text-xs">
 						{@render readinessHeaderRow()}
 						{#each blueStations as s, i}
 							{@const idx = blueInputIndices[i]}
 							<div
-								class="mt-1 grid grid-cols-[68px_66px_1fr_48px_44px_44px_44px_44px_62px_62px] items-center gap-1 rounded border border-blue-200 bg-white/75 px-1.5 py-1.5"
+								class="alliance-blue-border-soft mt-1 grid grid-cols-[68px_66px_1fr_48px_44px_44px_44px_44px_80px] items-center gap-1 rounded border bg-white/75 px-1.5 py-1.5"
 							>
 								{@render readinessStatusCell(hasActiveEstopHardware(idx))}
-								<div class="text-center font-bold text-blue-900">Station {i + 1}</div>
+								<div class="alliance-blue-text text-center font-bold">Station {i + 1}</div>
 								<div class="flex items-center gap-1">
 									<input
 										type="text"
@@ -719,7 +717,7 @@
 								{@render readinessStatusCell(s.rioLinked)}
 								{@render readinessStatusCell(s.robotLinked)}
 								{@render stopButton('E', s.estop, idx)}
-								{@render stopButton('A', s.astop, idx)}
+								<!-- {@render stopButton('A', s.astop, idx)} -->
 							</div>
 						{/each}
 					</div>
@@ -733,25 +731,24 @@
 				</div>
 
 				<!-- Red Alliance -->
-				<div class="bg-[#fde3e3]">
-					<div class="flex items-center justify-between border-b border-rose-200 px-3 py-2">
-						<span class="rounded-full bg-rose-700 px-3 py-0.5 text-sm font-bold text-white">0</span>
-						<span class="text-sm font-bold tracking-wide text-rose-900">RED ALLIANCE</span>
+				<div class="alliance-red-bg-soft">
+					<div class="alliance-red-border-soft flex items-center justify-between border-b px-3 py-2">
 						<span
 							class="rounded px-2 py-0.5 text-xs font-bold text-white {redReady
 								? 'bg-emerald-700'
 								: 'bg-rose-700'}">{redReady ? 'READY' : 'NOT READY'}</span
 						>
+						<span class="alliance-red-text text-sm font-bold tracking-wide">RED ALLIANCE</span>
 					</div>
 					<div class="p-2 text-xs">
 						{@render readinessHeaderRow()}
 						{#each redStations as s, i}
 							{@const idx = redInputIndices[i]}
 							<div
-								class="mt-1 grid grid-cols-[68px_66px_1fr_48px_44px_44px_44px_44px_62px_62px] items-center gap-1 rounded border border-rose-200 bg-white/75 px-1.5 py-1.5"
+								class="alliance-red-border-soft mt-1 grid grid-cols-[68px_66px_1fr_48px_44px_44px_44px_44px_80px] items-center gap-1 rounded border bg-white/75 px-1.5 py-1.5"
 							>
 								{@render readinessStatusCell(hasActiveEstopHardware(idx))}
-								<div class="text-center font-bold text-rose-900">Station {3 - i}</div>
+								<div class="alliance-red-text text-center font-bold">Station {3 - i}</div>
 								<div class="flex items-center gap-1">
 									<input
 										type="text"
@@ -773,7 +770,7 @@
 								{@render readinessStatusCell(s.rioLinked)}
 								{@render readinessStatusCell(s.robotLinked)}
 								{@render stopButton('E', s.estop, idx)}
-								{@render stopButton('A', s.astop, idx)}
+								<!-- {@render stopButton('A', s.astop, idx)} -->
 							</div>
 						{/each}
 					</div>
@@ -787,7 +784,7 @@
 							onclick={configureAccessPoint}
 							disabled={isConfiguring}
 							aria-busy={isConfiguring}
-							class="rounded bg-blue-700 px-3 py-1.5 text-sm font-bold text-white hover:bg-blue-600"
+							class="brand-secondary-bg rounded px-3 py-1.5 text-sm font-bold text-white hover:opacity-90"
 						>
 							{isConfiguring ? 'Configuring...' : 'Configure'}
 						</button>
@@ -819,14 +816,14 @@
 		</div>
 
 		<!-- Match control bar -->
-		<div class="rounded border border-slate-300 bg-[#eceef2] p-3 shadow-sm">
+		<div class="app-neutral-bg rounded border border-slate-300 p-3 shadow-sm">
 			<div class="flex flex-wrap items-center justify-center gap-3">
 				<button
 					onclick={() => fms.startPreMatch()}
 					disabled={phase !== 'Idle'}
 					class="h-14 min-w-44 rounded px-5 text-sm font-black disabled:cursor-not-allowed disabled:opacity-40 {phase ===
 					'Idle'
-						? 'bg-amber-500 text-slate-900 hover:bg-amber-400'
+						? 'bg-amber-400 text-slate-900 hover:bg-amber-300'
 						: 'bg-amber-800 text-white'}"
 				>
 					Prestart Match
@@ -888,7 +885,7 @@
 						activeTab = 'score';
 					}}
 					class="mr-6 pb-2 {activeTab === 'score'
-						? 'border-b-2 border-blue-600 font-semibold text-blue-700'
+						? 'brand-secondary-border brand-secondary-text border-b-2 font-semibold'
 						: 'text-slate-500 hover:text-slate-800'}">Score</button
 				>
 				<button
@@ -896,7 +893,7 @@
 						activeTab = 'status';
 					}}
 					class="mr-6 pb-2 {activeTab === 'status'
-						? 'border-b-2 border-blue-600 font-semibold text-blue-700'
+						? 'brand-secondary-border brand-secondary-text border-b-2 font-semibold'
 						: 'text-slate-500 hover:text-slate-800'}">Status</button
 				>
 				<button
@@ -904,7 +901,7 @@
 						activeTab = 'field';
 					}}
 					class="mr-6 pb-2 {activeTab === 'field'
-						? 'border-b-2 border-blue-600 font-semibold text-blue-700'
+						? 'brand-secondary-border brand-secondary-text border-b-2 font-semibold'
 						: 'text-slate-500 hover:text-slate-800'}">Field</button
 				>
 				<button
@@ -912,7 +909,7 @@
 						activeTab = 'options';
 					}}
 					class="mr-6 pb-2 {activeTab === 'options'
-						? 'border-b-2 border-blue-600 font-semibold text-blue-700'
+						? 'brand-secondary-border brand-secondary-text border-b-2 font-semibold'
 						: 'text-slate-500 hover:text-slate-800'}">Options</button
 				>
 				<button
@@ -920,7 +917,7 @@
 						activeTab = 'log';
 					}}
 					class="mr-6 pb-2 {activeTab === 'log'
-						? 'border-b-2 border-blue-600 font-semibold text-blue-700'
+						? 'brand-secondary-border brand-secondary-text border-b-2 font-semibold'
 						: 'text-slate-500 hover:text-slate-800'}">Log</button
 				>
 			</div>
@@ -942,8 +939,8 @@
 			{:else if activeTab === 'status'}
 				<div class="grid grid-cols-2">
 					<!-- Blue Alliance -->
-					<div class="border-r border-slate-200 bg-blue-50 p-3">
-						<div class="mb-2 text-xs font-bold tracking-wider text-blue-800 uppercase">
+					<div class="alliance-blue-bg-soft border-r border-slate-200 p-3">
+						<div class="alliance-blue-text mb-2 text-xs font-bold tracking-wider uppercase">
 							Blue Alliance
 						</div>
 						{#each blueStations as s, i}
@@ -952,8 +949,8 @@
 					</div>
 
 					<!-- Red Alliance -->
-					<div class="bg-rose-50 p-3">
-						<div class="mb-2 text-xs font-bold tracking-wider text-rose-800 uppercase">
+					<div class="alliance-red-bg-soft p-3">
+						<div class="alliance-red-text mb-2 text-xs font-bold tracking-wider uppercase">
 							Red Alliance
 						</div>
 						{#each redStations as s, i}
@@ -1107,9 +1104,7 @@
 		</div>
 	</main>
 
-	<footer
-		class="fixed right-0 bottom-0 left-0 border-t border-slate-300 bg-[#eceff4] px-3 py-1 text-xs text-slate-600"
-	>
+	<footer class="app-neutral-bg fixed right-0 bottom-0 left-0 border-t border-slate-300 px-3 py-1 text-xs text-slate-600">
 		<div class="relative mx-auto max-w-[1700px]">
 			<span
 				>{matchState
@@ -1117,7 +1112,7 @@
 					: 'Loop — ms'}</span
 			>
 			<span class="absolute left-1/2 -translate-x-1/2">PossumFMS</span>
-			<a href="/audience" class="absolute right-0 text-blue-700 hover:text-blue-500"
+			<a href="/audience" class="brand-secondary-text absolute right-0 hover:opacity-80"
 				>Audience Overlay</a
 			>
 		</div>
