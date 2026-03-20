@@ -3,7 +3,7 @@ namespace PossumFMS.Core.Arena;
 /// <summary>Sent in control packet byte [6]. Values match the FRC DS protocol.</summary>
 public enum MatchType : byte
 {
-    None = 0,
+    Test = 0,
     Practice = 1,
     Qualification = 2,
     Playoff = 3,

@@ -13,7 +13,7 @@ public sealed class ArenaTests
         var arena = new PossumFMS.Core.Arena.Arena();
 
         Assert.Equal(MatchPhase.Idle, arena.Phase);
-        Assert.Equal(PossumFMS.Core.Arena.MatchType.None, arena.MatchType);
+        Assert.Equal(PossumFMS.Core.Arena.MatchType.Test, arena.MatchType);
         Assert.Equal(1, arena.MatchNumber);
         Assert.Equal(0, arena.MatchRepeat);
         Assert.Equal(TimeSpan.Zero, arena.TimeRemaining);

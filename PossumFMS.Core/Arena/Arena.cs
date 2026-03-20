@@ -24,7 +24,7 @@ public sealed class Arena
 
     // ── Match metadata (encoded in every control packet) ───────────────────────
 
-    public MatchType MatchType   { get; set; } = MatchType.None;
+    public MatchType MatchType   { get; set; } = MatchType.Test;
     public int       MatchNumber { get; set; } = 1;
     public int       MatchRepeat { get; set; } = 0;
 

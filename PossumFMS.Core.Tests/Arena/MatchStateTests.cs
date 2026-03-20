@@ -158,7 +158,7 @@ public sealed class MatchStateTests
     [Fact]
     public void MatchType_None_IsZero()
     {
-        Assert.Equal(0, (byte)PossumFMS.Core.Arena.MatchType.None);
+        Assert.Equal(0, (byte)PossumFMS.Core.Arena.MatchType.Test);
     }
 
     [Fact]

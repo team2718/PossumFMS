@@ -329,7 +329,7 @@ public sealed class ControlPacketTests
     // ── Match type (buf[6]) ────────────────────────────────────────────────────
 
     [Theory]
-    [InlineData(PossumFMS.Core.Arena.MatchType.None,          0)]
+    [InlineData(PossumFMS.Core.Arena.MatchType.Test,          0)]
     [InlineData(PossumFMS.Core.Arena.MatchType.Practice,      1)]
     [InlineData(PossumFMS.Core.Arena.MatchType.Qualification, 2)]
     [InlineData(PossumFMS.Core.Arena.MatchType.Playoff,       3)]

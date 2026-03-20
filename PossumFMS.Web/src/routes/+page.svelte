@@ -293,16 +293,14 @@
 		const selectedLevels = new Set(selectedLogSeverities);
 		const keyword = logSearch.trim().toLowerCase();
 
-		return [...fms.logEntries]
-			.reverse()
-			.filter((entry: RecentLogEntry) => {
-				if (!selectedLevels.has(entry.level)) return false;
+		return [...fms.logEntries].reverse().filter((entry: RecentLogEntry) => {
+			if (!selectedLevels.has(entry.level)) return false;
 
-				if (!keyword) return true;
+			if (!keyword) return true;
 
-				const haystack = `${entry.level} ${entry.category} ${entry.message}`.toLowerCase();
-				return haystack.includes(keyword);
-			});
+			const haystack = `${entry.level} ${entry.category} ${entry.message}`.toLowerCase();
+			return haystack.includes(keyword);
+		});
 	});
 
 	async function adjustFuelPoints(alliance: 'Red' | 'Blue', isAuto: boolean, delta: number) {
@@ -462,15 +460,19 @@
 	<div
 		class="mb-2 rounded border p-2 text-xs {s.estop
 			? alliance === 'red'
-				? 'alliance-red-border-soft alliance-red-bg-soft'
-				: 'alliance-red-border-soft alliance-red-bg-soft'
+				? 'alliance-red-border-soft alliance-red-bg'
+				: 'alliance-red-border-soft alliance-red-bg'
 			: alliance === 'red'
 				? 'alliance-red-border-soft bg-white'
 				: 'alliance-blue-border-soft bg-white'}"
 	>
 		<div class="mb-1.5 flex items-center justify-between">
-			<span class="font-black {alliance === 'blue' ? 'alliance-blue-text' : 'alliance-red-text'}"
-				>Station {stationNumber} — Team {s.teamNumber || '—'}</span
+			<span
+				class="font-black {s.estop
+					? 'text-white'
+					: alliance === 'blue'
+						? 'alliance-blue-text'
+						: 'alliance-red-text'}">Station {stationNumber} — Team {s.teamNumber || '—'}</span
 			>
 			<div class="flex gap-1">
 				{#if s.estop}<span
@@ -679,7 +681,9 @@
 			<div class="grid min-w-[1200px] grid-cols-[1fr_170px_1fr]">
 				<!-- Blue Alliance -->
 				<div class="alliance-blue-bg-soft border-r border-slate-300">
-					<div class="alliance-blue-border-soft flex items-center justify-between border-b px-3 py-2">
+					<div
+						class="alliance-blue-border-soft flex items-center justify-between border-b px-3 py-2"
+					>
 						<span class="alliance-blue-text text-sm font-bold tracking-wide">BLUE ALLIANCE</span>
 						<span
 							class="rounded px-2 py-0.5 text-xs font-bold text-white {blueReady
@@ -725,14 +729,27 @@
 
 				<!-- Center column -->
 				<div
-					class="flex items-center justify-center border-r border-slate-300 bg-white text-sm font-bold text-slate-700"
+					class="flex flex-col items-center justify-center gap-2 bg-slate-50 px-4 py-4 text-center"
 				>
-					Test Match
+					<div class="text-xs font-bold tracking-widest text-slate-500 uppercase">Match Status</div>
+					<div class="text-xl font-black tracking-tight text-slate-800">
+						{matchState?.matchType ?? 'Test'} Match
+					</div>
+
+					<div
+						class="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-3 py-1 shadow-sm"
+					>
+						<span class="text-[11px] font-bold tracking-wider text-slate-600 uppercase">
+							{phase}
+						</span>
+					</div>
 				</div>
 
 				<!-- Red Alliance -->
 				<div class="alliance-red-bg-soft">
-					<div class="alliance-red-border-soft flex items-center justify-between border-b px-3 py-2">
+					<div
+						class="alliance-red-border-soft flex items-center justify-between border-b px-3 py-2"
+					>
 						<span
 							class="rounded px-2 py-0.5 text-xs font-bold text-white {redReady
 								? 'bg-emerald-700'
@@ -786,21 +803,15 @@
 							aria-busy={isConfiguring}
 							class="brand-secondary-bg rounded px-3 py-1.5 text-sm font-bold text-white hover:opacity-90"
 						>
-							{isConfiguring ? 'Configuring...' : 'Configure'}
+							{isConfiguring ? 'Configuring...' : 'Configure AP'}
 						</button>
 						<button
 							onclick={clearAllTeams}
 							disabled={isConfiguring}
 							class="rounded bg-slate-600 px-3 py-1.5 text-sm font-bold text-white hover:bg-slate-500"
 						>
-							Clear All
+							Clear Teams
 						</button>
-						{#if configureWarning}
-							<span class="text-xs font-semibold text-rose-700">{configureWarning}</span>
-						{/if}
-						{#if configureSuccess}
-							<span class="text-xs font-semibold text-emerald-700">{configureSuccess}</span>
-						{/if}
 						<span class="text-slate-600">FMS AP Status:</span>
 						<span
 							class="rounded px-2 py-0.5 text-xs font-bold {matchState.accessPoint.status ===
@@ -810,6 +821,12 @@
 									? 'bg-yellow-100 text-yellow-800'
 									: 'bg-rose-100 text-rose-800'}">{matchState.accessPoint.status}</span
 						>
+						{#if configureWarning}
+							<span class="text-xs font-semibold text-rose-700">{configureWarning}</span>
+						{/if}
+						{#if configureSuccess}
+							<span class="text-xs font-semibold text-emerald-700">{configureSuccess}</span>
+						{/if}
 					</div>
 				{/if}
 			</div>
@@ -820,7 +837,7 @@
 			<div class="flex flex-wrap items-center justify-center gap-3">
 				<button
 					onclick={() => fms.startPreMatch()}
-					disabled={phase !== 'Idle'}
+					disabled={phase !== 'Idle' || !!matchState?.arenaEstop}
 					class="h-14 min-w-44 rounded px-5 text-sm font-black disabled:cursor-not-allowed disabled:opacity-40 {phase ===
 					'Idle'
 						? 'bg-amber-400 text-slate-900 hover:bg-amber-300'
@@ -855,10 +872,11 @@
 				</button>
 				<button
 					onclick={() => fms.clearMatch()}
-					disabled={(phase !== 'PostMatch' && phase !== 'PreMatch') || !!matchState?.arenaEstop}
+					disabled={(phase !== 'PostMatch' && phase !== 'PreMatch' && phase !== 'Idle') ||
+						!!matchState?.arenaEstop}
 					class="h-14 min-w-44 rounded bg-slate-500 px-5 text-sm font-black text-white hover:bg-slate-400 disabled:cursor-not-allowed disabled:opacity-40"
 				>
-					Clear Match
+					Clear
 				</button>
 				{#if matchState?.arenaEstop}
 					<button
@@ -1036,75 +1054,85 @@
 						</div>
 					{/if}
 				</div>
-				{:else if activeTab === 'log'}
-					<div class="p-3">
-						<div class="mb-3 flex flex-wrap items-end justify-between gap-3 rounded border border-slate-200 bg-slate-50 p-3">
-							<div class="min-w-[260px] flex-1">
-								<label for="log-search" class="mb-1 block text-xs font-semibold text-slate-600"
-									>Search Logs</label
-								>
-								<input
-									id="log-search"
-									type="text"
-									bind:value={logSearch}
-									placeholder="Keyword, category, or message"
-									class="w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm"
-								/>
-							</div>
+			{:else if activeTab === 'log'}
+				<div class="p-3">
+					<div
+						class="mb-3 flex flex-wrap items-end justify-between gap-3 rounded border border-slate-200 bg-slate-50 p-3"
+					>
+						<div class="min-w-[260px] flex-1">
+							<label for="log-search" class="mb-1 block text-xs font-semibold text-slate-600"
+								>Search Logs</label
+							>
+							<input
+								id="log-search"
+								type="text"
+								bind:value={logSearch}
+								placeholder="Keyword, category, or message"
+								class="w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm"
+							/>
+						</div>
 
-							<div>
-								<div class="mb-1 text-xs font-semibold text-slate-600">Severity Filters</div>
-								<div class="flex flex-wrap gap-2">
-									{#each logSeverityOptions as level}
-										<label class="inline-flex items-center gap-1 px-2 py-1 text-xs text-slate-700">
-											<input
-												type="checkbox"
-												checked={selectedLogSeverities.includes(level)}
-												onchange={(e) =>
-													toggleLogSeverity(level, (e.currentTarget as HTMLInputElement).checked)}
-											/>
-											<span>{level}</span>
-										</label>
-									{/each}
-								</div>
+						<div>
+							<div class="mb-1 text-xs font-semibold text-slate-600">Severity Filters</div>
+							<div class="flex flex-wrap gap-2">
+								{#each logSeverityOptions as level}
+									<label class="inline-flex items-center gap-1 px-2 py-1 text-xs text-slate-700">
+										<input
+											type="checkbox"
+											checked={selectedLogSeverities.includes(level)}
+											onchange={(e) =>
+												toggleLogSeverity(level, (e.currentTarget as HTMLInputElement).checked)}
+										/>
+										<span>{level}</span>
+									</label>
+								{/each}
 							</div>
+						</div>
 
-							<!-- <div class="text-xs text-slate-600">
+						<!-- <div class="text-xs text-slate-600">
 								<div>Total buffered: <span class="font-bold text-slate-900">{fms.logEntries.length}</span></div>
 								<div>Visible: <span class="font-bold text-slate-900">{filteredLogEntries.length}</span></div>
 							</div> -->
-						</div>
-
-						{#if selectedLogSeverities.length === 0}
-							<div class="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900">
-								Select at least one severity level to display log entries.
-							</div>
-						{:else if filteredLogEntries.length === 0}
-							<div class="rounded border border-slate-200 bg-slate-50 px-3 py-6 text-center text-sm text-slate-500">
-								No log entries match the current filters.
-							</div>
-						{:else}
-							<div class="space-y-2">
-								{#each filteredLogEntries as entry}
-									<div class="rounded border px-3 py-2 shadow-sm {logEntryClasses(entry.level)}">
-										<div class="mb-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-semibold uppercase tracking-wide opacity-90">
-											<span>{entry.level}</span>
-											<span>{formatLogTimestamp(entry.timestampUtc)}</span>
-											<span class="normal-case tracking-normal">{entry.category}</span>
-										</div>
-										<div class="whitespace-pre-wrap break-words font-mono text-[12px] leading-5">
-											{entry.message}
-										</div>
-									</div>
-								{/each}
-							</div>
-						{/if}
 					</div>
+
+					{#if selectedLogSeverities.length === 0}
+						<div
+							class="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900"
+						>
+							Select at least one severity level to display log entries.
+						</div>
+					{:else if filteredLogEntries.length === 0}
+						<div
+							class="rounded border border-slate-200 bg-slate-50 px-3 py-6 text-center text-sm text-slate-500"
+						>
+							No log entries match the current filters.
+						</div>
+					{:else}
+						<div class="space-y-2">
+							{#each filteredLogEntries as entry}
+								<div class="rounded border px-3 py-2 shadow-sm {logEntryClasses(entry.level)}">
+									<div
+										class="mb-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-semibold tracking-wide uppercase opacity-90"
+									>
+										<span>{entry.level}</span>
+										<span>{formatLogTimestamp(entry.timestampUtc)}</span>
+										<span class="tracking-normal normal-case">{entry.category}</span>
+									</div>
+									<div class="font-mono text-[12px] leading-5 break-words whitespace-pre-wrap">
+										{entry.message}
+									</div>
+								</div>
+							{/each}
+						</div>
+					{/if}
+				</div>
 			{/if}
 		</div>
 	</main>
 
-	<footer class="app-neutral-bg fixed right-0 bottom-0 left-0 border-t border-slate-300 px-3 py-1 text-xs text-slate-600">
+	<footer
+		class="app-neutral-bg fixed right-0 bottom-0 left-0 border-t border-slate-300 px-3 py-1 text-xs text-slate-600"
+	>
 		<div class="relative mx-auto max-w-[1700px]">
 			<span
 				>{matchState
