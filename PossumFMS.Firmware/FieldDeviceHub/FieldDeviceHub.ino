@@ -44,20 +44,16 @@ enum FlashingStatus : uint8_t {
 
 portMUX_TYPE stateLock = portMUX_INITIALIZER_UNLOCKED;
 
-volatile uint32_t pendingFuelDelta = 0;
-volatile uint32_t inFlightFuelDelta = 0;
+volatile uint32_t fuelCount = 0;
 volatile uint32_t lastReplyTimeMs = 0;
+volatile bool shouldCountFuel = true;
 
 volatile uint8_t ledR = 0;
 volatile uint8_t ledG = 0;
 volatile uint8_t ledB = 0;
 volatile FlashingStatus flashingStatus = FlashingStatusOff;
 
-bool hasInFlightHeartbeat = false;
 bool hasReceivedReplySinceConnect = false;
-uint16_t heartbeatSequence = 1;
-uint16_t heartbeatPrefix = 0;
-uint32_t currentHeartbeatId = 1;
 
 
 void setup() {
@@ -72,12 +68,6 @@ void setup() {
     Serial.println(F("Failed to boot VL53L0X"));
     while(1);
   }
-
-  heartbeatPrefix = (uint16_t)(esp_random() & 0x7FFFu);
-  if (heartbeatPrefix == 0) {
-    heartbeatPrefix = 1;
-  }
-  currentHeartbeatId = (((uint32_t)heartbeatPrefix) << 16) | heartbeatSequence;
 
   lox.startRangeContinuous();
 
@@ -110,7 +100,9 @@ void ballCountTask(void* parameter) {
       if (!seeBall && rangemm < 70) {
         seeBall = true;
         portENTER_CRITICAL(&stateLock);
-        pendingFuelDelta++;
+        if (shouldCountFuel) {
+          fuelCount++;
+        }
         portEXIT_CRITICAL(&stateLock);
       }
 
@@ -118,6 +110,8 @@ void ballCountTask(void* parameter) {
         seeBall = false;
       }
     }
+
+    Serial.printf("seeBall: %d, fuelCount: %d, shouldCountFuel: %d\n", seeBall, fuelCount, shouldCountFuel);
 
     vTaskDelay(pdMS_TO_TICKS(1));
   }
@@ -145,10 +139,8 @@ void networkLedTask(void* parameter) {
     if (now - lastHeartbeatMs >= HEARTBEAT_INTERVAL_MS) {
       lastHeartbeatMs = now;
 
-      uint32_t sentFuelDelta = 0;
-      uint32_t sentHeartbeatId = 0;
-      uint32_t sentAtMs = sendHeartbeat(&sentFuelDelta, &sentHeartbeatId);
-      receiveReply(sentAtMs, sentFuelDelta, sentHeartbeatId);
+      uint32_t sentAtMs = sendHeartbeat();
+      receiveReply(sentAtMs);
     }
 
     vTaskDelay(pdMS_TO_TICKS(5));
@@ -213,40 +205,20 @@ void connectFms() {
 
   portENTER_CRITICAL(&stateLock);
   lastReplyTimeMs = 0;
+  shouldCountFuel = true;
   portEXIT_CRITICAL(&stateLock);
 
   hasReceivedReplySinceConnect = false;
   Serial.println("[HUB] FMS connected.");
 }
 
-// ── Build and send an e-stop heartbeat ───────────────────────────────────────
-void advanceHeartbeatId() {
-  heartbeatSequence++;
-  if (heartbeatSequence == 0) {
-    heartbeatPrefix = (uint16_t)(esp_random() & 0x7FFFu);
-    if (heartbeatPrefix == 0) {
-      heartbeatPrefix = 1;
-    }
-    heartbeatSequence = 1;
-  }
-
-  currentHeartbeatId = (((uint32_t)heartbeatPrefix) << 16) | heartbeatSequence;
-}
-
-uint32_t sendHeartbeat(uint32_t* sentFuelDelta, uint32_t* sentHeartbeatId) {
-  uint32_t pendingFuelDeltaSnapshot;
-  uint32_t inFlightFuelDeltaSnapshot;
+// ── Build and send a hub heartbeat ───────────────────────────────────────────
+uint32_t sendHeartbeat() {
+  uint32_t fuelCountSnapshot;
   uint32_t lastReplyTimeSnapshot;
 
   portENTER_CRITICAL(&stateLock);
-  if (!hasInFlightHeartbeat) {
-    inFlightFuelDelta = pendingFuelDelta;
-    pendingFuelDelta = 0;
-    hasInFlightHeartbeat = true;
-  }
-
-  pendingFuelDeltaSnapshot = pendingFuelDelta;
-  inFlightFuelDeltaSnapshot = inFlightFuelDelta;
+  fuelCountSnapshot = fuelCount;
   lastReplyTimeSnapshot = lastReplyTimeMs;
   portEXIT_CRITICAL(&stateLock);
 
@@ -255,36 +227,17 @@ uint32_t sendHeartbeat(uint32_t* sentFuelDelta, uint32_t* sentHeartbeatId) {
     enc.addString("name",             DEVICE_NAME);
     enc.addString("type",             "hub");
   enc.addInt32 ("last_reply_time_ms", (int32_t)lastReplyTimeSnapshot);
-  enc.addInt32 ("heartbeat_id",      (int32_t)currentHeartbeatId);
   enc.addString("alliance",         ALLIANCE_NAME);
-  enc.addInt32 ("fuel_delta",       (int32_t)inFlightFuelDeltaSnapshot);
+  enc.addInt32 ("fuel_count",       (int32_t)fuelCountSnapshot);
     enc.end();
-
-  (void)pendingFuelDeltaSnapshot;
-  *sentFuelDelta = inFlightFuelDeltaSnapshot;
-  *sentHeartbeatId = currentHeartbeatId;
 
   uint32_t sentAtMs = millis();
   client.write(enc.buf, enc.length());
   return sentAtMs;
 }
 
-void acknowledgeFuelDelta(uint32_t sentHeartbeatId, uint32_t sentFuelDelta) {
-  portENTER_CRITICAL(&stateLock);
-  if (hasInFlightHeartbeat && currentHeartbeatId == sentHeartbeatId) {
-    inFlightFuelDelta = 0;
-    hasInFlightHeartbeat = false;
-  }
-  portEXIT_CRITICAL(&stateLock);
-
-  (void)sentFuelDelta;
-  if (currentHeartbeatId == sentHeartbeatId) {
-    advanceHeartbeatId();
-  }
-}
-
 // ── Read and parse the server reply ──────────────────────────────────────────
-void receiveReply(uint32_t sentAtMs, uint32_t sentFuelDelta, uint32_t sentHeartbeatId) {
+void receiveReply(uint32_t sentAtMs) {
   uint32_t replyTimeoutMs = hasReceivedReplySinceConnect
     ? REPLY_TIMEOUT_MS
     : INITIAL_REPLY_TIMEOUT_MS;
@@ -331,14 +284,6 @@ void receiveReply(uint32_t sentAtMs, uint32_t sentFuelDelta, uint32_t sentHeartb
         return;
     }
 
-    uint32_t acceptedHeartbeatId = (uint32_t)dec.getInt32("accepted_heartbeat_id", -1);
-    if (acceptedHeartbeatId != sentHeartbeatId) {
-      Serial.printf("[HUB] Reply heartbeat mismatch: expected %lu got %lu\n",
-                    (unsigned long)sentHeartbeatId,
-                    (unsigned long)acceptedHeartbeatId);
-      return;
-    }
-
     FlashingStatus nextFlashingStatus = FlashingStatusOff;
     String flashingStatusValue = dec.getString("flashing_status", "off");
     if (flashingStatusValue == "flash_white") {
@@ -347,8 +292,15 @@ void receiveReply(uint32_t sentAtMs, uint32_t sentFuelDelta, uint32_t sentHeartb
       nextFlashingStatus = FlashingStatusDark;
     }
 
+    bool nextShouldCountFuel = dec.getBool("should_count_fuel", true);
+    bool clearFuelCount = dec.getBool("clear_fuel_count", false);
+
     portENTER_CRITICAL(&stateLock);
     lastReplyTimeMs = millis() - sentAtMs;
+    shouldCountFuel = nextShouldCountFuel;
+    if (clearFuelCount) {
+      fuelCount = 0;
+    }
     ledR = (uint8_t)dec.getInt32("led_r", 0);
     ledG = (uint8_t)dec.getInt32("led_g", 0);
     ledB = (uint8_t)dec.getInt32("led_b", 0);
@@ -356,5 +308,4 @@ void receiveReply(uint32_t sentAtMs, uint32_t sentFuelDelta, uint32_t sentHeartb
     portEXIT_CRITICAL(&stateLock);
 
     hasReceivedReplySinceConnect = true;
-    acknowledgeFuelDelta(sentHeartbeatId, sentFuelDelta);
 }
