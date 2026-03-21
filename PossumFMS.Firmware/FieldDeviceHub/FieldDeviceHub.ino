@@ -30,7 +30,7 @@ const BaseType_t BALL_COUNT_CORE = 0;
 WiFiClient client;
 
 #define LED_PIN   13
-#define LED_COUNT 60
+#define LED_COUNT 175
 
 Adafruit_NeoPixel strip(LED_COUNT, LED_PIN, NEO_RGBW + NEO_KHZ800);
 

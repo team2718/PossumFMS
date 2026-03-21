@@ -25,7 +25,7 @@
 const char* FMS_HOST      = "192.168.1.167";
 const uint16_t FMS_PORT   = 1678;
 
-const char* DEVICE_NAME   = "estop_1";   // unique label shown in FMS
+const char* DEVICE_NAME   = "estop_field";   // unique label shown in FMS
 const char* ALLIANCE_NAME = "field";
 const int STATION_NUMBER  = 0;
 

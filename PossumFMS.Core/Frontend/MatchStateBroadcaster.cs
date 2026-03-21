@@ -174,8 +174,7 @@ public sealed class MatchStateBroadcaster(
                 kind = "Hub",
                 receivedUtc = hub.ReceivedUtc,
                 alliance = hub.Alliance,
-                fuelDelta = hub.FuelDelta,
-                heartbeatId = hub.HeartbeatId,
+                fuelCount = hub.FuelCount,
             },
             EstopHeartbeat estop => new
             {

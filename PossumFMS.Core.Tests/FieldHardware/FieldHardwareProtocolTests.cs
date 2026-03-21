@@ -34,9 +34,8 @@ public sealed class FieldHardwareProtocolTests : IDisposable
         {
             { "name", "hub-red" },
             { "type", "hub" },
-            { "heartbeat_id", 1001 },
             { "alliance", "red" },
-            { "fuel_delta", 3 },
+            { "fuel_count", 3 },
         };
 
         _protocol.ParseHeartbeat(_device, doc);
@@ -51,9 +50,8 @@ public sealed class FieldHardwareProtocolTests : IDisposable
         {
             { "name", "hub-blue" },
             { "type", "hub" },
-            { "heartbeat_id", 1002 },
             { "alliance", "blue" },
-            { "fuel_delta", 0 },
+            { "fuel_count", 0 },
         };
 
         _protocol.ParseHeartbeat(_device, doc);
@@ -63,22 +61,20 @@ public sealed class FieldHardwareProtocolTests : IDisposable
     }
 
     [Fact]
-    public void ParseHeartbeat_Hub_StoresFuelDelta()
+    public void ParseHeartbeat_Hub_StoresFuelCount()
     {
         var doc = new BsonDocument
         {
             { "name", "hub-red" },
             { "type", "hub" },
-            { "heartbeat_id", 1003 },
             { "alliance", "red" },
-            { "fuel_delta", 7 },
+            { "fuel_count", 7 },
         };
 
         _protocol.ParseHeartbeat(_device, doc);
 
         var hb = Assert.IsType<HubHeartbeat>(_device.LastHeartbeat);
-        Assert.Equal(7, hb.FuelDelta);
-        Assert.Equal(1003, hb.HeartbeatId);
+        Assert.Equal(7, hb.FuelCount);
     }
 
     [Fact]
@@ -89,9 +85,8 @@ public sealed class FieldHardwareProtocolTests : IDisposable
             { "name", "hub-red" },
             { "type", "hub" },
             { "last_reply_time_ms", 42 },
-            { "heartbeat_id", 1004 },
             { "alliance", "red" },
-            { "fuel_delta", 0 },
+            { "fuel_count", 0 },
         };
 
         _protocol.ParseHeartbeat(_device, doc);
@@ -100,21 +95,17 @@ public sealed class FieldHardwareProtocolTests : IDisposable
     }
 
     [Fact]
-    public void ParseHeartbeat_Hub_MissingFuelDelta_DefaultsToZero()
+    public void ParseHeartbeat_Hub_MissingFuelCount_Throws()
     {
         var doc = new BsonDocument
         {
             { "name", "hub-red" },
             { "type", "hub" },
-            { "heartbeat_id", 1005 },
             { "alliance", "red" },
-            // no fuel_delta field
+            // no fuel_count field
         };
 
-        _protocol.ParseHeartbeat(_device, doc);
-
-        var hb = Assert.IsType<HubHeartbeat>(_device.LastHeartbeat);
-        Assert.Equal(0, hb.FuelDelta);
+        Assert.Throws<InvalidOperationException>(() => _protocol.ParseHeartbeat(_device, doc));
     }
 
     [Fact]
@@ -124,9 +115,8 @@ public sealed class FieldHardwareProtocolTests : IDisposable
         {
             { "name", "hub-??" },
             { "type", "hub" },
-            { "heartbeat_id", 1006 },
             { "alliance", "green" }, // invalid
-            { "fuel_delta", 0 },
+            { "fuel_count", 0 },
         };
 
         Assert.Throws<InvalidOperationException>(() => _protocol.ParseHeartbeat(_device, doc));
@@ -139,22 +129,21 @@ public sealed class FieldHardwareProtocolTests : IDisposable
         {
             { "name", "hub-??" },
             { "type", "hub" },
-            { "heartbeat_id", 1007 },
-            { "fuel_delta", 0 },
+            { "fuel_count", 0 },
         };
 
         Assert.Throws<InvalidOperationException>(() => _protocol.ParseHeartbeat(_device, doc));
     }
 
     [Fact]
-    public void ParseHeartbeat_Hub_MissingHeartbeatId_Throws()
+    public void ParseHeartbeat_Hub_NegativeFuelCount_Throws()
     {
         var doc = new BsonDocument
         {
             { "name", "hub-red" },
             { "type", "hub" },
             { "alliance", "red" },
-            { "fuel_delta", 0 },
+            { "fuel_count", -1 },
         };
 
         Assert.Throws<InvalidOperationException>(() => _protocol.ParseHeartbeat(_device, doc));
@@ -300,9 +289,8 @@ public sealed class FieldHardwareProtocolTests : IDisposable
         {
             { "name", $"hub-{alliance}" },
             { "type", "hub" },
-            { "heartbeat_id", 2001 },
             { "alliance", alliance },
-            { "fuel_delta", 0 },
+            { "fuel_count", 0 },
         };
         _protocol.ParseHeartbeat(_device, doc);
         return _device;
@@ -317,7 +305,8 @@ public sealed class FieldHardwareProtocolTests : IDisposable
 
         var reply = _protocol.BuildReply(_device, arena, logic, null);
 
-        Assert.Equal(2001, reply["accepted_heartbeat_id"].AsInt32);
+        Assert.True(reply["should_count_fuel"].AsBoolean);
+        Assert.True(reply["clear_fuel_count"].AsBoolean);
         Assert.Equal(0,   reply["led_r"].AsInt32);
         Assert.Equal(255, reply["led_g"].AsInt32);
         Assert.Equal(0,   reply["led_b"].AsInt32);
@@ -372,9 +361,8 @@ public sealed class FieldHardwareProtocolTests : IDisposable
             {
                 { "name", "hub-blue" },
                 { "type", "hub" },
-                { "heartbeat_id", 2002 },
                 { "alliance", "blue" },
-                { "fuel_delta", 0 },
+                { "fuel_count", 0 },
             };
             _protocol.ParseHeartbeat(blueDevice, doc);
 
@@ -402,6 +390,7 @@ public sealed class FieldHardwareProtocolTests : IDisposable
 
         var reply = _protocol.BuildReply(_device, arena, logic, null);
 
+        Assert.False(reply["should_count_fuel"].AsBoolean);
         Assert.Equal(0, reply["led_r"].AsInt32);
         Assert.Equal(0, reply["led_g"].AsInt32);
         Assert.Equal(0, reply["led_b"].AsInt32);

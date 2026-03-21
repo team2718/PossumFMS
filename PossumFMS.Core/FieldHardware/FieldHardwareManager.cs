@@ -21,8 +21,7 @@ public sealed class FieldHardwareManager : BackgroundService
     private const int MaxBsonPacketSizeBytes = 1024 * 1024;
 
     private readonly ConcurrentDictionary<int, FieldDevice> _devices = new();
-    private readonly Lock _hubHeartbeatDeduplicationLock = new();
-    private readonly Dictionary<string, int> _lastAcceptedHubHeartbeatIdsByName = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<int, int> _lastObservedHubFuelCountsByDeviceId = new();
     private readonly ILogger<FieldHardwareManager> _logger;
     private readonly Arena.Arena _arena;
     private readonly GameLogic _gameLogic;
@@ -191,12 +190,19 @@ public sealed class FieldHardwareManager : BackgroundService
 
                     if (device.LastHeartbeat is HubHeartbeat hub)
                     {
-                        if (hub.FuelDelta > 0 && TryAcceptHubHeartbeat(device.Name, hub.HeartbeatId))
+                        var previousFuelCount = _lastObservedHubFuelCountsByDeviceId.TryGetValue(device.Id, out var previous)
+                            ? previous
+                            : hub.FuelCount;
+
+                        _lastObservedHubFuelCountsByDeviceId[device.Id] = hub.FuelCount;
+
+                        var fuelDelta = hub.FuelCount - previousFuelCount;
+                        if (fuelDelta > 0)
                         {
                             var alliance = string.Equals(hub.Alliance, "red", StringComparison.OrdinalIgnoreCase)
                                 ? AllianceColor.Red
                                 : AllianceColor.Blue;
-                            _gameLogic.ScoreFuel(alliance, hub.FuelDelta);
+                            _gameLogic.ScoreFuel(alliance, fuelDelta);
                         }
                     }
                 }
@@ -241,6 +247,7 @@ public sealed class FieldHardwareManager : BackgroundService
 
         device.Status = FieldDeviceStatus.Disconnected;
         _devices.TryRemove(deviceId, out _);
+        _lastObservedHubFuelCountsByDeviceId.TryRemove(deviceId, out _);
         client.Dispose();
 
         _logger.LogInformation("Field device {Name} at {RemoteEndpoint} disconnected.", device.Name, endpoint);
@@ -285,21 +292,6 @@ public sealed class FieldHardwareManager : BackgroundService
         }
         catch (InvalidOperationException)
         {
-        }
-    }
-
-    private bool TryAcceptHubHeartbeat(string deviceName, int heartbeatId)
-    {
-        lock (_hubHeartbeatDeduplicationLock)
-        {
-            if (_lastAcceptedHubHeartbeatIdsByName.TryGetValue(deviceName, out var lastAcceptedHeartbeatId)
-                && lastAcceptedHeartbeatId == heartbeatId)
-            {
-                return false;
-            }
-
-            _lastAcceptedHubHeartbeatIdsByName[deviceName] = heartbeatId;
-            return true;
         }
     }
 

@@ -89,16 +89,18 @@ internal sealed class HubDeviceProtocolHandler : IFieldDeviceProtocolHandler
     public DeviceHeartbeatParseResult Parse(BsonDocument heartbeat)
     {
         var alliance = BsonField.GetString(heartbeat, "alliance")?.ToLowerInvariant();
-        var fuelDelta = BsonField.GetInt32(heartbeat, "fuel_delta") ?? 0;
-        var heartbeatId = BsonField.GetInt32(heartbeat, "heartbeat_id");
+        var fuelCount = BsonField.GetInt32(heartbeat, "fuel_count");
 
         if (alliance is not ("red" or "blue"))
             throw new InvalidOperationException("Hub heartbeat must include alliance as 'red' or 'blue'.");
 
-        if (heartbeatId is null)
-            throw new InvalidOperationException("Hub heartbeat must include heartbeat_id.");
+        if (fuelCount is null)
+            throw new InvalidOperationException("Hub heartbeat must include fuel_count.");
 
-        return new DeviceHeartbeatParseResult(new HubHeartbeat(alliance, fuelDelta, heartbeatId.Value, DateTime.UtcNow));
+        if (fuelCount < 0)
+            throw new InvalidOperationException("Hub heartbeat fuel_count must be >= 0.");
+
+        return new DeviceHeartbeatParseResult(new HubHeartbeat(alliance, fuelCount.Value, DateTime.UtcNow));
     }
 
     public BsonDocument BuildReply(FieldDevice device, Arena.Arena arena, GameLogic gameLogic)
@@ -107,11 +109,14 @@ internal sealed class HubDeviceProtocolHandler : IFieldDeviceProtocolHandler
         var alliance = ParseAlliance(hubHeartbeat?.Alliance);
         var (r, g, b) = GetHubLedColor(alliance, arena, gameLogic);
         var flashingStatus = GetFlashingStatus(alliance, arena, gameLogic);
+        var shouldCountFuel = alliance is not null && gameLogic.IsHubActive(alliance.Value);
+        var clearFuelCount = ShouldClearFuelCount(device, arena);
 
         return new BsonDocument
         {
             { "accepted", true },
-            { "accepted_heartbeat_id", hubHeartbeat?.HeartbeatId ?? 0 },
+            { "should_count_fuel", shouldCountFuel },
+            { "clear_fuel_count", clearFuelCount },
             { "flashing_status", flashingStatus },
             { "led_r", r},
             { "led_g", g},
@@ -153,6 +158,22 @@ internal sealed class HubDeviceProtocolHandler : IFieldDeviceProtocolHandler
             return "flash_off";
 
         return "off";
+    }
+
+    private static bool ShouldClearFuelCount(FieldDevice device, Arena.Arena arena)
+    {
+        if (arena.Phase is not (MatchPhase.PreMatch or MatchPhase.Idle))
+        {
+            device.LastFuelClearSignalPhase = null;
+            return false;
+        }
+
+        var currentPhase = arena.Phase.ToString();
+        if (string.Equals(device.LastFuelClearSignalPhase, currentPhase, StringComparison.Ordinal))
+            return false;
+
+        device.LastFuelClearSignalPhase = currentPhase;
+        return true;
     }
 
     private static AllianceColor? ParseAlliance(string? alliance)
