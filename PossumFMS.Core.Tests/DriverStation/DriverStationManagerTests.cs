@@ -14,6 +14,15 @@ public sealed class DriverStationManagerTests
         return new DriverStationManager(arena, NullLogger<DriverStationManager>.Instance);
     }
 
+    private static void AssignSingle(
+        DriverStationManager manager,
+        AllianceStation station,
+        int teamNumber,
+        string wpaKey = "")
+    {
+        manager.AssignTeams([new DriverStationManager.TeamAssignment(station, teamNumber, wpaKey)]);
+    }
+
     // ── Constructor / Stations ─────────────────────────────────────────────────
 
     [Fact]
@@ -44,14 +53,14 @@ public sealed class DriverStationManagerTests
         Assert.Same(viaIndex, viaDict);
     }
 
-    // ── AssignTeam ─────────────────────────────────────────────────────────────
+    // ── AssignTeams ────────────────────────────────────────────────────────────
 
     [Fact]
     public void AssignTeam_SetsTeamNumber()
     {
         var mgr = CreateManager();
 
-        mgr.AssignTeam(AllianceStations.Red1, 1234);
+        AssignSingle(mgr, AllianceStations.Red1, 1234);
 
         Assert.Equal(1234, mgr[AllianceStations.Red1].TeamNumber);
     }
@@ -61,7 +70,7 @@ public sealed class DriverStationManagerTests
     {
         var mgr = CreateManager();
 
-        mgr.AssignTeam(AllianceStations.Blue3, 5678, "mypassword");
+        AssignSingle(mgr, AllianceStations.Blue3, 5678, "mypassword");
 
         Assert.Equal("mypassword", mgr[AllianceStations.Blue3].WpaKey);
     }
@@ -70,11 +79,11 @@ public sealed class DriverStationManagerTests
     public void AssignTeam_ZeroTeamNumber_ClearsWpaKey()
     {
         var mgr = CreateManager();
-        mgr.AssignTeam(AllianceStations.Red2, 9999, "secret");
+        AssignSingle(mgr, AllianceStations.Red2, 9999, "secret");
 
-        mgr.AssignTeam(AllianceStations.Red2, 0);
+        AssignSingle(mgr, AllianceStations.Red2, 0);
 
-        Assert.Equal("possum2718", mgr[AllianceStations.Red2].WpaKey);
+        Assert.Equal(string.Empty, mgr[AllianceStations.Red2].WpaKey);
         Assert.Equal(0, mgr[AllianceStations.Red2].TeamNumber);
     }
 
@@ -84,7 +93,7 @@ public sealed class DriverStationManagerTests
         var mgr = CreateManager();
 
         Assert.Throws<ArgumentOutOfRangeException>(
-            () => mgr.AssignTeam(AllianceStations.Red1, -1));
+            () => AssignSingle(mgr, AllianceStations.Red1, -1));
     }
 
     [Fact]
@@ -94,7 +103,7 @@ public sealed class DriverStationManagerTests
         bool fired = false;
         mgr.TeamAssignmentsChanged += () => fired = true;
 
-        mgr.AssignTeam(AllianceStations.Red1, 9999);
+        AssignSingle(mgr, AllianceStations.Red1, 9999);
 
         Assert.True(fired);
     }
@@ -104,9 +113,42 @@ public sealed class DriverStationManagerTests
     {
         var mgr = CreateManager();
 
-        mgr.AssignTeam(AllianceStations.Blue1, 0);
+        AssignSingle(mgr, AllianceStations.Blue1, 0);
 
-        Assert.Equal("possum2718", mgr[AllianceStations.Blue1].WpaKey);
+        Assert.Equal(string.Empty, mgr[AllianceStations.Blue1].WpaKey);
+    }
+
+    [Fact]
+    public void AssignTeam_WhenTeamAlreadyOnAnotherStation_MovesTeam()
+    {
+        var mgr = CreateManager();
+        AssignSingle(mgr, AllianceStations.Blue2, 2718);
+        mgr.AssignTeams([
+            new DriverStationManager.TeamAssignment(AllianceStations.Red1, 2718),
+            new DriverStationManager.TeamAssignment(AllianceStations.Blue2, 0),
+        ]);
+
+        Assert.Equal(2718, mgr[AllianceStations.Red1].TeamNumber);
+        Assert.Equal(0, mgr[AllianceStations.Blue2].TeamNumber);
+    }
+
+    [Fact]
+    public void AssignTeam_ReorderedMoveCalls_FirstCallIsRejectedForDuplicateTeam()
+    {
+        var mgr = CreateManager();
+        AssignSingle(mgr, AllianceStations.Blue2, 2718);
+
+        // Simulate frontend issuing destination assignment before source clear.
+        Assert.Throws<InvalidOperationException>(() =>
+            AssignSingle(mgr, AllianceStations.Red1, 2718));
+        AssignSingle(mgr, AllianceStations.Blue2, 0);
+
+        var stationsWithTeam = AllianceStations.All
+            .Count(station => mgr[station].TeamNumber == 2718);
+
+        Assert.Equal(0, stationsWithTeam);
+        Assert.Equal(0, mgr[AllianceStations.Red1].TeamNumber);
+        Assert.Equal(0, mgr[AllianceStations.Blue2].TeamNumber);
     }
 
     [Fact]
@@ -114,8 +156,8 @@ public sealed class DriverStationManagerTests
     {
         var mgr = CreateManager();
 
-        mgr.AssignTeam(AllianceStations.Red1, 100);
-        mgr.AssignTeam(AllianceStations.Red2, 200);
+        AssignSingle(mgr, AllianceStations.Red1, 100);
+        AssignSingle(mgr, AllianceStations.Red2, 200);
 
         Assert.Equal(100, mgr[AllianceStations.Red1].TeamNumber);
         Assert.Equal(200, mgr[AllianceStations.Red2].TeamNumber);
@@ -128,7 +170,7 @@ public sealed class DriverStationManagerTests
         arena.StartPreMatch();
         var mgr = CreateManager(arena);
 
-        Assert.Throws<InvalidOperationException>(() => mgr.AssignTeam(AllianceStations.Red1, 111));
+        Assert.Throws<InvalidOperationException>(() => AssignSingle(mgr, AllianceStations.Red1, 111));
     }
 
     [Fact]
@@ -144,7 +186,7 @@ public sealed class DriverStationManagerTests
         station.RioLinked = true;
         station.RobotLinked = true;
 
-        mgr.AssignTeam(AllianceStations.Red1, 4321);
+        AssignSingle(mgr, AllianceStations.Red1, 4321);
 
         Assert.Equal(4321, station.TeamNumber);
         Assert.Null(station.UdpEndpoint);

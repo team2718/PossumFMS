@@ -122,6 +122,10 @@
 		battery: number;
 		robotLinked: boolean;
 		dsLinked: boolean;
+		radioLinked: boolean;
+		rioLinked: boolean;
+		isReady: boolean;
+		isReadyInMatch: boolean;
 		tripTimeMs: number;
 		missedPackets: number;
 		secondsSinceLastRobotLink: number;
@@ -269,11 +273,19 @@
 	}
 
 	// A station is ready if it is bypassed, OR if both DS and robot are linked
+	const isMatchInProgress = $derived(
+		phase === 'Auto' || phase === 'AutoToTeleopTransition' || phase === 'Teleop'
+	);
+	const readinessPositiveLabel = $derived(isMatchInProgress ? 'ACTIVE' : 'READY');
+	const readinessNegativeLabel = $derived(isMatchInProgress ? 'INACTIVE' : 'NOT READY');
+
+	// Readiness state comes from backend DriverStationConnection derived properties
+	// so frontend and backend readiness logic cannot drift.
 	const blueReady = $derived(
-		blueStations.every((s) => (s.bypassed || (s.dsLinked && s.robotLinked)))
+		blueStations.every((s) => (isMatchInProgress ? s.isReadyInMatch : s.isReady))
 	);
 	const redReady = $derived(
-		redStations.every((s) => (s.bypassed || (s.dsLinked && s.robotLinked)))
+		redStations.every((s) => (isMatchInProgress ? s.isReadyInMatch : s.isReady))
 	);
 
 	let activeTab = $state('status');
@@ -432,16 +444,15 @@
 
 {#snippet readinessHeaderRow()}
 	<div
-		class="grid grid-cols-[68px_66px_1fr_48px_44px_44px_44px_44px_80px] items-center gap-1 px-1 py-1 text-center font-bold text-slate-600"
+		class="grid grid-cols-[68px_66px_1fr_48px_44px_44px_88px_80px] items-center gap-1 px-1 py-1 text-center font-bold text-slate-600"
 	>
 		<div>E-Stop HW</div>
 		<div>Station</div>
 		<div>Team</div>
 		<div>Bypass</div>
 		<div>DS</div>
-		<div>Radio</div>
-		<div>RIO</div>
 		<div>Robot</div>
+		<div>Enabled</div>
 		<div>E-Stop</div>
 		<!-- <div>A-Stop</div> -->
 	</div>
@@ -454,6 +465,23 @@
 			: 'bg-rose-700'}"
 	>
 		{online ? 'OK' : 'X'}
+	</div>
+{/snippet}
+
+{#snippet robotEnabledCell(estop: boolean, astop: boolean, robotLinked: boolean, bypassed: boolean)}
+	{@const state = estop
+		? { label: 'E-Stopped', classes: 'bg-rose-700 text-white' }
+		: astop
+			? { label: 'A-Stopped', classes: 'bg-rose-700 text-white' }
+			: bypassed
+				? { label: 'Bypassed', classes: 'bg-slate-500 text-white' }
+				: !robotLinked
+					? { label: 'No Robot', classes: 'bg-slate-500 text-white' }
+					: { label: 'Enabled', classes: 'bg-emerald-600 text-white' }}
+	<div
+		class="mx-auto flex h-7 w-20 items-center justify-center rounded px-1 text-[10px] font-bold whitespace-nowrap {state.classes}"
+	>
+		{state.label}
 	</div>
 {/snippet}
 
@@ -588,6 +616,14 @@
 				Expected station: {s.wrongStation}
 			</div>
 		{/if}
+		<div class="mt-1 flex flex-wrap items-center gap-1">
+			<span class="rounded px-1.5 py-0.5 text-[10px] font-bold text-white {s.dsLinked ? 'bg-emerald-600' : 'bg-slate-400'}">DS</span>
+			<span class="rounded px-1.5 py-0.5 text-[10px] font-bold text-white {s.robotLinked ? 'bg-emerald-600' : 'bg-slate-400'}">Robot</span>
+			<span class="rounded px-1.5 py-0.5 text-[10px] font-bold text-white {s.radioLinked ? 'bg-emerald-600' : 'bg-slate-400'}">Radio</span>
+			<span class="rounded px-1.5 py-0.5 text-[10px] font-bold text-white {s.rioLinked ? 'bg-emerald-600' : 'bg-slate-400'}">RIO</span>
+			<span class="ml-1 rounded px-1.5 py-0.5 text-[10px] font-bold {s.isReady ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}">Ready</span>
+			<span class="rounded px-1.5 py-0.5 text-[10px] font-bold {s.isReadyInMatch ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}">In-Match</span>
+		</div>
 		<div class="mt-1.5 grid grid-cols-4 gap-1 text-slate-600">
 			<div class="rounded bg-slate-50 px-1.5 py-1">
 				<div class="text-[10px] text-slate-400">Battery</div>
@@ -780,7 +816,9 @@
 						<span
 							class="rounded px-2 py-0.5 text-xs font-bold text-white {blueReady
 								? 'bg-emerald-700'
-								: 'bg-rose-700'}">{blueReady ? 'READY' : 'NOT READY'}</span
+								: 'bg-rose-700'}">{blueReady
+								? readinessPositiveLabel
+								: readinessNegativeLabel}</span
 						>
 					</div>
 					<div class="p-2 text-xs">
@@ -788,7 +826,7 @@
 						{#each blueStations as s, i}
 							{@const idx = blueInputIndices[i]}
 							<div
-								class="alliance-blue-border-soft mt-1 grid grid-cols-[68px_66px_1fr_48px_44px_44px_44px_44px_80px] items-center gap-1 rounded border bg-white/75 px-1.5 py-1.5"
+								class="alliance-blue-border-soft mt-1 grid grid-cols-[68px_66px_1fr_48px_44px_44px_88px_80px] items-center gap-1 rounded border bg-white/75 px-1.5 py-1.5"
 							>
 								{@render readinessStatusCell(hasActiveEstopHardware(idx))}
 								<div class="alliance-blue-text text-center font-bold">Station {i + 1}</div>
@@ -799,20 +837,20 @@
 										pattern="[0-9]*"
 										placeholder="Team"
 										bind:value={inputs[idx].team}
-										disabled={phase !== 'Idle' || isConfiguring}
+										disabled={phase !== 'Idle'}
 										class="h-7 w-full rounded border border-slate-300 bg-white px-2 text-xs"
 									/>
 								</div>
 								<input
 									type="checkbox"
 									checked={s.bypassed}
+									disabled={phase !== 'Idle'}
 									onchange={() => fms.bypassStation(idx, !s.bypassed)}
 									class="mx-auto h-4 w-4 cursor-pointer"
 								/>
 								{@render readinessStatusCell(s.dsLinked)}
-								{@render readinessStatusCell(s.radioLinked)}
-								{@render readinessStatusCell(s.rioLinked)}
 								{@render readinessStatusCell(s.robotLinked)}
+																{@render robotEnabledCell(s.estop, s.astop, s.robotLinked, s.bypassed)}
 								{@render stopButton('E', s.estop, idx)}
 								<!-- {@render stopButton('A', s.astop, idx)} -->
 							</div>
@@ -846,7 +884,9 @@
 						<span
 							class="rounded px-2 py-0.5 text-xs font-bold text-white {redReady
 								? 'bg-emerald-700'
-								: 'bg-rose-700'}">{redReady ? 'READY' : 'NOT READY'}</span
+								: 'bg-rose-700'}">{redReady
+								? readinessPositiveLabel
+								: readinessNegativeLabel}</span
 						>
 						<span class="alliance-red-text text-sm font-bold tracking-wide">RED ALLIANCE</span>
 					</div>
@@ -855,7 +895,7 @@
 						{#each redStations as s, i}
 							{@const idx = redInputIndices[i]}
 							<div
-								class="alliance-red-border-soft mt-1 grid grid-cols-[68px_66px_1fr_48px_44px_44px_44px_44px_80px] items-center gap-1 rounded border bg-white/75 px-1.5 py-1.5"
+								class="alliance-red-border-soft mt-1 grid grid-cols-[68px_66px_1fr_48px_44px_44px_88px_80px] items-center gap-1 rounded border bg-white/75 px-1.5 py-1.5"
 							>
 								{@render readinessStatusCell(hasActiveEstopHardware(idx))}
 								<div class="alliance-red-text text-center font-bold">Station {3 - i}</div>
@@ -873,13 +913,13 @@
 								<input
 									type="checkbox"
 									checked={s.bypassed}
+									disabled={phase !== 'Idle'}
 									onchange={() => fms.bypassStation(idx, !s.bypassed)}
 									class="mx-auto h-4 w-4 cursor-pointer"
 								/>
 								{@render readinessStatusCell(s.dsLinked)}
-								{@render readinessStatusCell(s.radioLinked)}
-								{@render readinessStatusCell(s.rioLinked)}
 								{@render readinessStatusCell(s.robotLinked)}
+								{@render robotEnabledCell(s.estop, s.astop, s.robotLinked, s.bypassed)}
 								{@render stopButton('E', s.estop, idx)}
 								<!-- {@render stopButton('A', s.astop, idx)} -->
 							</div>

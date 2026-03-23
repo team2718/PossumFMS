@@ -75,31 +75,103 @@ public sealed class DriverStationManager : BackgroundService
     /// <summary>Raised whenever any station's team assignment changes.</summary>
     public event Action? TeamAssignmentsChanged;
 
+    public sealed record TeamAssignment(AllianceStation Station, int TeamNumber, string WpaKey = "");
+
     /// <summary>
-    /// Assigns a team to a station and fires <see cref="TeamAssignmentsChanged"/>.
-    /// Pass teamNumber = 0 to clear the slot.
+    /// Applies a set of team assignments atomically.
+    /// Stations not present in <paramref name="assignments"/> are left unchanged.
+    /// Duplicate non-zero team numbers are not allowed.
     /// </summary>
-    public void AssignTeam(AllianceStation station, int teamNumber, string wpaKey = "")
+    public void AssignTeams(IReadOnlyList<TeamAssignment> assignments)
     {
+        // Team mappings are only mutable while the field is idle so station identity
+        // cannot change mid-match.
         if (_arena.Phase != MatchPhase.Idle)
             throw new InvalidOperationException("Team assignments can only be changed while the arena is idle.");
 
-        if (teamNumber < 0)
-            throw new ArgumentOutOfRangeException(nameof(teamNumber), "Team number cannot be negative.");
+        // Caller must provide an assignment collection (empty is allowed and is a no-op).
+        if (assignments is null)
+            throw new ArgumentNullException(nameof(assignments));
+
+        if (assignments.Count == 0)
+            return;
+
+        // Validate each requested entry:
+        //  - station key must be one of the 6 known field stations
+        //  - team number must be non-negative (0 means "unassigned")
+        foreach (var assignment in assignments)
+        {
+            if (!Stations.ContainsKey(assignment.Station))
+                throw new ArgumentException($"Unknown alliance station '{assignment.Station}'.", nameof(assignments));
+
+            if (assignment.TeamNumber < 0)
+                throw new ArgumentOutOfRangeException(nameof(assignments), $"Team number for station {assignment.Station} cannot be negative.");
+        }
+
+        var latestByStation = new Dictionary<AllianceStation, TeamAssignment>();
+        foreach (var assignment in assignments)
+            latestByStation[assignment.Station] = assignment;
+
+        // Compute what the full station→team map would be after applying this partial
+        // update so duplicate-team detection includes both changed and unchanged stations.
+        var resultingTeamNumbers = new Dictionary<AllianceStation, int>();
+        foreach (var station in AllianceStations.All)
+            resultingTeamNumbers[station] = Stations[station].TeamNumber;
+
+        foreach (var station in AllianceStations.All)
+            if (latestByStation.TryGetValue(station, out var assignment))
+                resultingTeamNumbers[station] = assignment.TeamNumber;
+
+        var duplicateTeams = resultingTeamNumbers
+            .Where(x => x.Value > 0)
+            .GroupBy(x => x.Value)
+            .Where(g => g.Count() > 1)
+            .Select(g => g.Key)
+            .ToArray();
+
+        // Reject any final state where the same non-zero team appears on >1 station.
+        if (duplicateTeams.Length > 0)
+            throw new InvalidOperationException($"Duplicate team assignments are not allowed: {string.Join(", ", duplicateTeams)}.");
 
         // if wpaKey is empty, set it to "possum2718" as a default until we get a radio programming setup
-        if (string.IsNullOrEmpty(wpaKey))
-            wpaKey = "possum2718";
+        static string NormalizeWpaKey(int teamNumber, string wpaKey)
+        {
+            if (teamNumber == 0)
+                return string.Empty;
 
-        var ds = Stations[station];
-        int previousTeamNumber = ds.TeamNumber;
+            return string.IsNullOrEmpty(wpaKey) ? "possum2718" : wpaKey;
+        }
 
-        if (previousTeamNumber != teamNumber)
-            ClearStationConnectionState(ds, "team assignment changed", closeTcpClient: true);
+        var changed = false;
 
-        ds.TeamNumber = teamNumber;
-        ds.WpaKey     = wpaKey;
-        TeamAssignmentsChanged?.Invoke();
+        lock (_stationStateLock)
+        {
+            // Apply only stations present in this request. If the team number changes,
+            // clear active DS network state so stale endpoint/socket ownership cannot persist.
+            foreach (var station in AllianceStations.All)
+            {
+                if (!latestByStation.TryGetValue(station, out var assignment))
+                    continue;
+
+                var ds = Stations[station];
+                var normalizedWpaKey = NormalizeWpaKey(assignment.TeamNumber, assignment.WpaKey);
+                var teamChanged = ds.TeamNumber != assignment.TeamNumber;
+                var keyChanged = ds.WpaKey != normalizedWpaKey;
+
+                if (!teamChanged && !keyChanged)
+                    continue;
+
+                if (teamChanged)
+                    ClearStationConnectionState(ds, "team assignment changed", closeTcpClient: true);
+
+                ds.TeamNumber = assignment.TeamNumber;
+                ds.WpaKey = normalizedWpaKey;
+                changed = true;
+            }
+        }
+
+        if (changed)
+            TeamAssignmentsChanged?.Invoke();
     }
 
     public void Estop(AllianceStation station)  => Stations[station].Estop = true;
@@ -348,6 +420,9 @@ public sealed class DriverStationManager : BackgroundService
 
     private DriverStationConnection? FindStationByTeamNumber(int teamNumber)
     {
+        if (teamNumber <= 0)
+            return null;
+
         foreach (var ds in Stations.Values)
             if (ds.TeamNumber == teamNumber) return ds;
         return null;
@@ -428,7 +503,7 @@ public sealed class DriverStationManager : BackgroundService
         buf[2] = 0; // protocol version
 
         bool estop   = ds.Estop || _arena.ArenaEstop;
-        bool enabled = !estop && !ds.Astop && _arena.IsMatchRunning && !ds.Bypassed && IsDriverStationCommunicationEnabled();
+        bool enabled = ds.TeamNumber > 0 && !estop && !ds.Astop && _arena.IsMatchRunning && !ds.Bypassed && IsDriverStationCommunicationEnabled();
         bool auto    = _arena.Phase == MatchPhase.Auto;
 
         byte control = 0;
@@ -531,6 +606,13 @@ public sealed class DriverStationManager : BackgroundService
             }
 
             int teamNumber = (initBuf[3] << 8) | initBuf[4];
+
+            if (teamNumber <= 0)
+            {
+                _logger.LogWarning("Driver Station at {IP} reported invalid team number {Team}; dropping connection.", remoteIp, teamNumber);
+                await Task.Delay(1000, ct);
+                return;
+            }
 
             ds = FindStationByTeamNumber(teamNumber);
             if (ds is null)

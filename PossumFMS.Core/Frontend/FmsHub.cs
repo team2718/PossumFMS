@@ -26,37 +26,6 @@ public sealed class FmsHub(
     // ── Team assignment ────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Assigns a team to a station.
-    /// Pass teamNumber = 0 to clear the slot.
-    /// </summary>
-    public async Task AssignTeam(int stationIndex, int teamNumber, string wpaKey = "")
-    {
-        if (arena.Phase != MatchPhase.Idle)
-            throw new HubException("Team assignments can only be changed while the arena is idle.");
-
-        var station = AllianceStations.All[stationIndex];
-
-        if (teamNumber < 0)
-            throw new HubException("Team number cannot be negative.");
-
-        if (teamNumber != 0)
-        {
-            var duplicateStation = AllianceStations.All
-                .Where(s => s != station)
-                .FirstOrDefault(s => dsManager[s].TeamNumber == teamNumber);
-
-            if (duplicateStation is not null)
-                throw new HubException(
-                    $"Team {teamNumber} is already assigned to {duplicateStation}. " +
-                    "Use AssignTeams to move teams between stations in one operation.");
-        }
-
-        logger.LogInformation("Assigning team {Team} to {Station}.", teamNumber, station);
-        dsManager.AssignTeam(station, teamNumber, wpaKey);
-        await BroadcastMatchState();
-    }
-
-    /// <summary>
     /// Atomically assigns all six stations in order (Red1, Red2, Red3, Blue1, Blue2, Blue3).
     /// Use teamNumber = 0 to clear a slot.
     /// </summary>
@@ -97,11 +66,14 @@ public sealed class FmsHub(
 
         logger.LogInformation("Assigning all stations at once requested by {Client}.", Context.ConnectionId);
 
-        for (int i = 0; i < AllianceStations.All.Count; i++)
-            dsManager.AssignTeam(AllianceStations.All[i], 0, string.Empty);
+        var managerAssignments = assignments
+            .Select((assignment, index) => new DriverStationManager.TeamAssignment(
+                AllianceStations.All[index],
+                assignment.TeamNumber,
+                assignment.WpaKey ?? string.Empty))
+            .ToList();
 
-        for (int i = 0; i < AllianceStations.All.Count; i++)
-            dsManager.AssignTeam(AllianceStations.All[i], assignments[i].TeamNumber, assignments[i].WpaKey ?? string.Empty);
+        dsManager.AssignTeams(managerAssignments);
 
         await BroadcastMatchState();
     }

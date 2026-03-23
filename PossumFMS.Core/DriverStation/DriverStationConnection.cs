@@ -82,7 +82,14 @@ public sealed class DriverStationConnection
     public bool IsLinked => DsLinked && RobotLinked;
 
     /// <summary>True when this station is ready for a match to start.</summary>
-    public bool IsReady  => (Bypassed || IsLinked) && !Estop;
+    public bool IsReady  => (Bypassed || (TeamNumber > 0 && IsLinked)) && !Estop;
+
+    /// <summary>
+    /// True when this station is in an acceptable state while a match is running.
+    /// This intentionally ignores E-stop state so a robot that is e-stopped mid-match
+    /// is still treated as an active/acceptable station for field continuity.
+    /// </summary>
+    public bool IsReadyInMatch => Bypassed || (TeamNumber > 0 && IsLinked);
 
     public DriverStationConnection(AllianceStation station) => Station = station;
 }

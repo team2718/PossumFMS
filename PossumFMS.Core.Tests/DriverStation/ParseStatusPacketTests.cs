@@ -24,7 +24,7 @@ public sealed class ParseStatusPacketTests
     {
         var arena = new PossumFMS.Core.Arena.Arena();
         var mgr = new DriverStationManager(arena, NullLogger<DriverStationManager>.Instance);
-        mgr.AssignTeam(station ?? AllianceStations.Red1, teamNumber);
+        mgr.AssignTeams([new DriverStationManager.TeamAssignment(station ?? AllianceStations.Red1, teamNumber)]);
         return mgr;
     }
 
@@ -83,7 +83,7 @@ public sealed class ParseStatusPacketTests
             is var arena
             ? new DriverStationManager(arena, NullLogger<DriverStationManager>.Instance)
             : throw new InvalidOperationException();
-        mgr.AssignTeam(AllianceStations.Blue3, 9999);
+        mgr.AssignTeams([new DriverStationManager.TeamAssignment(AllianceStations.Blue3, 9999)]);
 
         var pkt = MinimalPacket(9999);
         Assert.Equal(0x27, pkt[4]);

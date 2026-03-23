@@ -118,6 +118,7 @@ public sealed class DriverStationConnectionTests
     public void IsReady_WhenLinkedAndNoEstop_True()
     {
         var ds = Make();
+        ds.TeamNumber  = 1234;
         ds.DsLinked    = true;
         ds.RobotLinked = true;
         ds.Estop       = false;
@@ -139,6 +140,7 @@ public sealed class DriverStationConnectionTests
     public void IsReady_WhenLinkedButEstopped_False()
     {
         var ds = Make();
+        ds.TeamNumber  = 1234;
         ds.DsLinked    = true;
         ds.RobotLinked = true;
         ds.Estop       = true;
@@ -168,8 +170,21 @@ public sealed class DriverStationConnectionTests
     public void IsReady_WhenDsLinkedButRobotNotLinked_False()
     {
         var ds = Make();
+        ds.TeamNumber  = 1234;
         ds.DsLinked    = true;
         ds.RobotLinked = false;
+        ds.Estop       = false;
+
+        Assert.False(ds.IsReady);
+    }
+
+    [Fact]
+    public void IsReady_WhenLinkedButNoAssignedTeam_False()
+    {
+        var ds = Make();
+        ds.TeamNumber  = 0;
+        ds.DsLinked    = true;
+        ds.RobotLinked = true;
         ds.Estop       = false;
 
         Assert.False(ds.IsReady);

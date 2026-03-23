@@ -134,6 +134,8 @@ public sealed class MatchStateBroadcaster(
                 astop         = ds.Astop,
                 bypassed      = ds.Bypassed,
                 wrongStation  = ds.WrongStation,
+                isReady       = ds.IsReady,
+                isReadyInMatch = ds.IsReadyInMatch,
                 wifi          = new
                 {
                     radioLinked       = wifi.RadioLinked,

@@ -27,6 +27,8 @@ export interface Station {
 	estop: boolean;
 	astop: boolean;
 	bypassed: boolean;
+	isReady: boolean;
+	isReadyInMatch: boolean;
 	wrongStation: boolean;
 	wifi: WifiStatus | null;
 }
@@ -214,10 +216,6 @@ class FmsConnection {
 		return this.hub.invoke(methodName, ...args);
 	}
 
-	/** Assign a team number (and optional WPA key) to a station (0=Red1 … 5=Blue3) */
-	assignTeam(stationIndex: number, teamNumber: number, wpaKey = '') {
-		return this.invoke('AssignTeam', stationIndex, teamNumber, wpaKey);
-	}
 	/** Assign all 6 stations at once in Red1, Red2, Red3, Blue1, Blue2, Blue3 order */
 	assignTeams(assignments: TeamAssignment[]) {
 		return this.invoke('AssignTeams', assignments);
