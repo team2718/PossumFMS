@@ -444,7 +444,7 @@
 
 {#snippet readinessHeaderRow()}
 	<div
-		class="grid grid-cols-[68px_66px_1fr_48px_44px_44px_88px_80px] items-center gap-1 px-1 py-1 text-center font-bold text-slate-600"
+		class="hidden items-center gap-1 px-1 py-1 text-center font-bold text-slate-600 sm:grid sm:grid-cols-[68px_66px_minmax(128px,1fr)_48px_44px_44px_88px_80px]"
 	>
 		<div>E-Stop HW</div>
 		<div>Station</div>
@@ -805,10 +805,10 @@
 
 	<main class="mx-auto flex max-w-[1700px] flex-col gap-3 px-3 py-3">
 		<!-- Alliance readiness panels -->
-		<div class="overflow-x-auto rounded border border-slate-300 bg-white shadow-sm">
-			<div class="grid min-w-[1200px] grid-cols-[1fr_170px_1fr]">
+		<div class="rounded border border-slate-300 bg-white shadow-sm">
+			<div class="grid grid-cols-1 xl:grid-cols-[1fr_170px_1fr]">
 				<!-- Blue Alliance -->
-				<div class="alliance-blue-bg-soft border-r border-slate-300">
+				<div class="alliance-blue-bg-soft border-b border-slate-300 xl:border-r xl:border-b-0">
 					<div
 						class="alliance-blue-border-soft flex items-center justify-between border-b px-3 py-2"
 					>
@@ -821,12 +821,65 @@
 								: readinessNegativeLabel}</span
 						>
 					</div>
-					<div class="p-2 text-xs">
+					<div class="overflow-x-auto p-2 text-xs">
 						{@render readinessHeaderRow()}
 						{#each blueStations as s, i}
 							{@const idx = blueInputIndices[i]}
 							<div
-								class="alliance-blue-border-soft mt-1 grid grid-cols-[68px_66px_1fr_48px_44px_44px_88px_80px] items-center gap-1 rounded border bg-white/75 px-1.5 py-1.5"
+								class="alliance-blue-border-soft mt-1 rounded border bg-white/75 px-1.5 py-1.5 sm:hidden"
+							>
+								<div class="grid grid-cols-[76px_1fr] items-end gap-2">
+									<label class="flex flex-col items-center gap-1 text-[10px] font-semibold tracking-wide text-slate-500 uppercase">
+										<span>Bypass</span>
+										<input
+											type="checkbox"
+											checked={s.bypassed}
+											disabled={phase !== 'Idle'}
+											onchange={() => fms.bypassStation(idx, !s.bypassed)}
+											class="h-4 w-4 cursor-pointer"
+										/>
+									</label>
+									<div class="min-w-0">
+										<div class="alliance-blue-text mb-1 font-bold">Station {i + 1}</div>
+										<input
+											type="text"
+											inputmode="numeric"
+											pattern="[0-9]*"
+											placeholder="Team"
+											bind:value={inputs[idx].team}
+											disabled={phase !== 'Idle'}
+											class="h-8 w-full rounded border border-slate-300 bg-white px-2 text-sm"
+										/>
+									</div>
+								</div>
+								<div class="mt-2 grid grid-cols-4">
+									<div class="flex flex-col items-center gap-0.5">
+										<span class="text-[10px] font-semibold tracking-wide text-slate-500 uppercase">E-Stop HW</span>
+										{@render readinessStatusCell(hasActiveEstopHardware(idx))}
+									</div>
+									<div class="flex flex-col items-center gap-0.5">
+										<span class="text-[10px] font-semibold tracking-wide text-slate-500 uppercase">DS</span>
+										{@render readinessStatusCell(s.dsLinked)}
+									</div>
+									<div class="flex flex-col items-center gap-0.5">
+										<span class="text-[10px] font-semibold tracking-wide text-slate-500 uppercase">Robot</span>
+										{@render readinessStatusCell(s.robotLinked)}
+									</div>
+									<div class="flex flex-col items-center gap-0.5">
+										<span class="text-[10px] font-semibold tracking-wide text-slate-500 uppercase">Enabled</span>
+										{@render robotEnabledCell(s.estop, s.astop, s.robotLinked, s.bypassed)}
+									</div>
+								</div>
+								<div class="mt-2 flex justify-center">
+									<div class="flex flex-col items-center gap-1">
+										<span class="text-[10px] font-semibold tracking-wide text-slate-500 uppercase">E-Stop</span>
+									{@render stopButton('E', s.estop, idx)}
+									</div>
+								</div>
+								<!-- {@render stopButton('A', s.astop, idx)} -->
+							</div>
+							<div
+								class="alliance-blue-border-soft mt-1 hidden grid-cols-[68px_66px_minmax(128px,1fr)_48px_44px_44px_88px_80px] items-center gap-1 rounded border bg-white/75 px-1.5 py-1.5 sm:grid"
 							>
 								{@render readinessStatusCell(hasActiveEstopHardware(idx))}
 								<div class="alliance-blue-text text-center font-bold">Station {i + 1}</div>
@@ -838,7 +891,7 @@
 										placeholder="Team"
 										bind:value={inputs[idx].team}
 										disabled={phase !== 'Idle'}
-										class="h-7 w-full rounded border border-slate-300 bg-white px-2 text-xs"
+										class="h-7 min-w-[8rem] w-full rounded border border-slate-300 bg-white px-2 text-xs"
 									/>
 								</div>
 								<input
@@ -850,7 +903,7 @@
 								/>
 								{@render readinessStatusCell(s.dsLinked)}
 								{@render readinessStatusCell(s.robotLinked)}
-																{@render robotEnabledCell(s.estop, s.astop, s.robotLinked, s.bypassed)}
+								{@render robotEnabledCell(s.estop, s.astop, s.robotLinked, s.bypassed)}
 								{@render stopButton('E', s.estop, idx)}
 								<!-- {@render stopButton('A', s.astop, idx)} -->
 							</div>
@@ -860,7 +913,7 @@
 
 				<!-- Center column -->
 				<div
-					class="flex flex-col items-center justify-center gap-2 bg-slate-50 px-4 py-4 text-center"
+					class="order-first flex flex-col items-center justify-center gap-2 border-b border-slate-300 bg-slate-50 px-4 py-4 text-center xl:order-none xl:border-b-0"
 				>
 					<div class="text-xs font-bold tracking-widest text-slate-500 uppercase">Match Status</div>
 					<div class="text-xl font-black tracking-tight text-slate-800">
@@ -890,12 +943,65 @@
 						>
 						<span class="alliance-red-text text-sm font-bold tracking-wide">RED ALLIANCE</span>
 					</div>
-					<div class="p-2 text-xs">
+					<div class="overflow-x-auto p-2 text-xs">
 						{@render readinessHeaderRow()}
 						{#each redStations as s, i}
 							{@const idx = redInputIndices[i]}
 							<div
-								class="alliance-red-border-soft mt-1 grid grid-cols-[68px_66px_1fr_48px_44px_44px_88px_80px] items-center gap-1 rounded border bg-white/75 px-1.5 py-1.5"
+								class="alliance-red-border-soft mt-1 rounded border bg-white/75 px-1.5 py-1.5 sm:hidden"
+							>
+								<div class="grid grid-cols-[76px_1fr] items-end gap-2">
+									<label class="flex flex-col items-center gap-1 text-[10px] font-semibold tracking-wide text-slate-500 uppercase">
+										<span>Bypass</span>
+										<input
+											type="checkbox"
+											checked={s.bypassed}
+											disabled={phase !== 'Idle'}
+											onchange={() => fms.bypassStation(idx, !s.bypassed)}
+											class="h-4 w-4 cursor-pointer"
+										/>
+									</label>
+									<div class="min-w-0">
+										<div class="alliance-red-text mb-1 font-bold">Station {3 - i}</div>
+										<input
+											type="text"
+											inputmode="numeric"
+											pattern="[0-9]*"
+											placeholder="Team"
+											bind:value={inputs[idx].team}
+											disabled={phase !== 'Idle' || isConfiguring}
+											class="h-8 w-full rounded border border-slate-300 bg-white px-2 text-sm"
+										/>
+									</div>
+								</div>
+								<div class="mt-2 grid grid-cols-4 gap-2">
+									<div class="flex flex-col items-center gap-0.5">
+										<span class="text-[10px] font-semibold tracking-wide text-slate-500 uppercase">E-Stop HW</span>
+										{@render readinessStatusCell(hasActiveEstopHardware(idx))}
+									</div>
+									<div class="flex flex-col items-center gap-0.5">
+										<span class="text-[10px] font-semibold tracking-wide text-slate-500 uppercase">DS</span>
+										{@render readinessStatusCell(s.dsLinked)}
+									</div>
+									<div class="flex flex-col items-center gap-0.5">
+										<span class="text-[10px] font-semibold tracking-wide text-slate-500 uppercase">Robot</span>
+										{@render readinessStatusCell(s.robotLinked)}
+									</div>
+									<div class="flex flex-col items-center gap-0.5">
+										<span class="text-[10px] font-semibold tracking-wide text-slate-500 uppercase">Enabled</span>
+										{@render robotEnabledCell(s.estop, s.astop, s.robotLinked, s.bypassed)}
+									</div>
+								</div>
+								<div class="mt-2 flex justify-center">
+									<div class="flex flex-col items-center gap-1">
+										<span class="text-[10px] font-semibold tracking-wide text-slate-500 uppercase">E-Stop</span>
+									{@render stopButton('E', s.estop, idx)}
+									</div>
+								</div>
+								<!-- {@render stopButton('A', s.astop, idx)} -->
+							</div>
+							<div
+								class="alliance-red-border-soft mt-1 hidden grid-cols-[68px_66px_minmax(128px,1fr)_48px_44px_44px_88px_80px] items-center gap-1 rounded border bg-white/75 px-1.5 py-1.5 sm:grid"
 							>
 								{@render readinessStatusCell(hasActiveEstopHardware(idx))}
 								<div class="alliance-red-text text-center font-bold">Station {3 - i}</div>
@@ -907,7 +1013,7 @@
 										placeholder="Team"
 										bind:value={inputs[idx].team}
 										disabled={phase !== 'Idle' || isConfiguring}
-										class="h-7 w-full rounded border border-slate-300 bg-white px-2 text-xs"
+										class="h-7 min-w-[8rem] w-full rounded border border-slate-300 bg-white px-2 text-xs"
 									/>
 								</div>
 								<input
@@ -1089,7 +1195,7 @@
 					</div>
 				</div>
 			{:else if activeTab === 'status'}
-				<div class="grid grid-cols-2">
+				<div class="grid grid-cols-1 lg:grid-cols-2">
 					<!-- Blue Alliance -->
 					<div class="alliance-blue-bg-soft border-r border-slate-200 p-3">
 						<div class="alliance-blue-text mb-2 text-xs font-bold tracking-wider uppercase">
