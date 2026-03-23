@@ -42,6 +42,7 @@ public sealed class DriverStationManager : BackgroundService
     private static readonly TimeSpan LoopTimingWindow = TimeSpan.FromSeconds(30);
 
     private readonly object _loopTimingLock = new();
+    private readonly object _stationStateLock = new();
     private readonly Queue<(long Timestamp, double DurationMs)> _loopTimingSamples = new();
     private double _currentLoopMs;
     private double _maxLoopMs30s;
@@ -80,6 +81,9 @@ public sealed class DriverStationManager : BackgroundService
     /// </summary>
     public void AssignTeam(AllianceStation station, int teamNumber, string wpaKey = "")
     {
+        if (_arena.Phase != MatchPhase.Idle)
+            throw new InvalidOperationException("Team assignments can only be changed while the arena is idle.");
+
         if (teamNumber < 0)
             throw new ArgumentOutOfRangeException(nameof(teamNumber), "Team number cannot be negative.");
 
@@ -88,6 +92,11 @@ public sealed class DriverStationManager : BackgroundService
             wpaKey = "possum2718";
 
         var ds = Stations[station];
+        int previousTeamNumber = ds.TeamNumber;
+
+        if (previousTeamNumber != teamNumber)
+            ClearStationConnectionState(ds, "team assignment changed", closeTcpClient: true);
+
         ds.TeamNumber = teamNumber;
         ds.WpaKey     = wpaKey;
         TeamAssignmentsChanged?.Invoke();
@@ -554,9 +563,26 @@ public sealed class DriverStationManager : BackgroundService
             byte stationIndex = (byte)((ds.Station.Color == AllianceColor.Red ? 0 : 3) + (int)ds.Station.Position - 1);
             await stream.WriteAsync(new byte[] { 0x00, 0x03, 0x19, stationIndex, stationStatus }, ct);
 
-            ds.TcpClient   = tcpClient;
-            ds.UdpEndpoint = new IPEndPoint(remoteIp, DsUdpReceivePort);
-            ds.TeamNumber  = teamNumber;
+            lock (_stationStateLock)
+            {
+                var endpoint = new IPEndPoint(remoteIp, DsUdpReceivePort);
+
+                foreach (var other in Stations.Values)
+                {
+                    if (ReferenceEquals(other, ds))
+                        continue;
+
+                    if (other.UdpEndpoint?.Address.Equals(remoteIp) == true)
+                        ClearStationConnectionState(other, "endpoint moved to another station", closeTcpClient: true);
+                }
+
+                if (ds.UdpEndpoint?.Address.Equals(remoteIp) != true)
+                    ClearStationConnectionState(ds, "station reconnected from a new endpoint", closeTcpClient: true);
+
+                ds.TcpClient   = tcpClient;
+                ds.UdpEndpoint = endpoint;
+                ds.TeamNumber  = teamNumber;
+            }
 
             _logger.LogInformation("Team {Team} connected in station {Station} ({IP}).",
                 teamNumber, ds.Station, remoteIp);
@@ -577,12 +603,7 @@ public sealed class DriverStationManager : BackgroundService
         {
             if (ds is not null)
             {
-                ds.TcpClient   = null;
-                ds.UdpEndpoint = null;
-                ds.DsLinked    = false;
-                ds.RobotLinked = false;
-                ds.RadioLinked = false;
-                ds.RioLinked   = false;
+                ClearStationConnectionState(ds, "TCP disconnected", closeTcpClient: false);
                 _logger.LogInformation("DS {Station} (team {Team}) TCP disconnected.", ds.Station, ds.TeamNumber);
             }
             tcpClient.Dispose();
@@ -703,5 +724,34 @@ public sealed class DriverStationManager : BackgroundService
 
             _maxLoopMs30s = maxLoopMs;
         }
+    }
+
+    private void ClearStationConnectionState(
+        DriverStationConnection station,
+        string reason,
+        bool closeTcpClient)
+    {
+        TcpClient? tcpClientToClose;
+
+        lock (_stationStateLock)
+        {
+            tcpClientToClose = station.TcpClient;
+            station.TcpClient   = null;
+            station.UdpEndpoint = null;
+            station.DsLinked    = false;
+            station.RobotLinked = false;
+            station.RadioLinked = false;
+            station.RioLinked   = false;
+            station.BatteryVoltage = 0;
+        }
+
+        if (closeTcpClient)
+            tcpClientToClose?.Dispose();
+
+        _logger.LogInformation(
+            "Cleared DS station state for {Station} (team {Team}) because {Reason}.",
+            station.Station,
+            station.TeamNumber,
+            reason);
     }
 }

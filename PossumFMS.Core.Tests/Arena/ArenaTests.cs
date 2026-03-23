@@ -22,7 +22,41 @@ public sealed class ArenaTests
         Assert.False(arena.WasAborted);
         Assert.False(arena.ArenaEstop);
         Assert.False(arena.FreePracticeEnabled);
+        Assert.Equal(TimeSpan.FromSeconds(20), arena.AutoDuration);
+        Assert.Equal(TimeSpan.FromSeconds(3), arena.AutoToTeleopTransitionDuration);
+        Assert.Equal(TimeSpan.FromSeconds(140), arena.TeleopDuration);
         Assert.Equal(string.Empty, arena.GameData);
+    }
+
+    [Fact]
+    public void SetMatchDurations_FromIdle_UpdatesDurations()
+    {
+        var arena = new PossumFMS.Core.Arena.Arena();
+
+        arena.SetMatchDurations(TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(30));
+
+        Assert.Equal(TimeSpan.FromSeconds(5), arena.AutoDuration);
+        Assert.Equal(TimeSpan.FromSeconds(1), arena.AutoToTeleopTransitionDuration);
+        Assert.Equal(TimeSpan.FromSeconds(30), arena.TeleopDuration);
+    }
+
+    [Fact]
+    public void SetMatchDurations_WhenNotIdle_Throws()
+    {
+        var arena = new PossumFMS.Core.Arena.Arena();
+        arena.StartPreMatch();
+
+        Assert.Throws<InvalidOperationException>(() =>
+            arena.SetMatchDurations(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1)));
+    }
+
+    [Fact]
+    public void SetMatchDurations_NegativeAuto_Throws()
+    {
+        var arena = new PossumFMS.Core.Arena.Arena();
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            arena.SetMatchDurations(TimeSpan.FromSeconds(-1), TimeSpan.Zero, TimeSpan.Zero));
     }
 
     [Fact]
@@ -211,6 +245,19 @@ public sealed class ArenaTests
         Assert.Equal(MatchPhase.Auto, arena.Phase);
         arena.Tick();
         Assert.Equal(MatchPhase.Auto, arena.Phase);
+    }
+
+    [Fact]
+    public void Tick_WithZeroDurations_AdvancesToPostMatchInSingleTick()
+    {
+        var arena = new PossumFMS.Core.Arena.Arena();
+        arena.SetMatchDurations(TimeSpan.Zero, TimeSpan.Zero, TimeSpan.Zero);
+        arena.StartPreMatch();
+        arena.StartMatch();
+
+        arena.Tick();
+
+        Assert.Equal(MatchPhase.PostMatch, arena.Phase);
     }
 
     [Fact]

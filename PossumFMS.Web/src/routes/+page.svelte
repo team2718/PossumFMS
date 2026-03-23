@@ -141,6 +141,12 @@
 	async function configureAccessPoint() {
 		configureWarning = '';
 		configureSuccess = '';
+
+		if (phase !== 'Idle') {
+			configureWarning = 'Team assignments can only be changed while the arena is idle.';
+			return;
+		}
+
 		const seenTeams = new Map<number, number>();
 		const teamsToAssign = new Array<number>(inputs.length).fill(0);
 
@@ -186,6 +192,12 @@
 
 		configureWarning = '';
 		configureSuccess = '';
+
+		if (phase !== 'Idle') {
+			configureWarning = 'Team assignments can only be changed while the arena is idle.';
+			return;
+		}
+
 		isConfiguring = true;
 
 		try {
@@ -256,18 +268,24 @@
 		return fieldDevices.some((device) => isEstopHardwareMappedToStation(device, stationIndex));
 	}
 
-	// A station is ready if it is bypassed, OR if both DS and robot are linked — and it has no active e-stop.
+	// A station is ready if it is bypassed, OR if both DS and robot are linked
 	const blueReady = $derived(
-		blueStations.every((s) => (s.bypassed || (s.dsLinked && s.robotLinked)) && !s.estop)
+		blueStations.every((s) => (s.bypassed || (s.dsLinked && s.robotLinked)))
 	);
 	const redReady = $derived(
-		redStations.every((s) => (s.bypassed || (s.dsLinked && s.robotLinked)) && !s.estop)
+		redStations.every((s) => (s.bypassed || (s.dsLinked && s.robotLinked)))
 	);
 
 	let activeTab = $state('status');
 	let scoreWarning = $state('');
 	let optionsWarning = $state('');
+	let optionsSuccess = $state('');
 	let isTogglingFreePractice = $state(false);
+	let isSavingMatchDurations = $state(false);
+	let autoDurationSecondsInput = $state('20');
+	let autoToTeleopTransitionDurationSecondsInput = $state('3');
+	let teleopDurationSecondsInput = $state('140');
+	let hasInitializedMatchDurations = $state(false);
 	let logSearch = $state('');
 	const logSeverityOptions: LogSeverity[] = [
 		'Trace',
@@ -344,6 +362,7 @@
 
 	async function setFreePracticeEnabled(enabled: boolean) {
 		optionsWarning = '';
+		optionsSuccess = '';
 		isTogglingFreePractice = true;
 
 		try {
@@ -355,6 +374,58 @@
 					: 'Failed to update Free Practice. Please try again.';
 		} finally {
 			isTogglingFreePractice = false;
+		}
+	}
+
+	$effect(() => {
+		if (!matchState?.matchDurations) return;
+
+		if (!hasInitializedMatchDurations && !isSavingMatchDurations) {
+			autoDurationSecondsInput = String(matchState.matchDurations.autoSeconds);
+			autoToTeleopTransitionDurationSecondsInput = String(
+				matchState.matchDurations.autoToTeleopTransitionSeconds
+			);
+			teleopDurationSecondsInput = String(matchState.matchDurations.teleopSeconds);
+			hasInitializedMatchDurations = true;
+		}
+	});
+
+	function parseNonNegativeSeconds(value: string): number | null {
+		const parsed = Number(value);
+		if (!Number.isFinite(parsed) || parsed < 0) return null;
+		return parsed;
+	}
+
+	async function saveMatchDurations() {
+		optionsWarning = '';
+		optionsSuccess = '';
+
+		if (phase !== 'Idle') {
+			optionsWarning = 'Match durations can only be changed while the arena is idle.';
+			return;
+		}
+
+		const autoSeconds = parseNonNegativeSeconds(autoDurationSecondsInput);
+		const transitionSeconds = parseNonNegativeSeconds(autoToTeleopTransitionDurationSecondsInput);
+		const teleopSeconds = parseNonNegativeSeconds(teleopDurationSecondsInput);
+
+		if (autoSeconds === null || transitionSeconds === null || teleopSeconds === null) {
+			optionsWarning = 'All durations must be non-negative numbers (0 is allowed).';
+			return;
+		}
+
+		isSavingMatchDurations = true;
+
+		try {
+			await fms.setMatchDurations(autoSeconds, transitionSeconds, teleopSeconds);
+			optionsSuccess = 'Match durations updated.';
+		} catch (error) {
+			optionsWarning =
+				error instanceof Error
+					? error.message
+					: 'Failed to update match durations. Please try again.';
+		} finally {
+			isSavingMatchDurations = false;
 		}
 	}
 </script>
@@ -728,6 +799,7 @@
 										pattern="[0-9]*"
 										placeholder="Team"
 										bind:value={inputs[idx].team}
+										disabled={phase !== 'Idle' || isConfiguring}
 										class="h-7 w-full rounded border border-slate-300 bg-white px-2 text-xs"
 									/>
 								</div>
@@ -794,6 +866,7 @@
 										pattern="[0-9]*"
 										placeholder="Team"
 										bind:value={inputs[idx].team}
+										disabled={phase !== 'Idle' || isConfiguring}
 										class="h-7 w-full rounded border border-slate-300 bg-white px-2 text-xs"
 									/>
 								</div>
@@ -820,7 +893,7 @@
 					<div class="flex flex-wrap items-center justify-center gap-3 text-sm">
 						<button
 							onclick={configureAccessPoint}
-							disabled={isConfiguring}
+							disabled={isConfiguring || phase !== 'Idle'}
 							aria-busy={isConfiguring}
 							class="brand-secondary-bg rounded px-3 py-1.5 text-sm font-bold text-white hover:opacity-90"
 						>
@@ -828,7 +901,7 @@
 						</button>
 						<button
 							onclick={clearAllTeams}
-							disabled={isConfiguring}
+							disabled={isConfiguring || phase !== 'Idle'}
 							class="rounded bg-slate-600 px-3 py-1.5 text-sm font-bold text-white hover:bg-slate-500"
 						>
 							Clear Teams
@@ -1006,6 +1079,13 @@
 							{optionsWarning}
 						</div>
 					{/if}
+					{#if optionsSuccess}
+						<div
+							class="mb-3 rounded border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700"
+						>
+							{optionsSuccess}
+						</div>
+					{/if}
 					<div class="flex flex-wrap gap-3">
 						<div class="min-w-[320px] rounded border border-slate-200 bg-slate-50 px-4 py-3">
 							<div class="flex items-start justify-between gap-4">
@@ -1031,6 +1111,61 @@
 								{phase === 'Idle'
 									? 'Free Practice can be toggled while the arena is idle.'
 									: 'Return the arena to Idle before changing Free Practice.'}
+							</div>
+						</div>
+						<div class="min-w-[420px] rounded border border-slate-200 bg-slate-50 px-4 py-3">
+							<div class="text-sm font-bold text-slate-900">Match Durations</div>
+							<div class="mt-1 text-xs text-slate-600">
+								Configure Auto, Auto to Teleop transition, and Teleop durations in seconds. Enter 0 for instant progression.
+							</div>
+							<div class="mt-3 grid grid-cols-3 gap-3">
+								<label class="text-xs font-semibold text-slate-700">
+									<span>Auto (s)</span>
+									<input
+										type="number"
+										min="0"
+										step="1"
+										bind:value={autoDurationSecondsInput}
+										disabled={phase !== 'Idle' || isSavingMatchDurations}
+										class="mt-1 w-full rounded border border-slate-300 bg-white px-2 py-1 text-sm"
+									/>
+								</label>
+								<label class="text-xs font-semibold text-slate-700">
+									<span>Auto→Teleop (s)</span>
+									<input
+										type="number"
+										min="0"
+										step="1"
+										bind:value={autoToTeleopTransitionDurationSecondsInput}
+										disabled={phase !== 'Idle' || isSavingMatchDurations}
+										class="mt-1 w-full rounded border border-slate-300 bg-white px-2 py-1 text-sm"
+									/>
+								</label>
+								<label class="text-xs font-semibold text-slate-700">
+									<span>Teleop (s)</span>
+									<input
+										type="number"
+										min="0"
+										step="1"
+										bind:value={teleopDurationSecondsInput}
+										disabled={phase !== 'Idle' || isSavingMatchDurations}
+										class="mt-1 w-full rounded border border-slate-300 bg-white px-2 py-1 text-sm"
+									/>
+								</label>
+							</div>
+							<div class="mt-3 flex items-center justify-between gap-3">
+								<div class="text-[11px] font-medium text-slate-500">
+									{phase === 'Idle'
+										? 'Durations can be changed while the arena is idle.'
+										: 'Return the arena to Idle before changing durations.'}
+								</div>
+								<button
+									onclick={saveMatchDurations}
+									disabled={phase !== 'Idle' || isSavingMatchDurations}
+									class="brand-secondary-bg rounded px-3 py-1.5 text-sm font-bold text-white hover:opacity-90"
+								>
+									{isSavingMatchDurations ? 'Saving...' : 'Save Durations'}
+								</button>
 							</div>
 						</div>
 						{#if matchState?.arenaEstop}

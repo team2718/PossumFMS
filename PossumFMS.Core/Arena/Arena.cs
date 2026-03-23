@@ -11,9 +11,9 @@ public sealed class Arena
 {
     // ── Match timing ───────────────────────────────────────────────────────────
 
-    private static readonly TimeSpan AutoDuration    = TimeSpan.FromSeconds(20);
-    private static readonly TimeSpan AutoToTeleopTransitionDuration = TimeSpan.FromSeconds(3);
-    private static readonly TimeSpan TeleopDuration  = TimeSpan.FromSeconds(140);
+    public TimeSpan AutoDuration { get; private set; } = TimeSpan.FromSeconds(20);
+    public TimeSpan AutoToTeleopTransitionDuration { get; private set; } = TimeSpan.FromSeconds(3);
+    public TimeSpan TeleopDuration { get; private set; } = TimeSpan.FromSeconds(140);
 
     private readonly Stopwatch _phaseTimer = new();
     private TimeSpan _phaseDuration;
@@ -128,23 +128,50 @@ public sealed class Arena
         FreePracticeEnabled = enabled;
     }
 
+    public void SetMatchDurations(
+        TimeSpan autoDuration,
+        TimeSpan autoToTeleopTransitionDuration,
+        TimeSpan teleopDuration)
+    {
+        if (Phase != MatchPhase.Idle)
+            throw new InvalidOperationException("Match durations can only be changed while the arena is idle.");
+
+        if (autoDuration < TimeSpan.Zero)
+            throw new ArgumentOutOfRangeException(nameof(autoDuration), "Auto duration cannot be negative.");
+
+        if (autoToTeleopTransitionDuration < TimeSpan.Zero)
+            throw new ArgumentOutOfRangeException(nameof(autoToTeleopTransitionDuration), "Auto-to-Teleop transition duration cannot be negative.");
+
+        if (teleopDuration < TimeSpan.Zero)
+            throw new ArgumentOutOfRangeException(nameof(teleopDuration), "Teleop duration cannot be negative.");
+
+        AutoDuration = autoDuration;
+        AutoToTeleopTransitionDuration = autoToTeleopTransitionDuration;
+        TeleopDuration = teleopDuration;
+    }
+
     /// <summary>
     /// Called by the DriverStationManager on each tick to advance phase transitions
     /// (e.g. Auto → Teleop → Over) based on elapsed time.
     /// </summary>
     public void Tick()
     {
-        switch (Phase)
+        while (true)
         {
-            case MatchPhase.Auto when TimeRemaining == TimeSpan.Zero:
-                TransitionTo(MatchPhase.AutoToTeleopTransition, AutoToTeleopTransitionDuration);
-                break;
-            case MatchPhase.AutoToTeleopTransition when TimeRemaining == TimeSpan.Zero:
-                TransitionTo(MatchPhase.Teleop, TeleopDuration);
-                break;
-            case MatchPhase.Teleop when TimeRemaining == TimeSpan.Zero:
-                TransitionTo(MatchPhase.PostMatch, TimeSpan.Zero);
-                break;
+            switch (Phase)
+            {
+                case MatchPhase.Auto when TimeRemaining == TimeSpan.Zero:
+                    TransitionTo(MatchPhase.AutoToTeleopTransition, AutoToTeleopTransitionDuration);
+                    continue;
+                case MatchPhase.AutoToTeleopTransition when TimeRemaining == TimeSpan.Zero:
+                    TransitionTo(MatchPhase.Teleop, TeleopDuration);
+                    continue;
+                case MatchPhase.Teleop when TimeRemaining == TimeSpan.Zero:
+                    TransitionTo(MatchPhase.PostMatch, TimeSpan.Zero);
+                    continue;
+            }
+
+            break;
         }
     }
 

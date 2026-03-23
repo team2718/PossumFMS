@@ -59,6 +59,12 @@ public sealed class MatchStateBroadcaster(
         freePracticeEnabled = arena.FreePracticeEnabled,
         matchType     = arena.MatchType.ToString(),
         matchNumber   = arena.MatchNumber,
+        matchDurations = new
+        {
+            autoSeconds = arena.AutoDuration.TotalSeconds,
+            autoToTeleopTransitionSeconds = arena.AutoToTeleopTransitionDuration.TotalSeconds,
+            teleopSeconds = arena.TeleopDuration.TotalSeconds,
+        },
         timeRemaining = arena.TimeRemaining.TotalSeconds,
         arenaEstop    = arena.ArenaEstop,
         wasAborted    = arena.WasAborted,

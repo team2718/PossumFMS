@@ -121,6 +121,39 @@ public sealed class DriverStationManagerTests
         Assert.Equal(200, mgr[AllianceStations.Red2].TeamNumber);
     }
 
+    [Fact]
+    public void AssignTeam_WhenArenaIsNotIdle_Throws()
+    {
+        var arena = new PossumFMS.Core.Arena.Arena();
+        arena.StartPreMatch();
+        var mgr = CreateManager(arena);
+
+        Assert.Throws<InvalidOperationException>(() => mgr.AssignTeam(AllianceStations.Red1, 111));
+    }
+
+    [Fact]
+    public void AssignTeam_WhenTeamChanges_ClearsStationConnectionState()
+    {
+        var mgr = CreateManager();
+        var station = mgr[AllianceStations.Red1];
+
+        station.TeamNumber = 1234;
+        station.UdpEndpoint = new IPEndPoint(IPAddress.Parse("10.27.18.5"), 1121);
+        station.DsLinked = true;
+        station.RadioLinked = true;
+        station.RioLinked = true;
+        station.RobotLinked = true;
+
+        mgr.AssignTeam(AllianceStations.Red1, 4321);
+
+        Assert.Equal(4321, station.TeamNumber);
+        Assert.Null(station.UdpEndpoint);
+        Assert.False(station.DsLinked);
+        Assert.False(station.RadioLinked);
+        Assert.False(station.RioLinked);
+        Assert.False(station.RobotLinked);
+    }
+
     // ── Estop ──────────────────────────────────────────────────────────────────
 
     [Fact]

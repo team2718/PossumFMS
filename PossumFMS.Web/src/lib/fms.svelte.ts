@@ -75,6 +75,11 @@ export interface MatchState {
 	freePracticeEnabled: boolean;
 	matchType: string; // e.g. "Practice", "Qualification", "Playoff"
 	matchNumber: number;
+	matchDurations: {
+		autoSeconds: number;
+		autoToTeleopTransitionSeconds: number;
+		teleopSeconds: number;
+	};
 	timeRemaining: number; // seconds
 	arenaEstop: boolean;
 	wasAborted: boolean;
@@ -264,6 +269,19 @@ class FmsConnection {
 	/** Toggle idle-only Free Practice mode, which suppresses DS communication. */
 	setFreePracticeEnabled(enabled: boolean) {
 		return this.invoke('SetFreePracticeEnabled', enabled);
+	}
+	/** Set Auto, Auto→Teleop transition, and Teleop durations in seconds (idle only). */
+	setMatchDurations(
+		autoDurationSeconds: number,
+		autoToTeleopTransitionDurationSeconds: number,
+		teleopDurationSeconds: number
+	) {
+		return this.invoke(
+			'SetMatchDurations',
+			autoDurationSeconds,
+			autoToTeleopTransitionDurationSeconds,
+			teleopDurationSeconds
+		);
 	}
 	/** Adjust alliance fuel score in Auto or Teleop. Delta may be positive or negative. */
 	adjustFuelPoints(alliance: 'Red' | 'Blue', isAuto: boolean, delta: number) {

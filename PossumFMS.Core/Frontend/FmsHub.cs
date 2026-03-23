@@ -31,6 +31,9 @@ public sealed class FmsHub(
     /// </summary>
     public async Task AssignTeam(int stationIndex, int teamNumber, string wpaKey = "")
     {
+        if (arena.Phase != MatchPhase.Idle)
+            throw new HubException("Team assignments can only be changed while the arena is idle.");
+
         var station = AllianceStations.All[stationIndex];
 
         if (teamNumber < 0)
@@ -59,6 +62,9 @@ public sealed class FmsHub(
     /// </summary>
     public async Task AssignTeams(IReadOnlyList<TeamAssignmentRequest> assignments)
     {
+        if (arena.Phase != MatchPhase.Idle)
+            throw new HubException("Team assignments can only be changed while the arena is idle.");
+
         if (assignments is null)
             throw new HubException("Assignments payload is required.");
 
@@ -115,6 +121,35 @@ public sealed class FmsHub(
             enabled);
 
         arena.SetFreePracticeEnabled(enabled);
+        await BroadcastMatchState();
+    }
+
+    public async Task SetMatchDurations(
+        double autoDurationSeconds,
+        double autoToTeleopTransitionDurationSeconds,
+        double teleopDurationSeconds)
+    {
+        if (!double.IsFinite(autoDurationSeconds) || autoDurationSeconds < 0)
+            throw new HubException("Auto duration must be a non-negative number of seconds.");
+
+        if (!double.IsFinite(autoToTeleopTransitionDurationSeconds) || autoToTeleopTransitionDurationSeconds < 0)
+            throw new HubException("Auto-to-Teleop transition duration must be a non-negative number of seconds.");
+
+        if (!double.IsFinite(teleopDurationSeconds) || teleopDurationSeconds < 0)
+            throw new HubException("Teleop duration must be a non-negative number of seconds.");
+
+        logger.LogInformation(
+            "SetMatchDurations requested by {Client}: Auto={Auto}s, Transition={Transition}s, Teleop={Teleop}s.",
+            Context.ConnectionId,
+            autoDurationSeconds,
+            autoToTeleopTransitionDurationSeconds,
+            teleopDurationSeconds);
+
+        arena.SetMatchDurations(
+            TimeSpan.FromSeconds(autoDurationSeconds),
+            TimeSpan.FromSeconds(autoToTeleopTransitionDurationSeconds),
+            TimeSpan.FromSeconds(teleopDurationSeconds));
+
         await BroadcastMatchState();
     }
 
