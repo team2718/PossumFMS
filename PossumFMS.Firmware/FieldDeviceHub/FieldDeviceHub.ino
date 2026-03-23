@@ -1,6 +1,7 @@
 #include "Adafruit_VL53L0X.h"
 #include <Adafruit_NeoPixel.h>
 #include <esp_system.h>
+#include <math.h>
 #include <WiFi.h>
 #include "bson_helper.h"
 #include "wifi_secrets.h"
@@ -59,9 +60,17 @@ bool hasReceivedReplySinceConnect = false;
 void setup() {
   Serial.begin(115200);
 
+  delay(100);
+
   strip.begin();           // INITIALIZE NeoPixel strip object (REQUIRED)
   strip.show();            // Turn OFF all pixels ASAP
   strip.setBrightness(50); // Set BRIGHTNESS to about 1/5 (max = 255)
+
+  ledR = 0;
+  ledG = 255;
+  ledB = 255;
+  flashingStatus = FlashingStatusOff;
+  colorWipe(strip.Color(255, 0, 255));
 
   Serial.println("sigma sigma sigma");
   if (!lox.begin()) {
@@ -97,6 +106,8 @@ void ballCountTask(void* parameter) {
     if (lox.isRangeComplete()) {
       int rangemm = lox.readRange();
 
+      Serial.printf("range: %04d mm\n", rangemm);
+
       if (!seeBall && rangemm < 70) {
         seeBall = true;
         portENTER_CRITICAL(&stateLock);
@@ -111,7 +122,7 @@ void ballCountTask(void* parameter) {
       }
     }
 
-    Serial.printf("seeBall: %d, fuelCount: %d, shouldCountFuel: %d\n", seeBall, fuelCount, shouldCountFuel);
+    // Serial.printf("seeBall: %d, fuelCount: %d, shouldCountFuel: %d\n", seeBall, fuelCount, shouldCountFuel);
 
     vTaskDelay(pdMS_TO_TICKS(1));
   }
@@ -160,20 +171,24 @@ void renderLed() {
   currentFlashingStatus = flashingStatus;
   portEXIT_CRITICAL(&stateLock);
 
-  uint32_t baseColor = strip.Color(currentG, currentR, currentB);
-  bool flashOn = ((millis() / FLASH_INTERVAL_MS) % 2) == 0;
+  uint8_t renderedR = currentR;
+  uint8_t renderedG = currentG;
+  uint8_t renderedB = currentB;
 
-  if (currentFlashingStatus == FlashingStatusWhite && flashOn) {
-    colorWipe(strip.Color(255, 255, 255));
-    return;
+  if (currentFlashingStatus != FlashingStatusOff) {
+    float phase = (float)(millis() % (FLASH_INTERVAL_MS * 2)) / (float)(FLASH_INTERVAL_MS * 2);
+    float blend = 0.5f - 0.5f * cosf(2.0f * PI * phase);
+
+    uint8_t targetR = currentFlashingStatus == FlashingStatusWhite ? 255 : 0;
+    uint8_t targetG = currentFlashingStatus == FlashingStatusWhite ? 255 : 0;
+    uint8_t targetB = currentFlashingStatus == FlashingStatusWhite ? 255 : 0;
+
+    renderedR = (uint8_t)roundf(currentR + ((targetR - currentR) * blend));
+    renderedG = (uint8_t)roundf(currentG + ((targetG - currentG) * blend));
+    renderedB = (uint8_t)roundf(currentB + ((targetB - currentB) * blend));
   }
 
-  if (currentFlashingStatus == FlashingStatusDark && flashOn) {
-    colorWipe(strip.Color(0, 0, 0));
-    return;
-  }
-
-  colorWipe(baseColor);
+  colorWipe(strip.Color(renderedG, renderedR, renderedB));
 }
 
 // =============================================================================
@@ -197,16 +212,23 @@ void connectWifi() {
 void connectFms() {
   client.stop();
   Serial.printf("[HUB] Connecting to FMS %s:%d\n", FMS_HOST, FMS_PORT);
+
+  portENTER_CRITICAL(&stateLock);
+  ledR = 0;
+  ledG = 255;
+  ledB = 255;
+  flashingStatus = FlashingStatusOff;
+  lastReplyTimeMs = 0;
+  shouldCountFuel = true;
+  portEXIT_CRITICAL(&stateLock);
+
+  colorWipe(strip.Color(255, 0, 255));
+
     while (!client.connect(FMS_HOST, FMS_PORT)) {
     Serial.println("[HUB] FMS connection failed; retrying in 1 s.");
         delay(1000);
     }
   client.setNoDelay(true);
-
-  portENTER_CRITICAL(&stateLock);
-  lastReplyTimeMs = 0;
-  shouldCountFuel = true;
-  portEXIT_CRITICAL(&stateLock);
 
   hasReceivedReplySinceConnect = false;
   Serial.println("[HUB] FMS connected.");
