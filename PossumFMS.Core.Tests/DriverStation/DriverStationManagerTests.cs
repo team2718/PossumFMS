@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging.Abstractions;
+using System.Text;
 using System.Net;
 using PossumFMS.Core.Arena;
 using PossumFMS.Core.DriverStation;
@@ -194,6 +195,26 @@ public sealed class DriverStationManagerTests
         Assert.False(station.RadioLinked);
         Assert.False(station.RioLinked);
         Assert.False(station.RobotLinked);
+    }
+
+    [Fact]
+    public void CreateStationInfoPacket_EncodesAssignedStationAndStatus()
+    {
+        byte[] packet = DriverStationManager.CreateStationInfoPacket(AllianceStations.Blue2, 0x01);
+
+        Assert.Equal([0x00, 0x03, 0x19, 0x04, 0x01], packet);
+    }
+
+    [Fact]
+    public void CreateEventCodePacket_EncodesHardcodedEventCode()
+    {
+        byte[] packet = DriverStationManager.CreateEventCodePacket();
+
+        Assert.Equal(0x00, packet[0]);
+        Assert.Equal(0x06, packet[1]);
+        Assert.Equal(0x14, packet[2]);
+        Assert.Equal(0x04, packet[3]);
+        Assert.Equal("POSM", Encoding.UTF8.GetString(packet, 4, 4));
     }
 
     // ── Estop ──────────────────────────────────────────────────────────────────

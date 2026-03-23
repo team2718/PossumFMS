@@ -2,6 +2,7 @@ using System.Collections.Frozen;
 using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
+using System.Text;
 using PossumFMS.Core.Arena;
 
 namespace PossumFMS.Core.DriverStation;
@@ -10,20 +11,19 @@ namespace PossumFMS.Core.DriverStation;
 /// Manages all six driver station connections and runs the high-frequency
 /// FMS control loop.
 ///
-/// TIMING: FRC requires FMS→DS packets at ≤10 ms period (~100 Hz).
-/// This manager runs a dedicated thread targeting a 5 ms tick (~200 Hz)
+/// This implementation runs a dedicated thread targeting a 5 ms tick (~200 Hz)
 /// using a Stopwatch-based spin-sleep to avoid OS scheduler jitter.
 ///
 /// Protocol:
 ///   DS → FMS status:  UDP 1160  (FMS listens; DS embeds team ID in each packet)
-///   FMS → DS control: UDP 1121  (FMS sends 22-byte control packets)
-///   DS → FMS TCP:     TCP 1750  (DS connects first; station assignment handshake)
+///   FMS → DS UDP:     UDP 1121  (control/context packet)
+///   DS ↔ FMS TCP:     TCP 1750  (team number, station info, event code, game data)
 /// </summary>
 public sealed class DriverStationManager : BackgroundService
 {
     // ── Timing ─────────────────────────────────────────────────────────────────
 
-    private static readonly TimeSpan LoopPeriod     = TimeSpan.FromMilliseconds(5);
+    private static readonly TimeSpan LoopPeriod     = TimeSpan.FromMilliseconds(10);
     private static readonly TimeSpan UdpLinkTimeout = TimeSpan.FromSeconds(1);
     private static readonly TimeSpan TcpReadTimeout = TimeSpan.FromSeconds(5);
 
@@ -32,6 +32,7 @@ public sealed class DriverStationManager : BackgroundService
     private const int FmsUdpListenPort = 1160;
     private const int DsUdpReceivePort = 1121;
     private const int FmsTcpListenPort = 1750;
+    private const string DriverStationEventCode = "POSM";
 
     // ── State ──────────────────────────────────────────────────────────────────
 
@@ -375,13 +376,15 @@ public sealed class DriverStationManager : BackgroundService
     {
         // DS → FMS UDP status packet layout:
         //   [0-1]  Sequence number (not used by FMS)
-        //   [2]    ?
-        //   [3]    Status flags: 0x08 = RioLinked, 0x10 = RadioLinked, 0x20 = RobotLinked
+        //   [2]    Protocol/comm version (FRCDocs observes 0x00)
+        //   [3]    Status byte. PossumFMS currently consumes:
+        //            0x08 = Rio ping, 0x10 = Radio ping, 0x20 = Robot comms active
         //   [4-5]  Team number, big-endian
         //   [6]    Battery voltage integer part (volts)
         //   [7]    Battery voltage fractional part (add value/256 V)
         //   [8+]   Variable-length tags: [length] [type] [data * (length-1)]
-        //            Tag 1, length 6: [lost_hi] [lost_lo] [?] [?] [trip_ms]
+        //            Tag 0x01 (Comms Metrics), length 6:
+        //              [lost_hi] [lost_lo] [sent_hi] [sent_lo] [trip_ms]
 
         int teamNumber = (packet[4] << 8) | packet[5];
         var ds = FindStationByTeamNumber(teamNumber);
@@ -473,7 +476,7 @@ public sealed class DriverStationManager : BackgroundService
 
     internal void EncodeControlPacket(byte[] buf, DriverStationConnection ds)
     {
-        // FMS → DS UDP control packet (22 bytes), per cheesy-arena protocol:
+        // FMS → DS UDP packet currently emitted by PossumFMS:
         //   [0-1]  Sequence number (big-endian, incremented each packet)
         //   [2]    Protocol version (0)
         //   [3]    Control byte:
@@ -481,13 +484,13 @@ public sealed class DriverStationManager : BackgroundService
         //            0x04 = Enabled
         //            0x40 = AStop (autonomous stop)
         //            0x80 = EStop
-        //   [4]    0 (unused)
+        //   [4]    Request byte (currently 0)
         //   [5]    Alliance station index: 0=R1, 1=R2, 2=R3, 3=B1, 4=B2, 5=B3
-        //   [6]    Match type: 0=none, 1=practice, 2=qualification, 3=playoff
+        //   [6]    Tournament level: 0=match test, 1=practice, 2=qualification, 3=playoff
         //   [7-8]  Match number (big-endian)
-        //   [9]    Match repeat number
+        //   [9]    Play/replay number
         //   [10-13] Microseconds within current second (big-endian)
-        //           Equivalent to Go's: time.Now().Nanosecond() / 1000
+        //   [14-19] Date/time fields
         //   [14]   Seconds
         //   [15]   Minutes
         //   [16]   Hours
@@ -529,12 +532,38 @@ public sealed class DriverStationManager : BackgroundService
         buf[15] = (byte)now.Minute;
         buf[16] = (byte)now.Hour;
         buf[17] = (byte)now.Day;
-        buf[18] = (byte)now.Month;
+        buf[18] = (byte)(now.Month - 1); // DS expects month in range 0-11
         buf[19] = (byte)(now.Year - 1900);
 
         int secsRemaining = (int)_arena.TimeRemaining.TotalSeconds;
         buf[20] = (byte)(secsRemaining >> 8);
         buf[21] = (byte)(secsRemaining & 0xFF);
+    }
+
+    internal static byte[] CreateStationInfoPacket(AllianceStation station, byte stationStatus)
+    {
+        byte stationIndex = (byte)((station.Color == AllianceColor.Red ? 0 : 3) + (int)station.Position - 1);
+        return CreateTcpPacket(0x19, [stationIndex, stationStatus]);
+    }
+
+    internal static byte[] CreateEventCodePacket()
+    {
+        byte[] eventCodeBytes = Encoding.UTF8.GetBytes(DriverStationEventCode);
+        var payload = new byte[eventCodeBytes.Length + 1];
+        payload[0] = (byte)eventCodeBytes.Length;
+        eventCodeBytes.CopyTo(payload, 1);
+        return CreateTcpPacket(0x14, payload);
+    }
+
+    private static byte[] CreateTcpPacket(byte packetType, ReadOnlySpan<byte> payload)
+    {
+        int size = payload.Length + 1;
+        var packet = new byte[size + 2];
+        packet[0] = (byte)(size >> 8);
+        packet[1] = (byte)(size & 0xFF);
+        packet[2] = packetType;
+        payload.CopyTo(packet.AsSpan(3));
+        return packet;
     }
 
     // ── Link timeouts ──────────────────────────────────────────────────────────
@@ -594,8 +623,8 @@ public sealed class DriverStationManager : BackgroundService
         try
         {
             // ── Handshake: read initial DS→FMS identification packet ───────────
-            // Format: [0x00, 0x03, 0x18, teamHi, teamLo]
-            //   size = 3 (2-byte big-endian), type = 24 (0x18), team number
+            // Format: [sizeHi, sizeLo, 0x18, teamHi, teamLo]
+            //   size = 3 (includes tag ID), type = 0x18 (team number)
             var initBuf = new byte[5];
             if (!await ReadExactAsync(stream, initBuf, ct)) return;
 
@@ -640,10 +669,11 @@ public sealed class DriverStationManager : BackgroundService
                 }
             }
 
-            // ── Send station assignment packet ─────────────────────────────────
-            // Format: [packetSize, packetSize, packetType, stationIndex, stationStatus]
-            byte stationIndex = (byte)((ds.Station.Color == AllianceColor.Red ? 0 : 3) + (int)ds.Station.Position - 1);
-            await stream.WriteAsync(new byte[] { 0x00, 0x03, 0x19, stationIndex, stationStatus }, ct);
+            // ── Send initial DS context ────────────────────────────────────────
+            // Station info establishes the assigned station and current context.
+            // Event code is a separate TCP tag that the DS displays in its UI.
+            await stream.WriteAsync(CreateStationInfoPacket(ds.Station, stationStatus), ct);
+            await stream.WriteAsync(CreateEventCodePacket(), ct);
 
             lock (_stationStateLock)
             {
@@ -697,8 +727,12 @@ public sealed class DriverStationManager : BackgroundService
     {
         // TCP packets: 2-byte big-endian length prefix followed by payload.
         //   Payload[0] = packet type
-        //     29 (0x1D) = Keepalive       — ignore
-        //     22 (0x16) = Robot log data  — ignore for now
+        //     0x15 = Usage report
+        //     0x16 = Robot log data
+        //     0x17 = Error/event data
+        //     0x1B = Challenge response
+        //     0x1C = DS ping heartbeat
+        //   PossumFMS currently ignores all inbound TCP payloads after the team-number tag.
         var sizeBuf = new byte[2];
         var dataBuf = new byte[65535];
 
@@ -713,7 +747,7 @@ public sealed class DriverStationManager : BackgroundService
             if (!await ReadExactAsync(stream, dataBuf.AsMemory(0, length), ct)) break;
 
             // int packetType = dataBuf[0];
-            // All currently known types (29=keepalive, 22=robot log) require no action.
+            // All currently known packet types are intentionally ignored for now.
         }
     }
 
