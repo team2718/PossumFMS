@@ -151,7 +151,7 @@
 				</svg>
 				<div class="text-center">
 					<div class="text-xl font-black tracking-wide">MATCH ABORT</div>
-					<div class="mt-1 text-xs font-semibold opacity-80">Ends the match immediately</div>
+					<div class="mt-1 text-xs font-semibold opacity-80">Disables all robots</div>
 				</div>
 			</button>
 
@@ -173,7 +173,7 @@
 					/>
 				</svg>
 				<div class="text-center">
-					<div class="text-xl font-black tracking-wide">A-STOP</div>
+					<div class="text-xl font-black tracking-wide">Auto STOP</div>
 					<div class="mt-1 text-xs font-semibold opacity-80">{scopeLabels[scope]}</div>
 				</div>
 			</button>
@@ -196,23 +196,10 @@
 					/>
 				</svg>
 				<div class="text-center">
-					<div class="text-xl font-black tracking-wide">E-STOP</div>
+					<div class="text-xl font-black tracking-wide">Emergency STOP</div>
 					<div class="mt-1 text-xs font-semibold opacity-80">{scopeLabels[scope]}</div>
 				</div>
 			</button>
 		</div>
-
-		<!-- Arena E-Stop reset (shown when active) -->
-		{#if matchState?.arenaEstop}
-			<div class="flex items-center justify-between gap-3 rounded-xl border-2 border-rose-300 bg-rose-50 px-4 py-3">
-				<span class="font-bold text-rose-700">Arena E-Stop is ACTIVE</span>
-				<button
-					onclick={() => fms.resetArenaEstop()}
-					class="rounded bg-yellow-500 px-4 py-2 font-bold text-slate-900 hover:bg-yellow-400"
-				>
-					Reset E-Stop
-				</button>
-			</div>
-		{/if}
 	</main>
 </div>

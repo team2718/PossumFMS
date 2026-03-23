@@ -491,7 +491,7 @@
 		onclick={() => (type === 'E' ? fms.estopStation(stationIndex) : fms.astopStation(stationIndex))}
 		class="mx-auto h-7 w-14 cursor-pointer rounded border border-rose-900 px-1 text-[10px] font-black tracking-wide text-white shadow-sm transition active:translate-y-px {active
 			? 'bg-rose-950'
-			: 'bg-rose-700 hover:bg-rose-600'}">{active ? 'LOCK' : `${type}-Stop`}</button
+			: 'bg-rose-700 hover:bg-rose-600'}">{type}-Stop</button
 	>
 {/snippet}
 
@@ -622,8 +622,9 @@
 			<span class="rounded px-1.5 py-0.5 text-[10px] font-bold text-white {s.robotLinked ? 'bg-emerald-600' : 'bg-slate-400'}">Robot</span>
 			<span class="rounded px-1.5 py-0.5 text-[10px] font-bold text-white {s.radioLinked ? 'bg-emerald-600' : 'bg-slate-400'}">Radio</span>
 			<span class="rounded px-1.5 py-0.5 text-[10px] font-bold text-white {s.rioLinked ? 'bg-emerald-600' : 'bg-slate-400'}">RIO</span>
-			<span class="ml-1 rounded px-1.5 py-0.5 text-[10px] font-bold {s.isReady ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}">Ready</span>
-			<span class="rounded px-1.5 py-0.5 text-[10px] font-bold {s.isReadyInMatch ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}">In-Match</span>
+			{#if s.isReady}
+				<span class="ml-1 rounded px-1.5 py-0.5 text-[10px] font-bold {s.isReady ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}">Ready</span>
+			{/if}
 		</div>
 		<div class="mt-1.5 grid grid-cols-4 gap-1 text-slate-600">
 			<div class="rounded bg-slate-50 px-1.5 py-1">

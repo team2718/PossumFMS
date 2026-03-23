@@ -122,16 +122,13 @@
 					? 'bg-emerald-600'
 					: 'bg-slate-400'}">RIO</span
 			>
-			<span
-				class="ml-1 rounded px-1.5 py-0.5 text-[10px] font-bold {s.isReady
-					? 'bg-emerald-100 text-emerald-800'
-					: 'bg-slate-100 text-slate-600'}">Ready</span
-			>
-			<span
-				class="rounded px-1.5 py-0.5 text-[10px] font-bold {s.isReadyInMatch
-					? 'bg-emerald-100 text-emerald-800'
-					: 'bg-slate-100 text-slate-600'}">In-Match</span
-			>
+            {#if s.isReady}
+                <span
+                    class="ml-1 rounded px-1.5 py-0.5 text-[10px] font-bold {s.isReady
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : 'bg-slate-100 text-slate-600'}">Ready</span
+                >
+            {/if}
 		</div>
 		<div class="mt-1.5 grid grid-cols-4 gap-1 text-slate-600">
 			<div class="rounded bg-slate-50 px-1.5 py-1">
@@ -234,26 +231,24 @@
 			</div>
 		{:else}
 			<!-- Station status cards -->
-			<div class="overflow-hidden rounded border border-slate-300 bg-white shadow-sm">
-				<div class="grid grid-cols-1 lg:grid-cols-2">
-					<div class="alliance-blue-bg-soft border-b border-slate-200 p-3 lg:border-r lg:border-b-0">
-						<div class="alliance-blue-text mb-2 text-xs font-bold tracking-wider uppercase">
-							Blue Alliance
-						</div>
-						{#each blueStations as s, i}
-							{@render stationCard(s, i + 1, 'blue')}
-						{/each}
-					</div>
-					<div class="alliance-red-bg-soft p-3">
-						<div class="alliance-red-text mb-2 text-xs font-bold tracking-wider uppercase">
-							Red Alliance
-						</div>
-						{#each redStations as s, i}
-							{@render stationCard(s, 3 - i, 'red')}
-						{/each}
-					</div>
-				</div>
-			</div>
+            <div class="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                <div class="rounded border p-3 alliance-blue-border-soft alliance-blue-bg-soft">
+                    <div class="mb-3 text-xs font-bold tracking-wider uppercase alliance-blue-text">
+                        Blue Alliance
+                    </div>
+                    {#each blueStations as s, i}
+                        {@render stationCard(s, i + 1, 'blue')}
+                    {/each}
+                </div>
+                <div class="rounded border p-3 alliance-red-border-soft alliance-red-bg-soft">
+                    <div class="mb-3 text-xs font-bold tracking-wider uppercase alliance-red-text">
+                        Red Alliance
+                    </div>
+                    {#each redStations as s, i}
+                        {@render stationCard(s, 3 - i, 'red')}
+                    {/each}
+                </div>
+            </div>
 
 			<!-- Field Devices -->
 			<div class="rounded border border-slate-300 bg-white shadow-sm">
