@@ -1,5 +1,6 @@
 ﻿<script lang="ts">
 	import { fms } from '$lib/fms.svelte';
+	import Navbar from '$lib/Navbar.svelte';
 	import type {
 		FieldDeviceDiagnostics,
 		LogSeverity,
@@ -782,26 +783,7 @@
 {/snippet}
 
 <div class="app-neutral-bg min-h-screen text-slate-900">
-	<div class="app-neutral-bg border-b border-slate-300">
-		<div class="mx-auto flex max-w-[1700px] items-end gap-1 px-3 pt-2 text-sm">
-			<div
-				class="rounded-t-md border border-b-0 border-slate-300 bg-white px-4 py-2 font-bold text-slate-900"
-				style="box-shadow: inset 0 3px 0 0 var(--color-secondary);"
-			>
-				Match Play
-			</div>
-			<div class="ml-auto flex items-center gap-3 px-2 pb-1 text-xs text-slate-600">
-				<span class="inline-flex items-center gap-1"
-					><span class="h-2.5 w-2.5 rounded-full {fms.connected ? 'bg-emerald-500' : 'bg-rose-500'}"
-					></span>{fms.connected ? 'Connected' : 'Connecting'}</span
-				>
-				<span>{matchState?.matchType ?? 'None'} #{matchState?.matchNumber ?? 0}</span>
-				<span class="font-mono font-semibold"
-					>{matchState ? formatTime(matchState.timeRemaining) : '0:00'}</span
-				>
-			</div>
-		</div>
-	</div>
+	<Navbar />
 
 	<main class="mx-auto flex max-w-[1700px] flex-col gap-3 px-3 py-3">
 		<!-- Alliance readiness panels -->
@@ -926,6 +908,9 @@
 						<span class="text-[11px] font-bold tracking-wider text-slate-600 uppercase">
 							{displayPhase}
 						</span>
+					</div>
+					<div class="font-mono text-2xl font-black tabular-nums text-slate-800">
+						{matchState ? formatTime(matchState.timeRemaining) : '0:00'}
 					</div>
 				</div>
 
