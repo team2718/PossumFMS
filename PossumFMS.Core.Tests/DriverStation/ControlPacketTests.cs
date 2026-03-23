@@ -128,6 +128,7 @@ public sealed class ControlPacketTests
     public void ControlByte_WhenNoEstopMatchRunning_EnabledBitSet()
     {
         var (mgr, arena, buf, ds) = Setup();
+        ds.TeamNumber = 2718; // nonzero team number to allow enabled=true
         arena.StartPreMatch();
         arena.StartMatch(); // Auto, no estop
 
@@ -276,6 +277,7 @@ public sealed class ControlPacketTests
     public void ControlByte_AutoAndEnabled_ExactValue0x06()
     {
         var (mgr, arena, buf, ds) = Setup();
+        ds.TeamNumber = 2718; // nonzero team number to allow enabled=true
         arena.StartPreMatch();
         arena.StartMatch(); // Auto phase, no stops
 

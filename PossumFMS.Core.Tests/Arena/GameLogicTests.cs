@@ -82,12 +82,12 @@ public sealed class GameLogicTests
     }
 
     [Fact]
-    public void IsHubStrictlyActive_WhenIdle_ReturnsTrue()
+    public void IsHubStrictlyActive_WhenIdle_ReturnsFalse()
     {
         var (_, logic) = Create();
 
-        Assert.True(logic.IsHubStrictlyActive(AllianceColor.Red));
-        Assert.True(logic.IsHubStrictlyActive(AllianceColor.Blue));
+        Assert.False(logic.IsHubStrictlyActive(AllianceColor.Red));
+        Assert.False(logic.IsHubStrictlyActive(AllianceColor.Blue));
     }
 
     [Fact]
