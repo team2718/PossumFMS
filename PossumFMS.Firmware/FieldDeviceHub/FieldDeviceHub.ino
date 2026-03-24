@@ -35,7 +35,11 @@ WiFiClient client;
 
 Adafruit_NeoPixel strip(LED_COUNT, LED_PIN, NEO_RGBW + NEO_KHZ800);
 
-Adafruit_VL53L0X lox = Adafruit_VL53L0X();
+const int XSHUT_PINS[]          = { 25, 26 };
+const int SENSOR_COUNT          = sizeof(XSHUT_PINS) / sizeof(XSHUT_PINS[0]);
+const uint8_t SENSOR_BASE_ADDR  = 0x30;  // sensor i gets address 0x30+i
+
+Adafruit_VL53L0X sensors[SENSOR_COUNT];
 
 enum FlashingStatus : uint8_t {
   FlashingStatusOff = 0,
@@ -73,18 +77,28 @@ void setup() {
   colorWipe(strip.Color(255, 0, 255));
 
   Serial.println("sigma sigma sigma");
-  if (!lox.begin()) {
-    Serial.println(F("Failed to boot VL53L0X"));
-    while(1);
-  }
 
-  lox.startRangeContinuous();
+  // Disable all sensors first so we can address them one by one.
+  for (int i = 0; i < SENSOR_COUNT; i++) {
+    pinMode(XSHUT_PINS[i], OUTPUT);
+    digitalWrite(XSHUT_PINS[i], LOW);
+  }
+  delay(10);
+
+  for (int i = 0; i < SENSOR_COUNT; i++) {
+    digitalWrite(XSHUT_PINS[i], HIGH);
+    delay(10);
+    if (!sensors[i].begin(SENSOR_BASE_ADDR + i)) {
+      Serial.printf("Failed to boot VL53L0X sensor %d (XSHUT pin %d)\n", i, XSHUT_PINS[i]);
+      while (1);
+    }
+    sensors[i].startRangeContinuous();
+    Serial.printf("[HUB] Sensor %d ready at I2C 0x%02X\n", i, SENSOR_BASE_ADDR + i);
+  }
 
   xTaskCreatePinnedToCore(networkLedTask, "network_led", 6144, nullptr, 1, nullptr, NETWORK_LED_CORE);
   xTaskCreatePinnedToCore(ballCountTask, "ball_count", 4096, nullptr, 1, nullptr, BALL_COUNT_CORE);
 }
-
-VL53L0X_RangingMeasurementData_t measure;
 
 void loop() {
   delay(1000);
@@ -100,29 +114,31 @@ void colorWipe(uint32_t color) {
 void ballCountTask(void* parameter) {
   (void)parameter;
 
-  bool seeBall = false;
+  bool seeBall[SENSOR_COUNT] = {};
 
   while (true) {
-    if (lox.isRangeComplete()) {
-      int rangemm = lox.readRange();
+    for (int i = 0; i < SENSOR_COUNT; i++) {
+      if (sensors[i].isRangeComplete()) {
+        int rangemm = sensors[i].readRange();
 
-      Serial.printf("range: %04d mm\n", rangemm);
+        Serial.printf("range[%d]: %04d mm\n", i, rangemm);
 
-      if (!seeBall && rangemm < 70) {
-        seeBall = true;
-        portENTER_CRITICAL(&stateLock);
-        if (shouldCountFuel) {
-          fuelCount++;
+        if (!seeBall[i] && rangemm < 70) {
+          seeBall[i] = true;
+          portENTER_CRITICAL(&stateLock);
+          if (shouldCountFuel) {
+            fuelCount++;
+          }
+          portEXIT_CRITICAL(&stateLock);
         }
-        portEXIT_CRITICAL(&stateLock);
-      }
 
-      if (seeBall && rangemm > 120) {
-        seeBall = false;
+        if (seeBall[i] && rangemm > 120) {
+          seeBall[i] = false;
+        }
       }
     }
 
-    // Serial.printf("seeBall: %d, fuelCount: %d, shouldCountFuel: %d\n", seeBall, fuelCount, shouldCountFuel);
+    // Serial.printf("seeBall[0]: %d, fuelCount: %d, shouldCountFuel: %d\n", seeBall[0], fuelCount, shouldCountFuel);
 
     vTaskDelay(pdMS_TO_TICKS(1));
   }
