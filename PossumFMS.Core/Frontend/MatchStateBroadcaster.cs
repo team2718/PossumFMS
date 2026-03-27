@@ -25,7 +25,8 @@ public sealed class MatchStateBroadcaster(
     DriverStationManager dsManager,
     AccessPointManager   apManager,
     FieldHardwareManager fieldHardwareManager,
-    DisplayManager       displayManager) : BackgroundService
+    DisplayManager       displayManager,
+    DatabaseService      databaseService) : BackgroundService
 {
     private static readonly TimeSpan BroadcastInterval = TimeSpan.FromMilliseconds(200);
 
@@ -45,6 +46,7 @@ public sealed class MatchStateBroadcaster(
     internal object Build()
     {
         var loopTiming = dsManager.GetLoopTimingSnapshot();
+        var teams = databaseService.GetTeams();
 
         var redFuelCombined = gameLogic.RedScore.AutoFuelPoints + gameLogic.RedScore.TeleopFuelPoints;
         var blueFuelCombined = gameLogic.BlueScore.AutoFuelPoints + gameLogic.BlueScore.TeleopFuelPoints;
@@ -62,6 +64,7 @@ public sealed class MatchStateBroadcaster(
         freePracticeEnabled = arena.FreePracticeEnabled,
         matchType     = arena.MatchType.ToString(),
         matchNumber   = arena.MatchNumber,
+        matchId       = arena.MatchId,
         matchDurations = new
         {
             autoSeconds = arena.AutoDuration.TotalSeconds,
@@ -116,6 +119,7 @@ public sealed class MatchStateBroadcaster(
         },
         accessPoint   = new { status = apManager.ApStatus },
         audienceView  = displayManager.AudienceView,
+        allianceOrder = displayManager.AllianceOrder,
         lastCommittedMatch = BuildLastCommittedMatchObject(displayManager.LastCommittedMatch),
         stations      = AllianceStations.All.Select((s, i) =>
         {
@@ -141,6 +145,7 @@ public sealed class MatchStateBroadcaster(
                 wrongStation  = ds.WrongStation,
                 isReady       = ds.IsReady,
                 isReadyInMatch = ds.IsReadyInMatch,
+                avatarBase64  = teams.TryGetValue(ds.TeamNumber, out var teamRecord) ? teamRecord.AvatarBase64 : null,
                 wifi          = new
                 {
                     radioLinked       = wifi.RadioLinked,
@@ -225,6 +230,7 @@ public sealed class MatchStateBroadcaster(
 
         return new
         {
+            matchId     = match.MatchId,
             matchType   = match.MatchType,
             matchNumber = match.MatchNumber,
             committedAt = match.CommittedAt,

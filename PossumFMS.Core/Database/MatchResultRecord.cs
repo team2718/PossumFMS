@@ -7,6 +7,7 @@ namespace PossumFMS.Core.Database;
 /// </summary>
 public sealed record MatchResultRecord
 {
+    public string MatchId { get; init; } = Guid.NewGuid().ToString();
     public string MatchType { get; init; } = "";
     public int MatchNumber { get; init; }
     public DateTimeOffset CommittedAt { get; init; }

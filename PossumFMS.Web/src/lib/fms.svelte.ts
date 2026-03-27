@@ -30,6 +30,7 @@ export interface Station {
 	isReady: boolean;
 	isReadyInMatch: boolean;
 	wrongStation: boolean;
+	avatarBase64: string | null;
 	wifi: WifiStatus | null;
 }
 
@@ -77,6 +78,7 @@ export interface MatchState {
 	freePracticeEnabled: boolean;
 	matchType: string; // e.g. "Practice", "Qualification", "Playoff"
 	matchNumber: number;
+	matchId: string;
 	matchDurations: {
 		autoSeconds: number;
 		autoToTeleopTransitionSeconds: number;
@@ -95,7 +97,8 @@ export interface MatchState {
 	hubActive: { red: boolean; blue: boolean };
 	loopTiming: { currentMs: number; maxMs30s: number };
 	accessPoint: { status: string }; // "ACTIVE" | "CONFIGURING" | "ERROR"
-	audienceView: string; // "live" | "matchResults" | ...
+	audienceView: string; // "live" | "matchResults" | "blank" | ...
+	allianceOrder: string; // "blueLeft" | "redLeft"
 	lastCommittedMatch: MatchResultRecord | null;
 	stations: Station[]; // always 6: Red1, Red2, Red3, Blue1, Blue2, Blue3
 	fieldDevices: FieldDeviceDiagnostics[];
@@ -148,6 +151,7 @@ export interface MatchResultRankingPoints {
 }
 
 export interface MatchResultRecord {
+	matchId: string;
 	matchType: string;
 	matchNumber: number;
 	committedAt: string; // ISO date string
@@ -339,9 +343,13 @@ class FmsConnection {
 	commitMatchResults() {
 		return this.invoke('CommitMatchResults');
 	}
-	/** Change the audience overlay view ("live", "matchResults"). */
+	/** Change the audience overlay view ("live", "matchResults", "blank"). */
 	setAudienceView(view: string) {
 		return this.invoke('SetAudienceView', view);
+	}
+	/** Change the audience alliance display order ("blueLeft", "redLeft"). */
+	setAllianceOrder(order: string) {
+		return this.invoke('SetAllianceOrder', order);
 	}
 }
 

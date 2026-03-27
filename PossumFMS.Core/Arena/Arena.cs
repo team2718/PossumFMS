@@ -28,6 +28,7 @@ public sealed class Arena
     public MatchType MatchType   { get; set; } = MatchType.Test;
     public int       MatchNumber { get; set; } = 1;
     public int       MatchRepeat { get; set; } = 0;
+    public string    MatchId     { get; private set; } = Guid.NewGuid().ToString();
 
     /// <summary>Time remaining in the current phase. Zero when Idle or PostMatch.</summary>
     public TimeSpan TimeRemaining =>
@@ -90,6 +91,7 @@ public sealed class Arena
         if (IsMatchInProgress)
             throw new InvalidOperationException("Cannot start pre-match while a match is running.");
 
+        MatchId = Guid.NewGuid().ToString();
         WasAborted = false;
         TransitionTo(MatchPhase.PreMatch, TimeSpan.Zero);
     }

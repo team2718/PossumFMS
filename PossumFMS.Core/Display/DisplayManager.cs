@@ -13,13 +13,17 @@ public sealed class DisplayManager
     private readonly object _lock = new();
 
     public string AudienceView { get; private set; } = "live";
+    public string AllianceOrder { get; private set; } = "redLeft";
     public MatchResultRecord? LastCommittedMatch { get; private set; }
 
     private static readonly HashSet<string> KnownViews =
     [
+        "blank",
         "live",
         "matchResults",
     ];
+
+    private static readonly HashSet<string> KnownOrders = ["blueLeft", "redLeft"];
 
     /// <summary>
     /// Sets the audience overlay view. Throws ArgumentException for unknown views
@@ -31,6 +35,17 @@ public sealed class DisplayManager
             throw new ArgumentException($"Unknown audience view '{view}'. Known views: {string.Join(", ", KnownViews)}.");
 
         lock (_lock) AudienceView = view;
+    }
+
+    /// <summary>
+    /// Sets the alliance display order. Valid values: "blueLeft", "redLeft".
+    /// </summary>
+    public void SetAllianceOrder(string order)
+    {
+        if (!KnownOrders.Contains(order))
+            throw new ArgumentException($"Unknown alliance order '{order}'. Valid: blueLeft, redLeft.");
+
+        lock (_lock) AllianceOrder = order;
     }
 
     public void SetLastCommittedMatch(MatchResultRecord match)

@@ -16,6 +16,7 @@ public sealed class ArenaTests
         Assert.Equal(PossumFMS.Core.Arena.MatchType.Test, arena.MatchType);
         Assert.Equal(1, arena.MatchNumber);
         Assert.Equal(0, arena.MatchRepeat);
+        Assert.False(string.IsNullOrWhiteSpace(arena.MatchId));
         Assert.Equal(TimeSpan.Zero, arena.TimeRemaining);
         Assert.False(arena.IsMatchRunning);
         Assert.False(arena.IsMatchInProgress);
@@ -84,10 +85,12 @@ public sealed class ArenaTests
     public void StartPreMatch_FromIdle_TransitionsToPreMatch()
     {
         var arena = new PossumFMS.Core.Arena.Arena();
+        var originalMatchId = arena.MatchId;
 
         arena.StartPreMatch();
 
         Assert.Equal(MatchPhase.PreMatch, arena.Phase);
+        Assert.NotEqual(originalMatchId, arena.MatchId);
         Assert.Equal(TimeSpan.Zero, arena.TimeRemaining);
         Assert.False(arena.IsMatchInProgress);
         Assert.False(arena.IsMatchRunning);

@@ -310,7 +310,16 @@
 
 	// Audience view helpers
 	const audienceView = $derived(matchState?.audienceView ?? 'live');
-	const isShowingMatchResults = $derived(audienceView === 'matchResults');
+	const canCommit = $derived(
+		phase === 'PostMatch' &&
+			!isCommittingResults &&
+			!!matchState?.matchId &&
+			matchState?.lastCommittedMatch?.matchId !== matchState?.matchId
+	);
+	const hasCommittedResults = $derived(matchState?.lastCommittedMatch != null);
+	const allianceOrderSetting = $derived<'blueLeft' | 'redLeft'>(
+		(matchState?.allianceOrder as 'blueLeft' | 'redLeft') ?? 'blueLeft'
+	);
 
 	async function loadTeamsFromTba() {
 		teamLoadResult = null;
@@ -347,13 +356,6 @@
 		}
 	}
 
-	async function toggleAudienceView() {
-		try {
-			await fms.setAudienceView(isShowingMatchResults ? 'live' : 'matchResults');
-		} catch (error) {
-			// silently ignore
-		}
-	}
 	let hasInitializedMatchDurations = $state(false);
 	let logSearch = $state('');
 	const logSeverityOptions: LogSeverity[] = [
@@ -1116,84 +1118,107 @@
 
 		<!-- Match control bar -->
 		<div class="app-neutral-bg rounded border border-slate-300 p-3 shadow-sm">
-			<div class="flex flex-wrap items-center justify-center gap-3">
-				<button
-					onclick={() => fms.startPreMatch()}
-					disabled={phase !== 'Idle' || !!matchState?.arenaEstop || !!matchState?.freePracticeEnabled}
-					class="h-14 min-w-44 rounded px-5 text-sm font-black disabled:cursor-not-allowed disabled:opacity-40 {phase ===
-					'Idle' && !matchState?.freePracticeEnabled
-						? 'bg-amber-400 text-slate-900 hover:bg-amber-300'
-						: 'bg-amber-800 text-white'}"
-				>
-					Prestart Match
-				</button>
-				<button
-					onclick={() => fms.startMatch()}
-					disabled={phase !== 'PreMatch' || !blueReady || !redReady || !!matchState?.arenaEstop}
-					class="h-14 min-w-44 rounded px-5 text-sm font-black disabled:cursor-not-allowed {phase ===
-						'PreMatch' &&
-					blueReady &&
-					redReady &&
-					!matchState?.arenaEstop
-						? 'bg-emerald-700 text-white hover:bg-emerald-600'
-						: 'bg-[repeating-linear-gradient(-45deg,#b9bec8_0px,#b9bec8_8px,#a9aeb8_8px,#a9aeb8_16px)] text-slate-500'}"
-				>
-					Start Match
-				</button>
-				<button
-					onclick={() => fms.abortMatch()}
-					disabled={phase !== 'Auto' && phase !== 'AutoToTeleopTransition' && phase !== 'Teleop'}
-					class="h-14 min-w-44 rounded px-5 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-40 {phase ===
-						'Auto' ||
-					phase === 'AutoToTeleopTransition' ||
-					phase === 'Teleop'
-						? 'bg-orange-600 hover:bg-orange-500'
-						: 'bg-orange-900'}"
-				>
-					Abort Match
-				</button>
-				<button
-					onclick={() => fms.clearMatch()}
-					disabled={(phase !== 'PostMatch' && phase !== 'PreMatch' && phase !== 'Idle') ||
-						!!matchState?.arenaEstop}
-					class="h-14 min-w-44 rounded bg-slate-500 px-5 text-sm font-black text-white hover:bg-slate-400 disabled:cursor-not-allowed disabled:opacity-40"
-				>
-					Clear
-				</button>
-				<div class="flex flex-col items-center gap-1">
+			<div class="flex flex-col gap-2">
+				<!-- Row 1: Match lifecycle -->
+				<div class="flex flex-wrap items-center justify-center gap-3">
+					<button
+						onclick={() =>  {fms.startPreMatch(); fms.setAudienceView('live');}}
+						disabled={phase !== 'Idle' || !!matchState?.arenaEstop || !!matchState?.freePracticeEnabled}
+						class="h-14 min-w-44 rounded px-5 text-sm font-black disabled:cursor-not-allowed disabled:opacity-40 {phase ===
+						'Idle' && !matchState?.freePracticeEnabled
+							? 'bg-amber-400 text-slate-900 hover:bg-amber-300'
+							: 'bg-amber-800 text-white'}"
+					>
+						Prestart Match
+					</button>
+					<button
+						onclick={() => fms.startMatch()}
+						disabled={phase !== 'PreMatch' || !blueReady || !redReady || !!matchState?.arenaEstop}
+						class="h-14 min-w-44 rounded px-5 text-sm font-black disabled:cursor-not-allowed {phase ===
+							'PreMatch' &&
+						blueReady &&
+						redReady &&
+						!matchState?.arenaEstop
+							? 'bg-emerald-700 text-white hover:bg-emerald-600'
+							: 'bg-[repeating-linear-gradient(-45deg,#b9bec8_0px,#b9bec8_8px,#a9aeb8_8px,#a9aeb8_16px)] text-slate-500'}"
+					>
+						Start Match
+					</button>
+					<button
+						onclick={() => fms.abortMatch()}
+						disabled={phase !== 'Auto' && phase !== 'AutoToTeleopTransition' && phase !== 'Teleop'}
+						class="h-14 min-w-44 rounded px-5 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-40 {phase ===
+							'Auto' ||
+						phase === 'AutoToTeleopTransition' ||
+						phase === 'Teleop'
+							? 'bg-orange-600 hover:bg-orange-500'
+							: 'bg-orange-900'}"
+					>
+						Abort Match
+					</button>
 					<button
 						onclick={commitMatchResults}
-						disabled={phase !== 'PostMatch' || isCommittingResults}
-						class="h-14 min-w-44 rounded px-5 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-40 {phase ===
-						'PostMatch'
+						disabled={!canCommit}
+						class="h-14 min-w-44 rounded px-5 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-40 {canCommit
 							? 'bg-indigo-700 hover:bg-indigo-600'
 							: 'bg-indigo-950'}"
 					>
 						{isCommittingResults ? 'Committing…' : 'Commit Results'}
 					</button>
+					<button
+						onclick={() => fms.clearMatch()}
+						disabled={(phase !== 'PostMatch' && phase !== 'PreMatch' && phase !== 'Idle') ||
+							!!matchState?.arenaEstop}
+						class="h-14 min-w-44 rounded bg-slate-500 px-5 text-sm font-black text-white hover:bg-slate-400 disabled:cursor-not-allowed disabled:opacity-40"
+					>
+						Clear
+					</button>
+					{#if matchState?.arenaEstop}
+						<button
+							class="h-14 min-w-44 rounded bg-[repeating-linear-gradient(-45deg,#e7ca4f_0px,#e7ca4f_8px,#9a9a9a_8px,#9a9a9a_16px)] px-5 text-sm font-black text-black"
+						>
+							Arena is E-STOPPED!
+						</button>
+					{:else}
+						<button
+							onclick={() => fms.triggerArenaEstop()}
+							class="h-14 min-w-44 rounded bg-rose-700 px-5 text-sm font-black text-white hover:bg-rose-600"
+						>
+							Arena E-STOP
+						</button>
+					{/if}
 				</div>
-				<button
-					onclick={toggleAudienceView}
-					class="h-14 min-w-44 rounded px-5 text-sm font-black text-white {isShowingMatchResults
-						? 'bg-teal-700 hover:bg-teal-600'
-						: 'bg-slate-600 hover:bg-slate-500'}"
-				>
-					{isShowingMatchResults ? 'Show Live' : 'Show Match Results'}
-				</button>
-				{#if matchState?.arenaEstop}
+				<!-- Row 2: Display controls -->
+				<div class="flex flex-wrap items-center justify-center gap-3">
 					<button
-						class="h-14 min-w-44 rounded bg-[repeating-linear-gradient(-45deg,#e7ca4f_0px,#e7ca4f_8px,#9a9a9a_8px,#9a9a9a_16px)] px-5 text-sm font-black text-black"
+						onclick={() => fms.setAudienceView('blank')}
+						class="h-14 min-w-44 rounded border px-5 text-sm font-black transition-colors {audienceView ===
+						'blank'
+							? 'border-slate-900 bg-slate-800 text-white ring-2 ring-white'
+							: 'border-slate-400 bg-slate-300 text-slate-600 hover:bg-slate-200'}"
 					>
-						Arena is E-STOPPED!
+						Show Blank
 					</button>
-				{:else}
 					<button
-						onclick={() => fms.triggerArenaEstop()}
-						class="h-14 min-w-44 rounded bg-rose-700 px-5 text-sm font-black text-white hover:bg-rose-600"
+						onclick={() => fms.setAudienceView('live')}
+						class="h-14 min-w-44 rounded border px-5 text-sm font-black transition-colors {audienceView ===
+						'live'
+							? 'border-teal-900 bg-teal-700 text-white ring-2 ring-white'
+							: 'border-slate-400 bg-slate-300 text-slate-600 hover:bg-slate-200'}"
 					>
-						Arena E-STOP
+						Show Match Play
 					</button>
-				{/if}
+					<button
+						onclick={() => fms.setAudienceView('matchResults')}
+						disabled={!hasCommittedResults}
+						class="h-14 min-w-44 rounded border px-5 text-sm font-black transition-colors disabled:cursor-not-allowed disabled:opacity-40 {audienceView ===
+						'matchResults'
+							? 'border-teal-900 bg-teal-700 text-white ring-2 ring-white'
+							: 'border-slate-400 bg-slate-300 text-slate-600 hover:bg-slate-200'}"
+					>
+						Show Match Results
+					</button>
+				</div>
 			</div>
 		</div>
 
@@ -1382,6 +1407,36 @@
 								>
 									{isSavingMatchDurations ? 'Saving...' : 'Save Durations'}
 								</button>
+							</div>
+						</div>
+						<div class="min-w-[320px] rounded border border-slate-200 bg-slate-50 px-4 py-3">
+							<div class="text-sm font-bold text-slate-900">Alliance Display Order</div>
+							<div class="mt-1 text-xs text-slate-600">
+								Configure which alliance is shown on the left side of all audience views.
+							</div>
+							<div class="mt-3 flex items-center gap-6">
+								<label class="flex cursor-pointer items-center gap-2 text-sm text-slate-800">
+									<input
+										type="radio"
+										name="allianceOrder"
+										value="redLeft"
+										checked={allianceOrderSetting === 'redLeft'}
+										onchange={() => fms.setAllianceOrder('redLeft')}
+										class="h-4 w-4 cursor-pointer"
+									/>
+									<span>Red Left, Blue Right</span>
+								</label>
+								<label class="flex cursor-pointer items-center gap-2 text-sm text-slate-800">
+									<input
+										type="radio"
+										name="allianceOrder"
+										value="blueLeft"
+										checked={allianceOrderSetting === 'blueLeft'}
+										onchange={() => fms.setAllianceOrder('blueLeft')}
+										class="h-4 w-4 cursor-pointer"
+									/>
+									<span>Blue Left, Red Right</span>
+								</label>
 							</div>
 						</div>
 						{#if matchState?.arenaEstop}

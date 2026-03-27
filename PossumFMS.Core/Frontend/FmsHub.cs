@@ -360,6 +360,7 @@ public sealed class FmsHub(
 
         var result = new MatchResultRecord
         {
+            MatchId = arena.MatchId,
             MatchType  = arena.MatchType.ToString(),
             MatchNumber = arena.MatchNumber,
             CommittedAt = DateTimeOffset.UtcNow,
@@ -416,6 +417,24 @@ public sealed class FmsHub(
         }
 
         logger.LogInformation("SetAudienceView to '{View}' by {Client}.", view, Context.ConnectionId);
+        await BroadcastMatchState();
+    }
+
+    /// <summary>
+    /// Sets the audience alliance display order. Valid values: "blueLeft", "redLeft".
+    /// </summary>
+    public async Task SetAllianceOrder(string order)
+    {
+        try
+        {
+            displayManager.SetAllianceOrder(order);
+        }
+        catch (ArgumentException ex)
+        {
+            throw new HubException(ex.Message);
+        }
+
+        logger.LogInformation("SetAllianceOrder to '{Order}' by {Client}.", order, Context.ConnectionId);
         await BroadcastMatchState();
     }
 
