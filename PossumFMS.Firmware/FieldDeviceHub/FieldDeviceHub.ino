@@ -17,6 +17,10 @@ const uint32_t REPLY_TIMEOUT_MS = 100;
 const uint32_t INITIAL_REPLY_TIMEOUT_MS = 500;
 const uint32_t REPLY_BODY_TIMEOUT_MS = 200;
 const uint32_t FLASH_INTERVAL_MS = 250;
+const int BALL_DETECT_DROP_MM = 20;
+const int BALL_DETECT_RISE_MM = 10;
+const uint32_t SENSOR_STALE_MS = 500;
+const uint32_t SENSOR_STALE_LOG_INTERVAL_MS = 1000;
 
 const size_t RX_BUF_SIZE = 256;
 
@@ -35,7 +39,7 @@ WiFiClient client;
 
 Adafruit_NeoPixel strip(LED_COUNT, LED_PIN, NEO_RGBW + NEO_KHZ800);
 
-const int XSHUT_PINS[]          = { 25, 26 };
+const int XSHUT_PINS[]          = { 2, 4, 18, 19 };
 const int SENSOR_COUNT          = sizeof(XSHUT_PINS) / sizeof(XSHUT_PINS[0]);
 const uint8_t SENSOR_BASE_ADDR  = 0x30;  // sensor i gets address 0x30+i
 
@@ -114,31 +118,72 @@ void colorWipe(uint32_t color) {
 void ballCountTask(void* parameter) {
   (void)parameter;
 
-  bool seeBall[SENSOR_COUNT] = {};
+  int peakRange[SENSOR_COUNT] = {};
+  int troughRange[SENSOR_COUNT] = {};
+  bool hasSample[SENSOR_COUNT] = {};
+  bool waitingForRise[SENSOR_COUNT] = {};
+  uint32_t lastRangeSeenMs[SENSOR_COUNT] = {};
+  uint32_t lastStaleLogMs[SENSOR_COUNT] = {};
 
   while (true) {
+    uint32_t now = millis();
+
+    // Serial.printf("fuelCount: %d\n", fuelCount);
+
     for (int i = 0; i < SENSOR_COUNT; i++) {
       if (sensors[i].isRangeComplete()) {
         int rangemm = sensors[i].readRange();
+        lastRangeSeenMs[i] = now;
 
-        Serial.printf("range[%d]: %04d mm\n", i, rangemm);
+        // Serial.printf("range[%d]: %04d mm\n", i, rangemm);
 
-        if (!seeBall[i] && rangemm < 70) {
-          seeBall[i] = true;
-          portENTER_CRITICAL(&stateLock);
-          if (shouldCountFuel) {
-            fuelCount++;
-          }
-          portEXIT_CRITICAL(&stateLock);
+        if (!hasSample[i]) {
+          hasSample[i] = true;
+          peakRange[i] = rangemm;
+          troughRange[i] = rangemm;
+          continue;
         }
 
-        if (seeBall[i] && rangemm > 120) {
-          seeBall[i] = false;
+        if (!waitingForRise[i]) {
+          if (rangemm > peakRange[i]) {
+            peakRange[i] = rangemm;
+          }
+
+          if ((peakRange[i] - rangemm) >= BALL_DETECT_DROP_MM) {
+            waitingForRise[i] = true;
+            troughRange[i] = rangemm;
+          }
+        } else {
+          if (rangemm < troughRange[i]) {
+            troughRange[i] = rangemm;
+          }
+
+          if ((rangemm - troughRange[i]) >= BALL_DETECT_RISE_MM) {
+            portENTER_CRITICAL(&stateLock);
+            if (shouldCountFuel) {
+              fuelCount++;
+            }
+            portEXIT_CRITICAL(&stateLock);
+
+            waitingForRise[i] = false;
+            peakRange[i] = rangemm;
+            troughRange[i] = rangemm;
+          }
+        }
+      } else if (hasSample[i]) {
+        uint32_t staleMs = now - lastRangeSeenMs[i];
+        if (staleMs >= SENSOR_STALE_MS) {
+          if (now - lastStaleLogMs[i] >= SENSOR_STALE_LOG_INTERVAL_MS) {
+            Serial.printf("[HUB] Sensor %d stale for %lu ms, restarting continuous mode\n", i, (unsigned long)staleMs);
+            lastStaleLogMs[i] = now;
+          }
+
+          sensors[i].startRangeContinuous();
         }
       }
     }
 
-    // Serial.printf("seeBall[0]: %d, fuelCount: %d, shouldCountFuel: %d\n", seeBall[0], fuelCount, shouldCountFuel);
+    // Serial.printf("fuelCount: %d, shouldCountFuel: %d\n", fuelCount, shouldCountFuel);
 
     vTaskDelay(pdMS_TO_TICKS(1));
   }
