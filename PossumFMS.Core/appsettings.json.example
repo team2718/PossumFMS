@@ -15,5 +15,11 @@
     "ListenAddress": "0.0.0.0",
     "ListenPort": 1678,
     "ClientTimeoutMs": 500
+  },
+  "TheBlueAlliance": {
+    "ApiKey": ""
+  },
+  "Database": {
+    "DataPath": "./data"
   }
 }

@@ -1,8 +1,11 @@
 using Microsoft.AspNetCore.SignalR;
 using PossumFMS.Core.Arena;
+using PossumFMS.Core.Database;
+using PossumFMS.Core.Display;
 using PossumFMS.Core.DriverStation;
 using PossumFMS.Core.FieldHardware;
 using PossumFMS.Core.Network;
+using PossumFMS.Core.TheBlueAlliance;
 
 namespace PossumFMS.Core.Frontend;
 
@@ -21,6 +24,9 @@ public sealed class FmsHub(
     AccessPointManager apManager,
     RecentLogStore recentLogStore,
     MatchStateBroadcaster broadcaster,
+    DatabaseService databaseService,
+    TbaClient tbaClient,
+    DisplayManager displayManager,
     ILogger<FmsHub> logger) : Hub
 {
     // ── Team assignment ────────────────────────────────────────────────────────
@@ -269,6 +275,150 @@ public sealed class FmsHub(
         await BroadcastMatchState();
     }
 
+    // ── TBA / Database ─────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Fetches all teams at <paramref name="eventKey"/> from The Blue Alliance
+    /// (including avatars), merges them into the local JSON database, and returns
+    /// the new and total team counts.
+    /// Multiple events can be imported; records accumulate keyed by team number.
+    /// </summary>
+    public async Task<LoadTeamsResult> LoadTeamsFromTba(string eventKey)
+    {
+        if (string.IsNullOrWhiteSpace(eventKey))
+            throw new HubException("Event key is required (e.g. 2026nyny).");
+
+        eventKey = eventKey.Trim().ToLowerInvariant();
+        logger.LogInformation("LoadTeamsFromTba requested by {Client} for event {EventKey}.", Context.ConnectionId, eventKey);
+
+        List<TeamRecord> newTeams;
+        try
+        {
+            newTeams = await tbaClient.ImportTeamsWithAvatarsAsync(eventKey, Context.ConnectionAborted);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            throw new HubException($"Failed to load teams from The Blue Alliance: {ex.Message}");
+        }
+
+        var existing = databaseService.GetTeams();
+        foreach (var team in newTeams)
+            existing[team.TeamNumber] = team;
+
+        databaseService.SaveTeams(existing.Values.ToList());
+
+        logger.LogInformation(
+            "Merged {New} teams from {EventKey}. Total database: {Total} teams.",
+            newTeams.Count, eventKey, existing.Count);
+
+        return new LoadTeamsResult(newTeams.Count, existing.Count);
+    }
+
+    /// <summary>
+    /// Snapshots the current match scores and team assignments into the JSON
+    /// database as a committed match result. Only valid in the PostMatch phase.
+    /// Does not change the audience view.
+    /// </summary>
+    public async Task CommitMatchResults()
+    {
+        if (arena.Phase != MatchPhase.PostMatch)
+            throw new HubException("Match results can only be committed after a match has fully ended (PostMatch phase).");
+
+        logger.LogInformation("CommitMatchResults requested by {Client}.", Context.ConnectionId);
+
+        // Build team arrays in station order: Red1, Red2, Red3, Blue1, Blue2, Blue3
+        var teamNumbers = AllianceStations.All.Select(s => dsManager[s].TeamNumber).ToArray();
+        var redTeams    = teamNumbers[..3];
+        var blueTeams   = teamNumbers[3..];
+
+        var teamDb = databaseService.GetTeams();
+        static string[]  GetNicknames(int[] nums, Dictionary<int, TeamRecord> db)
+            => nums.Select(n => db.TryGetValue(n, out var t) ? t.Nickname : "").ToArray();
+        static string?[] GetAvatars(int[] nums, Dictionary<int, TeamRecord> db)
+            => nums.Select(n => db.TryGetValue(n, out var t) ? t.AvatarBase64 : null).ToArray();
+
+        var redFuelCombined    = gameLogic.RedScore.AutoFuelPoints  + gameLogic.RedScore.TeleopFuelPoints;
+        var blueFuelCombined   = gameLogic.BlueScore.AutoFuelPoints + gameLogic.BlueScore.TeleopFuelPoints;
+        var redTowerCombined   = gameLogic.RedScore.AutoTowerPoints  + gameLogic.RedScore.TeleopTowerPoints;
+        var blueTowerCombined  = gameLogic.BlueScore.AutoTowerPoints + gameLogic.BlueScore.TeleopTowerPoints;
+        var redWins  = gameLogic.RedScore.Total  > gameLogic.BlueScore.Total;
+        var blueWins = gameLogic.BlueScore.Total > gameLogic.RedScore.Total;
+        var tied     = gameLogic.RedScore.Total == gameLogic.BlueScore.Total;
+
+        static MatchRankingPoints BuildRp(int fuel, int tower, bool wins, bool isTied) => new()
+        {
+            Energized    = fuel  >= 100,
+            Supercharged = fuel  >= 360,
+            Traversal    = tower >= 50,
+            WinTie       = wins ? 3 : isTied ? 1 : 0,
+            Total        = (fuel >= 100 ? 1 : 0) + (fuel >= 360 ? 1 : 0) + (tower >= 50 ? 1 : 0) + (wins ? 3 : isTied ? 1 : 0),
+        };
+
+        var result = new MatchResultRecord
+        {
+            MatchType  = arena.MatchType.ToString(),
+            MatchNumber = arena.MatchNumber,
+            CommittedAt = DateTimeOffset.UtcNow,
+            RedTeams   = redTeams,
+            BlueTeams  = blueTeams,
+            RedTeamNicknames  = GetNicknames(redTeams,  teamDb),
+            BlueTeamNicknames = GetNicknames(blueTeams, teamDb),
+            RedTeamAvatars    = GetAvatars(redTeams,    teamDb),
+            BlueTeamAvatars   = GetAvatars(blueTeams,   teamDb),
+            RedScore  = gameLogic.RedScore.Total,
+            BlueScore = gameLogic.BlueScore.Total,
+            RedBreakdown = new MatchScoreBreakdown
+            {
+                AutoFuelPoints   = gameLogic.RedScore.AutoFuelPoints,
+                AutoTowerPoints  = gameLogic.RedScore.AutoTowerPoints,
+                TeleopFuelPoints = gameLogic.RedScore.TeleopFuelPoints,
+                TeleopTowerPoints = gameLogic.RedScore.TeleopTowerPoints,
+                Total            = gameLogic.RedScore.Total,
+            },
+            BlueBreakdown = new MatchScoreBreakdown
+            {
+                AutoFuelPoints   = gameLogic.BlueScore.AutoFuelPoints,
+                AutoTowerPoints  = gameLogic.BlueScore.AutoTowerPoints,
+                TeleopFuelPoints = gameLogic.BlueScore.TeleopFuelPoints,
+                TeleopTowerPoints = gameLogic.BlueScore.TeleopTowerPoints,
+                Total            = gameLogic.BlueScore.Total,
+            },
+            RedRankingPoints  = BuildRp(redFuelCombined,  redTowerCombined,  redWins,  tied),
+            BlueRankingPoints = BuildRp(blueFuelCombined, blueTowerCombined, blueWins, tied),
+        };
+
+        databaseService.SaveMatchResult(result);
+        displayManager.SetLastCommittedMatch(result);
+
+        logger.LogInformation(
+            "Committed results: {MatchType} Match {MatchNumber} — Red {Red} vs Blue {Blue}.",
+            result.MatchType, result.MatchNumber, result.RedScore, result.BlueScore);
+
+        await BroadcastMatchState();
+    }
+
+    /// <summary>
+    /// Changes the audience overlay view. Known values: "live", "matchResults".
+    /// </summary>
+    public async Task SetAudienceView(string view)
+    {
+        try
+        {
+            displayManager.SetAudienceView(view);
+        }
+        catch (ArgumentException ex)
+        {
+            throw new HubException(ex.Message);
+        }
+
+        logger.LogInformation("SetAudienceView to '{View}' by {Client}.", view, Context.ConnectionId);
+        await BroadcastMatchState();
+    }
+
     // ── State push ─────────────────────────────────────────────────────────────
 
     public Task RequestMatchState() => BroadcastMatchState();
@@ -295,4 +445,5 @@ public sealed class FmsHub(
     }
 
     public sealed record TeamAssignmentRequest(int TeamNumber, string WpaKey = "");
+    public sealed record LoadTeamsResult(int NewTeamsCount, int TotalTeamsCount);
 }

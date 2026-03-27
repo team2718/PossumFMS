@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.SignalR;
 using PossumFMS.Core.Arena;
+using PossumFMS.Core.Database;
+using PossumFMS.Core.Display;
 using PossumFMS.Core.DriverStation;
 using PossumFMS.Core.FieldHardware;
 using PossumFMS.Core.Network;
@@ -22,7 +24,8 @@ public sealed class MatchStateBroadcaster(
     GameLogic            gameLogic,
     DriverStationManager dsManager,
     AccessPointManager   apManager,
-    FieldHardwareManager fieldHardwareManager) : BackgroundService
+    FieldHardwareManager fieldHardwareManager,
+    DisplayManager       displayManager) : BackgroundService
 {
     private static readonly TimeSpan BroadcastInterval = TimeSpan.FromMilliseconds(200);
 
@@ -112,6 +115,8 @@ public sealed class MatchStateBroadcaster(
             maxMs30s  = loopTiming.MaxMs30s,
         },
         accessPoint   = new { status = apManager.ApStatus },
+        audienceView  = displayManager.AudienceView,
+        lastCommittedMatch = BuildLastCommittedMatchObject(displayManager.LastCommittedMatch),
         stations      = AllianceStations.All.Select((s, i) =>
         {
             var ds   = dsManager[s];
@@ -211,6 +216,58 @@ public sealed class MatchStateBroadcaster(
             traversal,
             winTie,
             total = (energized ? 1 : 0) + (supercharged ? 1 : 0) + (traversal ? 1 : 0) + winTie,
+        };
+    }
+
+    private static object? BuildLastCommittedMatchObject(MatchResultRecord? match)
+    {
+        if (match is null) return null;
+
+        return new
+        {
+            matchType   = match.MatchType,
+            matchNumber = match.MatchNumber,
+            committedAt = match.CommittedAt,
+            redTeams    = match.RedTeams,
+            blueTeams   = match.BlueTeams,
+            redTeamNicknames  = match.RedTeamNicknames,
+            blueTeamNicknames = match.BlueTeamNicknames,
+            redTeamAvatars    = match.RedTeamAvatars,
+            blueTeamAvatars   = match.BlueTeamAvatars,
+            redScore  = match.RedScore,
+            blueScore = match.BlueScore,
+            redBreakdown = new
+            {
+                autoFuelPoints    = match.RedBreakdown.AutoFuelPoints,
+                autoTowerPoints   = match.RedBreakdown.AutoTowerPoints,
+                teleopFuelPoints  = match.RedBreakdown.TeleopFuelPoints,
+                teleopTowerPoints = match.RedBreakdown.TeleopTowerPoints,
+                total             = match.RedBreakdown.Total,
+            },
+            blueBreakdown = new
+            {
+                autoFuelPoints    = match.BlueBreakdown.AutoFuelPoints,
+                autoTowerPoints   = match.BlueBreakdown.AutoTowerPoints,
+                teleopFuelPoints  = match.BlueBreakdown.TeleopFuelPoints,
+                teleopTowerPoints = match.BlueBreakdown.TeleopTowerPoints,
+                total             = match.BlueBreakdown.Total,
+            },
+            redRankingPoints = new
+            {
+                energized    = match.RedRankingPoints.Energized,
+                supercharged = match.RedRankingPoints.Supercharged,
+                traversal    = match.RedRankingPoints.Traversal,
+                winTie       = match.RedRankingPoints.WinTie,
+                total        = match.RedRankingPoints.Total,
+            },
+            blueRankingPoints = new
+            {
+                energized    = match.BlueRankingPoints.Energized,
+                supercharged = match.BlueRankingPoints.Supercharged,
+                traversal    = match.BlueRankingPoints.Traversal,
+                winTie       = match.BlueRankingPoints.WinTie,
+                total        = match.BlueRankingPoints.Total,
+            },
         };
     }
 }

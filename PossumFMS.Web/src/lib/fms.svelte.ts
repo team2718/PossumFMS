@@ -95,6 +95,8 @@ export interface MatchState {
 	hubActive: { red: boolean; blue: boolean };
 	loopTiming: { currentMs: number; maxMs30s: number };
 	accessPoint: { status: string }; // "ACTIVE" | "CONFIGURING" | "ERROR"
+	audienceView: string; // "live" | "matchResults" | ...
+	lastCommittedMatch: MatchResultRecord | null;
 	stations: Station[]; // always 6: Red1, Red2, Red3, Blue1, Blue2, Blue3
 	fieldDevices: FieldDeviceDiagnostics[];
 }
@@ -127,6 +129,40 @@ export interface RankingPointBreakdown {
 	traversal: boolean;
 	winTie: number;
 	total: number;
+}
+
+export interface MatchScoreBreakdown {
+	autoFuelPoints: number;
+	autoTowerPoints: number;
+	teleopFuelPoints: number;
+	teleopTowerPoints: number;
+	total: number;
+}
+
+export interface MatchResultRankingPoints {
+	energized: boolean;
+	supercharged: boolean;
+	traversal: boolean;
+	winTie: number;
+	total: number;
+}
+
+export interface MatchResultRecord {
+	matchType: string;
+	matchNumber: number;
+	committedAt: string; // ISO date string
+	redTeams: number[];
+	blueTeams: number[];
+	redTeamNicknames: string[];
+	blueTeamNicknames: string[];
+	redTeamAvatars: (string | null)[];
+	blueTeamAvatars: (string | null)[];
+	redScore: number;
+	blueScore: number;
+	redBreakdown: MatchScoreBreakdown;
+	blueBreakdown: MatchScoreBreakdown;
+	redRankingPoints: MatchResultRankingPoints;
+	blueRankingPoints: MatchResultRankingPoints;
 }
 
 export type LogSeverity =
@@ -293,6 +329,19 @@ class FmsConnection {
 	setEndgameTowerLevel(stationIndex: number, level: TowerEndgameLevel) {
 		const numericLevel = level === 'L1' ? 1 : level === 'L2' ? 2 : level === 'L3' ? 3 : 0;
 		return this.invoke('SetEndgameTowerLevel', stationIndex, numericLevel);
+	}
+	/** Load teams from a specific TBA event and merge into the local database. */
+	loadTeamsFromTba(eventKey: string): Promise<{ newTeamsCount: number; totalTeamsCount: number }> {
+		if (!this.hub) return Promise.reject(new Error('FMS is not connected yet.'));
+		return this.hub.invoke('LoadTeamsFromTba', eventKey);
+	}
+	/** Commit current match scores to the database. Only valid in PostMatch. */
+	commitMatchResults() {
+		return this.invoke('CommitMatchResults');
+	}
+	/** Change the audience overlay view ("live", "matchResults"). */
+	setAudienceView(view: string) {
+		return this.invoke('SetAudienceView', view);
 	}
 }
 

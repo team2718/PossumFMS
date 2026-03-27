@@ -1,5 +1,7 @@
 <script lang="ts">
+	import { fly } from 'svelte/transition';
 	import { fms } from '$lib/fms.svelte';
+	import type { MatchResultRecord } from '$lib/fms.svelte';
 
 	// Connect to the FMS hub to receive live match state
 	$effect(() => {
@@ -46,6 +48,10 @@
 	const blueTowerCombined = $derived(matchState?.blueBreakdown.towerCombined ?? 0);
 	const blueHubActive = $derived(matchState?.hubActive?.blue ?? false);
 	const redHubActive = $derived(matchState?.hubActive?.red ?? false);
+
+	// Audience view state
+	const audienceView = $derived(matchState?.audienceView ?? 'live');
+	const lastCommittedMatch = $derived<MatchResultRecord | null>(matchState?.lastCommittedMatch ?? null);
 
 	const soundFiles = [
 		'/sounds/match-start.wav',
@@ -248,64 +254,288 @@
 	</div>
 {/snippet}
 
-<div class="relative h-screen w-full overflow-hidden bg-transparent text-white">
-	<div class="pointer-events-none absolute inset-0">
-		<div class="absolute top-4 left-1/2 w-[95%] -translate-x-1/2 md:w-[88%]">
-			<div class="relative">
-				<!-- Blue hub active indicator (left of panel, arrow pointing toward left screen edge) -->
-				{@render hubIndicator('left', blueHubActive)}
-				<!-- Red hub active indicator (right of panel, arrow pointing toward right screen edge) -->
-				{@render hubIndicator('right', redHubActive)}
-				<div
-					class="grid grid-cols-[1fr_1fr_1fr_1fr_1fr_1fr_1fr_1fr_1fr] overflow-hidden rounded-lg border border-black/30 shadow-md shadow-black/70"
-				>
-					<!-- Blue Team 1 -->
-					{@render allianceTeamCell(blueTeams[0], !!blueStations[0]?.robotLinked, 'blue', false)}
-					<!-- Blue Team 2 (middle) -->
-					{@render allianceTeamCell(blueTeams[1], !!blueStations[1]?.robotLinked, 'blue', true)}
-					<!-- Blue Team 3 -->
-					{@render allianceTeamCell(blueTeams[2], !!blueStations[2]?.robotLinked, 'blue', false)}
-					<!-- Blue Score -->
-					<div
-						class="alliance-blue-bg flex items-center justify-center px-5 text-4xl font-black md:text-6xl"
-					>
-						{blueScore}
+{#snippet teamAvatarOrPlaceholder(avatarBase64: string | null | undefined)}
+	{#if avatarBase64}
+		<img
+			src="data:image/png;base64,{avatarBase64}"
+			alt="Team avatar"
+			class="h-10 w-10 rounded object-contain"
+		/>
+	{:else}
+		<svg
+			viewBox="0 0 40 40"
+			xmlns="http://www.w3.org/2000/svg"
+			class="h-10 w-10 opacity-40"
+			fill="currentColor"
+			aria-hidden="true"
+		>
+			<!-- Simple robot silhouette placeholder -->
+			<rect x="11" y="10" width="18" height="12" rx="3" />
+			<circle cx="16" cy="16" r="2.5" fill="black" opacity="0.5" />
+			<circle cx="24" cy="16" r="2.5" fill="black" opacity="0.5" />
+			<rect x="9" y="24" width="22" height="12" rx="3" />
+			<rect x="4" y="26" width="5" height="8" rx="2" />
+			<rect x="31" y="26" width="5" height="8" rx="2" />
+		</svg>
+	{/if}
+{/snippet}
+
+{#snippet matchResultsAlliancePanel(
+	alliance: 'blue' | 'red',
+	teams: number[],
+	nicknames: string[],
+	avatars: (string | null)[],
+	score: number
+)}
+	<div
+		class="flex-1 overflow-hidden rounded-lg border border-black/30 shadow-md shadow-black/70 {alliance ===
+		'blue'
+			? 'alliance-blue-bg-dark'
+			: 'alliance-red-bg-dark'}"
+	>
+		<!-- Alliance header with score -->
+		<div
+			class="flex items-center justify-between px-4 py-3 {alliance === 'blue'
+				? 'alliance-blue-bg-darker'
+				: 'alliance-red-bg-darker'}"
+		>
+			<div class="text-sm font-black tracking-wider uppercase opacity-80">
+				{alliance === 'blue' ? 'Blue Alliance' : 'Red Alliance'}
+			</div>
+			<div class="text-5xl font-black md:text-6xl">{score}</div>
+		</div>
+		<!-- Team rows -->
+		{#each teams as teamNum, i}
+			<div class="flex items-center gap-3 border-t border-black/20 px-4 py-2">
+				{@render teamAvatarOrPlaceholder(avatars[i])}
+				<div class="min-w-0 flex-1">
+					<div class="text-2xl font-black leading-tight md:text-3xl">
+						{teamNum > 0 ? teamNum : '----'}
 					</div>
-					<!-- Timer -->
-					<div class="flex flex-col items-center justify-center bg-white px-6 py-3 text-black">
-						<div class="text-4xl font-black md:text-6xl">
-							{matchState?.phase === 'AutoToTeleopTransition'
-								? '0:00'
-								: matchState
-									? formatTime(matchState.timeRemaining)
-									: '0:00'}
-						</div>
-						<div
-							class="-mt-1 text-sm font-black md:text-2xl {teleopPeriodIndicator
-								? ''
-								: 'invisible'}"
-						>
-							{teleopPeriodIndicator ?? '\u00a0'}
-						</div>
-					</div>
-					<!-- Red Score -->
-					<div
-						class="alliance-red-bg flex items-center justify-center px-5 text-4xl font-black md:text-6xl"
-					>
-						{redScore}
-					</div>
-					<!-- Red Team 1 -->
-					{@render allianceTeamCell(redTeams[0], !!redStations[0]?.robotLinked, 'red', false)}
-					<!-- Red Team 2 (middle) -->
-					{@render allianceTeamCell(redTeams[1], !!redStations[1]?.robotLinked, 'red', true)}
-					<!-- Red Team 3 -->
-					{@render allianceTeamCell(redTeams[2], !!redStations[2]?.robotLinked, 'red', false)}
+					{#if nicknames[i]}
+						<div class="truncate text-sm font-semibold opacity-75">{nicknames[i]}</div>
+					{/if}
 				</div>
 			</div>
-			<div class="mt-2 grid grid-cols-1 gap-2 md:grid-cols-2">
-				{@render rankingProgress('blue', blueFuelCombined, blueTowerCombined)}
-				{@render rankingProgress('red', redFuelCombined, redTowerCombined)}
-			</div>
-		</div>
+		{/each}
 	</div>
+{/snippet}
+
+{#snippet matchResultsView(match: MatchResultRecord | null)}
+	<div class="absolute top-4 left-1/2 w-[95%] -translate-x-1/2 md:w-[88%]">
+		{#if match === null}
+			<div
+				class="rounded-lg border border-black/30 bg-black/60 px-8 py-10 text-center shadow-md shadow-black/70"
+			>
+				<div class="text-2xl font-black opacity-60">No match results available</div>
+				<div class="mt-2 text-sm opacity-40">Commit a match result from the FMS to display here.</div>
+			</div>
+		{:else}
+			<!-- Match header -->
+			<div class="mb-3 text-center">
+				<div class="text-2xl font-black tracking-wide md:text-4xl">
+					{match.matchType} Match {match.matchNumber}
+				</div>
+				<div class="mt-0.5 text-sm font-semibold uppercase tracking-widest opacity-60">Results</div>
+			</div>
+
+			<!-- Alliance panels side by side -->
+			<div class="flex gap-3">
+				{@render matchResultsAlliancePanel(
+					'blue',
+					match.blueTeams,
+					match.blueTeamNicknames,
+					match.blueTeamAvatars,
+					match.blueScore
+				)}
+				{@render matchResultsAlliancePanel(
+					'red',
+					match.redTeams,
+					match.redTeamNicknames,
+					match.redTeamAvatars,
+					match.redScore
+				)}
+			</div>
+
+			<!-- Score breakdown + ranking points -->
+			<div class="mt-3 grid grid-cols-2 gap-3">
+				<!-- Score breakdown -->
+				<div
+					class="rounded-lg border border-black/30 bg-black/60 px-4 py-3 shadow-md shadow-black/70"
+				>
+					<div class="mb-2 text-xs font-black tracking-wider uppercase opacity-60">
+						Score Breakdown
+					</div>
+					<table class="w-full text-sm">
+						<thead>
+							<tr class="border-b border-white/20 text-xs font-black uppercase opacity-60">
+								<th class="pb-1 text-left font-semibold"></th>
+								<th class="pb-1 text-center font-semibold">
+									<span class="alliance-blue-text font-black">Blue</span>
+								</th>
+								<th class="pb-1 text-center font-semibold">
+									<span class="alliance-red-text font-black">Red</span>
+								</th>
+							</tr>
+						</thead>
+						<tbody class="divide-y divide-white/10">
+							{#each [
+								['Auto Fuel', match.blueBreakdown.autoFuelPoints, match.redBreakdown.autoFuelPoints],
+								['Auto Tower', match.blueBreakdown.autoTowerPoints, match.redBreakdown.autoTowerPoints],
+								['Teleop Fuel', match.blueBreakdown.teleopFuelPoints, match.redBreakdown.teleopFuelPoints],
+								['Teleop Tower', match.blueBreakdown.teleopTowerPoints, match.redBreakdown.teleopTowerPoints]
+							] as [label, blue, red]}
+								<tr>
+									<td class="py-1 pr-2 text-left text-xs font-semibold opacity-75">{label}</td>
+									<td class="py-1 text-center font-black">{blue}</td>
+									<td class="py-1 text-center font-black">{red}</td>
+								</tr>
+							{/each}
+							<tr class="border-t-2 border-white/40">
+								<td class="pt-1.5 pr-2 text-left text-xs font-black uppercase tracking-wide"
+									>Total</td
+								>
+								<td class="pt-1.5 text-center text-xl font-black">{match.blueScore}</td>
+								<td class="pt-1.5 text-center text-xl font-black">{match.redScore}</td>
+							</tr>
+						</tbody>
+					</table>
+				</div>
+
+				<!-- Ranking points -->
+				<div
+					class="rounded-lg border border-black/30 bg-black/60 px-4 py-3 shadow-md shadow-black/70"
+				>
+					<div class="mb-2 text-xs font-black tracking-wider uppercase opacity-60">
+						Ranking Points
+					</div>
+					<table class="w-full text-sm">
+						<thead>
+							<tr class="border-b border-white/20 text-xs uppercase opacity-60">
+								<th class="pb-1 text-left font-semibold"></th>
+								<th class="pb-1 text-center font-semibold">
+									<span class="alliance-blue-text font-black">Blue</span>
+								</th>
+								<th class="pb-1 text-center font-semibold">
+									<span class="alliance-red-text font-black">Red</span>
+								</th>
+							</tr>
+						</thead>
+						<tbody class="divide-y divide-white/10">
+							{#each [
+								['Energized', match.blueRankingPoints.energized, match.redRankingPoints.energized],
+								['Supercharged', match.blueRankingPoints.supercharged, match.redRankingPoints.supercharged],
+								['Traversal', match.blueRankingPoints.traversal, match.redRankingPoints.traversal]
+							] as [label, blue, red]}
+								<tr>
+									<td class="py-1 pr-2 text-left text-xs font-semibold opacity-75">{label}</td>
+									<td class="py-1 text-center font-black {blue ? 'text-white-glow' : 'opacity-30'}"
+										>{blue ? '✓' : '✗'}</td
+									>
+									<td class="py-1 text-center font-black {red ? 'text-white-glow' : 'opacity-30'}"
+										>{red ? '✓' : '✗'}</td
+									>
+								</tr>
+							{/each}
+							<tr>
+								<td class="py-1 pr-2 text-left text-xs font-semibold opacity-75">Win / Tie</td>
+								<td class="py-1 text-center font-black">{match.blueRankingPoints.winTie}</td>
+								<td class="py-1 text-center font-black">{match.redRankingPoints.winTie}</td>
+							</tr>
+							<tr class="border-t-2 border-white/40">
+								<td class="pt-1.5 pr-2 text-left text-xs font-black uppercase tracking-wide"
+									>Total RP</td
+								>
+								<td class="pt-1.5 text-center text-xl font-black">{match.blueRankingPoints.total}</td>
+								<td class="pt-1.5 text-center text-xl font-black">{match.redRankingPoints.total}</td>
+							</tr>
+						</tbody>
+					</table>
+				</div>
+			</div>
+		{/if}
+	</div>
+{/snippet}
+
+<div class="relative h-screen w-full overflow-hidden bg-transparent text-white">
+	{#key audienceView}
+		<div
+			in:fly={{ y: 40, duration: 500, opacity: 1 }}
+			out:fly={{ y: -40, duration: 300, opacity: 1 }}
+			class="pointer-events-none absolute inset-0"
+		>
+			{#if audienceView === 'live'}
+				<!--
+					Live scoreboard overlay: team numbers, timer, scores, ranking points progress.
+				-->
+				<div class="absolute top-4 left-1/2 w-[95%] -translate-x-1/2 md:w-[88%]">
+					<div class="relative">
+						<!-- Blue hub active indicator (left of panel, arrow pointing toward left screen edge) -->
+						{@render hubIndicator('left', blueHubActive)}
+						<!-- Red hub active indicator (right of panel, arrow pointing toward right screen edge) -->
+						{@render hubIndicator('right', redHubActive)}
+						<div
+							class="grid grid-cols-[1fr_1fr_1fr_1fr_1fr_1fr_1fr_1fr_1fr] overflow-hidden rounded-lg border border-black/30 shadow-md shadow-black/70"
+						>
+							<!-- Blue Team 1 -->
+							{@render allianceTeamCell(blueTeams[0], !!blueStations[0]?.robotLinked, 'blue', false)}
+							<!-- Blue Team 2 (middle) -->
+							{@render allianceTeamCell(blueTeams[1], !!blueStations[1]?.robotLinked, 'blue', true)}
+							<!-- Blue Team 3 -->
+							{@render allianceTeamCell(blueTeams[2], !!blueStations[2]?.robotLinked, 'blue', false)}
+							<!-- Blue Score -->
+							<div
+								class="alliance-blue-bg flex items-center justify-center px-5 text-4xl font-black md:text-6xl"
+							>
+								{blueScore}
+							</div>
+							<!-- Timer -->
+							<div class="flex flex-col items-center justify-center bg-white px-6 py-3 text-black">
+								<div class="text-4xl font-black md:text-6xl">
+									{matchState?.phase === 'AutoToTeleopTransition'
+										? '0:00'
+										: matchState
+											? formatTime(matchState.timeRemaining)
+											: '0:00'}
+								</div>
+								<div
+									class="-mt-1 text-sm font-black md:text-2xl {teleopPeriodIndicator
+										? ''
+										: 'invisible'}"
+								>
+									{teleopPeriodIndicator ?? '\u00a0'}
+								</div>
+							</div>
+							<!-- Red Score -->
+							<div
+								class="alliance-red-bg flex items-center justify-center px-5 text-4xl font-black md:text-6xl"
+							>
+								{redScore}
+							</div>
+							<!-- Red Team 1 -->
+							{@render allianceTeamCell(redTeams[0], !!redStations[0]?.robotLinked, 'red', false)}
+							<!-- Red Team 2 (middle) -->
+							{@render allianceTeamCell(redTeams[1], !!redStations[1]?.robotLinked, 'red', true)}
+							<!-- Red Team 3 -->
+							{@render allianceTeamCell(redTeams[2], !!redStations[2]?.robotLinked, 'red', false)}
+						</div>
+					</div>
+					<div class="mt-2 grid grid-cols-1 gap-2 md:grid-cols-2">
+						{@render rankingProgress('blue', blueFuelCombined, blueTowerCombined)}
+						{@render rankingProgress('red', redFuelCombined, redTowerCombined)}
+					</div>
+				</div>
+			{:else if audienceView === 'matchResults'}
+				<!--
+					Match results view: committed scores, breakdown, and ranking points.
+				-->
+				{@render matchResultsView(lastCommittedMatch)}
+			{:else}
+				<!--
+					Fallback for future views (e.g. prematch, break screen).
+					Add {:else if audienceView === 'prematch'} blocks above this one.
+				-->
+			{/if}
+		</div>
+	{/key}
 </div>

@@ -2,10 +2,13 @@ using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using Microsoft.Extensions.FileProviders;
 using PossumFMS.Core.Arena;
+using PossumFMS.Core.Database;
+using PossumFMS.Core.Display;
 using PossumFMS.Core.DriverStation;
 using PossumFMS.Core.FieldHardware;
 using PossumFMS.Core.Frontend;
 using PossumFMS.Core.Network;
+using PossumFMS.Core.TheBlueAlliance;
 
 // Check that this is the only instance of PossumFMS.Core running
 const string SingleInstanceMutexName = "PossumFMS.Core.Singleton";
@@ -51,6 +54,23 @@ builder.Services.AddHostedService<RecentLogBroadcaster>();
 // Match-state broadcaster
 builder.Services.AddSingleton<MatchStateBroadcaster>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<MatchStateBroadcaster>());
+
+// JSON file database (loaded into memory on startup)
+builder.Services.AddSingleton<DatabaseService>();
+
+// Audience display state manager
+builder.Services.AddSingleton<DisplayManager>();
+
+// The Blue Alliance HTTP client
+builder.Services.AddHttpClient("TBA", (sp, client) =>
+{
+    var config = sp.GetRequiredService<IConfiguration>();
+    var apiKey = config["TheBlueAlliance:ApiKey"] ?? "";
+    client.BaseAddress = new Uri("https://www.thebluealliance.com/api/v3/");
+    client.DefaultRequestHeaders.Add("X-TBA-Auth-Key", apiKey);
+    client.Timeout = TimeSpan.FromSeconds(15);
+});
+builder.Services.AddSingleton<TbaClient>();
 
 // Allow any origin since this will be only ever be on private local networks
 builder.Services.AddCors(options =>

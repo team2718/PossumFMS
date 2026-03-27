@@ -298,6 +298,62 @@
 	let autoDurationSecondsInput = $state('20');
 	let autoToTeleopTransitionDurationSecondsInput = $state('3');
 	let teleopDurationSecondsInput = $state('140');
+
+	// TBA team import
+	let tbaEventKeyInput = $state('');
+	let isLoadingTeams = $state(false);
+	let teamLoadResult = $state<{ success: true; message: string } | { success: false; message: string } | null>(null);
+
+	// Commit match results
+	let isCommittingResults = $state(false);
+	let commitResultsMessage = $state<{ success: boolean; text: string } | null>(null);
+
+	// Audience view helpers
+	const audienceView = $derived(matchState?.audienceView ?? 'live');
+	const isShowingMatchResults = $derived(audienceView === 'matchResults');
+
+	async function loadTeamsFromTba() {
+		teamLoadResult = null;
+		isLoadingTeams = true;
+		try {
+			const result = await fms.loadTeamsFromTba(tbaEventKeyInput.trim());
+			teamLoadResult = {
+				success: true,
+				message: `Loaded ${result.newTeamsCount} teams from ${tbaEventKeyInput.trim()}. Database now has ${result.totalTeamsCount} teams total.`
+			};
+		} catch (error) {
+			teamLoadResult = {
+				success: false,
+				message: error instanceof Error ? error.message : 'Failed to load teams.'
+			};
+		} finally {
+			isLoadingTeams = false;
+		}
+	}
+
+	async function commitMatchResults() {
+		commitResultsMessage = null;
+		isCommittingResults = true;
+		try {
+			await fms.commitMatchResults();
+			commitResultsMessage = { success: true, text: 'Match results committed.' };
+		} catch (error) {
+			commitResultsMessage = {
+				success: false,
+				text: error instanceof Error ? error.message : 'Failed to commit results.'
+			};
+		} finally {
+			isCommittingResults = false;
+		}
+	}
+
+	async function toggleAudienceView() {
+		try {
+			await fms.setAudienceView(isShowingMatchResults ? 'live' : 'matchResults');
+		} catch (error) {
+			// silently ignore
+		}
+	}
 	let hasInitializedMatchDurations = $state(false);
 	let logSearch = $state('');
 	const logSeverityOptions: LogSeverity[] = [
@@ -1104,6 +1160,26 @@
 				>
 					Clear
 				</button>
+				<div class="flex flex-col items-center gap-1">
+					<button
+						onclick={commitMatchResults}
+						disabled={phase !== 'PostMatch' || isCommittingResults}
+						class="h-14 min-w-44 rounded px-5 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-40 {phase ===
+						'PostMatch'
+							? 'bg-indigo-700 hover:bg-indigo-600'
+							: 'bg-indigo-950'}"
+					>
+						{isCommittingResults ? 'Committing…' : 'Commit Results'}
+					</button>
+				</div>
+				<button
+					onclick={toggleAudienceView}
+					class="h-14 min-w-44 rounded px-5 text-sm font-black text-white {isShowingMatchResults
+						? 'bg-teal-700 hover:bg-teal-600'
+						: 'bg-slate-600 hover:bg-slate-500'}"
+				>
+					{isShowingMatchResults ? 'Show Live' : 'Show Match Results'}
+				</button>
 				{#if matchState?.arenaEstop}
 					<button
 						class="h-14 min-w-44 rounded bg-[repeating-linear-gradient(-45deg,#e7ca4f_0px,#e7ca4f_8px,#9a9a9a_8px,#9a9a9a_16px)] px-5 text-sm font-black text-black"
@@ -1155,6 +1231,14 @@
 					class="mr-6 pb-2 {activeTab === 'options'
 						? 'brand-secondary-border brand-secondary-text border-b-2 font-semibold'
 						: 'text-slate-500 hover:text-slate-800'}">Options</button
+				>
+				<button
+					onclick={() => {
+						activeTab = 'event';
+					}}
+					class="mr-6 pb-2 {activeTab === 'event'
+						? 'brand-secondary-border brand-secondary-text border-b-2 font-semibold'
+						: 'text-slate-500 hover:text-slate-800'}">Event</button
 				>
 				<button
 					onclick={() => {
@@ -1375,7 +1459,51 @@
 						</div>
 					{/if}
 				</div>
-			{:else if activeTab === 'log'}
+			{:else if activeTab === 'event'}
+			<div class="p-4">
+				<div class="max-w-lg">
+					<div class="text-sm font-bold text-slate-900">Load Teams from The Blue Alliance</div>
+					<div class="mt-1 text-xs text-slate-600">
+						Enter an event key (e.g. <span class="font-mono">2026nyny</span>) to fetch all teams at
+						that event and their avatars. You can run this multiple times with different event keys —
+						teams will accumulate in the local database.
+					</div>
+					<div class="mt-3 flex items-end gap-2">
+						<label class="flex-1 text-xs font-semibold text-slate-700">
+							<span>Event Key</span>
+							<input
+								type="text"
+								bind:value={tbaEventKeyInput}
+								placeholder="e.g. 2026nyny"
+								disabled={isLoadingTeams}
+								class="mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2 font-mono text-sm disabled:opacity-50"
+							/>
+						</label>
+						<button
+							onclick={loadTeamsFromTba}
+							disabled={isLoadingTeams || !tbaEventKeyInput.trim()}
+							class="brand-secondary-bg rounded px-4 py-2 text-sm font-bold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+						>
+							{isLoadingTeams ? 'Loading…' : 'Load Teams'}
+						</button>
+					</div>
+					{#if isLoadingTeams}
+						<div class="mt-2 text-xs text-slate-500">
+							Fetching teams and avatars — this may take 10–30 seconds…
+						</div>
+					{/if}
+					{#if teamLoadResult}
+						<div
+							class="mt-3 rounded border px-3 py-2 text-xs font-semibold {teamLoadResult.success
+								? 'border-emerald-300 bg-emerald-50 text-emerald-800'
+								: 'border-rose-300 bg-rose-50 text-rose-700'}"
+						>
+							{teamLoadResult.message}
+						</div>
+					{/if}
+				</div>
+			</div>
+		{:else if activeTab === 'log'}
 				<div class="p-3">
 					<div
 						class="mb-3 flex flex-wrap items-end justify-between gap-3 rounded border border-slate-200 bg-slate-50 p-3"
