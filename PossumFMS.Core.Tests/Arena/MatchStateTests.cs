@@ -16,6 +16,7 @@ public sealed class MatchStateTests
         Assert.Equal(0, score.AutoTowerPoints);
         Assert.Equal(0, score.TeleopFuelPoints);
         Assert.Equal(0, score.TeleopTowerPoints);
+        Assert.Equal(0, score.PenaltyPoints);
         Assert.Equal(0, score.Total);
     }
 
@@ -28,9 +29,10 @@ public sealed class MatchStateTests
             AutoTowerPoints  = 10,
             TeleopFuelPoints = 15,
             TeleopTowerPoints = 20,
+            PenaltyPoints = 25,
         };
 
-        Assert.Equal(50, score.Total);
+        Assert.Equal(75, score.Total);
     }
 
     [Fact]
@@ -50,16 +52,33 @@ public sealed class MatchStateTests
         Assert.Equal(0, score.AutoTowerPoints);
         Assert.Equal(0, score.TeleopFuelPoints);
         Assert.Equal(0, score.TeleopTowerPoints);
+        Assert.Equal(0, score.PenaltyPoints);
         Assert.Equal(0, score.Total);
     }
 
     [Fact]
     public void AllianceScore_TotalIsZeroAfterReset()
     {
-        var score = new AllianceScore { AutoFuelPoints = 100, TeleopFuelPoints = 200 };
+        var score = new AllianceScore { AutoFuelPoints = 100, TeleopFuelPoints = 200, PenaltyPoints = 15 };
         score.Reset();
 
         Assert.Equal(0, score.Total);
+    }
+
+    [Fact]
+    public void ViolationRules_MinorAndMajorFoul_AwardExpectedPoints()
+    {
+        Assert.Equal(5, ViolationRules.GetAwardedPoints(ViolationType.MinorFoul));
+        Assert.Equal(15, ViolationRules.GetAwardedPoints(ViolationType.MajorFoul));
+    }
+
+    [Fact]
+    public void ViolationRules_OnlyMinorAndMajorFoul_AreImplemented()
+    {
+        Assert.True(ViolationRules.IsImplementedFoul(ViolationType.MinorFoul));
+        Assert.True(ViolationRules.IsImplementedFoul(ViolationType.MajorFoul));
+        Assert.False(ViolationRules.IsImplementedFoul(ViolationType.YellowCard));
+        Assert.False(ViolationRules.IsImplementedFoul(ViolationType.RedCard));
     }
 
     // ── AllianceStations ───────────────────────────────────────────────────────

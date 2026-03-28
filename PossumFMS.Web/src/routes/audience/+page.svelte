@@ -493,6 +493,24 @@
 									>
 								</tr>
 							{/each}
+							<tr class="border-t-2 border-neutral-400 bg-neutral-400">
+								<th
+									colspan="3"
+									class="py-1.5 text-center text-xl font-black uppercase tracking-wider"
+									>Penalty</th
+								>
+							</tr>
+							<tr class="border-t border-neutral-300 bg-neutral-200">
+								<td class="w-2/5 py-2 pr-4 text-right text-xl font-black md:text-5xl"
+									>{lBreakdown.penaltyPoints}</td
+								>
+								<td class="py-2 text-center text-xl font-black uppercase tracking-wider"
+									>Points</td
+								>
+								<td class="w-2/5 py-2 pl-4 text-left text-xl font-black md:text-5xl"
+									>{rBreakdown.penaltyPoints}</td
+								>
+							</tr>
 						</tbody>
 					</table>
 				</div>

@@ -177,6 +177,42 @@ public sealed class FmsHub(
         await BroadcastMatchState();
     }
 
+    public async Task AddViolation(int stationIndex, string rule)
+    {
+        EnsureViolationEditingAllowed();
+
+        if (!ViolationRules.IsImplementedRule(rule))
+            throw new HubException($"Unknown or unsupported rule '{rule}'.");
+
+        var station = GetStationByIndex(stationIndex);
+        var teamNumber = dsManager[station].TeamNumber;
+
+        logger.LogInformation(
+            "Add violation by {Client}: Station={Station}, Team={Team}, Rule={Rule}.",
+            Context.ConnectionId,
+            station,
+            teamNumber,
+            rule);
+
+        gameLogic.AddViolation(station, teamNumber, rule);
+        await BroadcastMatchState();
+    }
+
+    public async Task RemoveViolation(string violationId)
+    {
+        EnsureViolationEditingAllowed();
+
+        if (!Guid.TryParse(violationId, out var parsedId))
+            throw new HubException("violationId must be a valid GUID.");
+
+        logger.LogInformation("Remove violation by {Client}: ViolationId={ViolationId}.", Context.ConnectionId, parsedId);
+
+        if (!gameLogic.RemoveViolation(parsedId))
+            throw new HubException("Violation not found.");
+
+        await BroadcastMatchState();
+    }
+
     // ── Match control ──────────────────────────────────────────────────────────
 
     public async Task StartPreMatch()
@@ -378,6 +414,7 @@ public sealed class FmsHub(
                 AutoTowerPoints  = gameLogic.RedScore.AutoTowerPoints,
                 TeleopFuelPoints = gameLogic.RedScore.TeleopFuelPoints,
                 TeleopTowerPoints = gameLogic.RedScore.TeleopTowerPoints,
+                PenaltyPoints    = gameLogic.RedScore.PenaltyPoints,
                 Total            = gameLogic.RedScore.Total,
             },
             BlueBreakdown = new MatchScoreBreakdown
@@ -386,10 +423,26 @@ public sealed class FmsHub(
                 AutoTowerPoints  = gameLogic.BlueScore.AutoTowerPoints,
                 TeleopFuelPoints = gameLogic.BlueScore.TeleopFuelPoints,
                 TeleopTowerPoints = gameLogic.BlueScore.TeleopTowerPoints,
+                PenaltyPoints    = gameLogic.BlueScore.PenaltyPoints,
                 Total            = gameLogic.BlueScore.Total,
             },
             RedRankingPoints  = BuildRp(redFuelCombined,  redTowerCombined,  redWins,  tied),
             BlueRankingPoints = BuildRp(blueFuelCombined, blueTowerCombined, blueWins, tied),
+            Violations = gameLogic.Violations
+                .Select(violation => new MatchViolationRecord
+                {
+                    Id = violation.Id.ToString(),
+                    Alliance = violation.PenalizedAlliance.ToString(),
+                    Position = (int)violation.Station.Position,
+                    TeamNumber = violation.TeamNumber,
+                    Type = violation.Type.ToString(),
+                    Phase = violation.Phase.ToString(),
+                    TimeRemainingSeconds = violation.TimeRemainingSeconds,
+                    RecordedAt = violation.RecordedAt,
+                    AwardedPoints = violation.AwardedPoints,
+                    AwardedToAlliance = violation.AwardedToAlliance.ToString(),
+                })
+                .ToArray(),
         };
 
         databaseService.SaveMatchResult(result);
@@ -446,6 +499,14 @@ public sealed class FmsHub(
         Clients.Caller.SendAsync("RecentLogs", recentLogStore.GetEntries());
 
     private Task BroadcastMatchState() => broadcaster.BroadcastAsync();
+
+    private void EnsureViolationEditingAllowed()
+    {
+        if (arena.Phase is MatchPhase.Auto or MatchPhase.AutoToTeleopTransition or MatchPhase.Teleop or MatchPhase.PostMatch)
+            return;
+
+        throw new HubException("Violations can only be edited during a match or while reviewing PostMatch results.");
+    }
 
     private static AllianceStation GetStationByIndex(int stationIndex)
     {

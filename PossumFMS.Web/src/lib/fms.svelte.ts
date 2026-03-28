@@ -92,6 +92,7 @@ export interface MatchState {
 	currentTeleopPeriod: string; // e.g. "TransitionShift", "Shift1", "Shift2", "Shift3", "Shift4", "EndGame", "NotStarted"
 	redBreakdown: AllianceScoreBreakdown;
 	blueBreakdown: AllianceScoreBreakdown;
+	violations: MatchViolation[];
 	stationClimbs: StationClimbState[];
 	rankingPoints: { red: RankingPointBreakdown; blue: RankingPointBreakdown };
 	hubActive: { red: boolean; blue: boolean };
@@ -110,15 +111,32 @@ export interface TeamAssignment {
 }
 
 export type TowerEndgameLevel = 'None' | 'L1' | 'L2' | 'L3';
+export type ViolationType = 'MinorFoul' | 'MajorFoul' | 'YellowCard' | 'RedCard';
 
 export interface AllianceScoreBreakdown {
 	autoFuelPoints: number;
 	autoTowerPoints: number;
 	teleopFuelPoints: number;
 	teleopTowerPoints: number;
+	penaltyPoints: number;
 	fuelCombined: number;
 	towerCombined: number;
 	total: number;
+}
+
+export interface MatchViolation {
+	id: string;
+	stationIndex: number;
+	alliance: 'Red' | 'Blue';
+	position: number;
+	teamNumber: number;
+	rule: string;
+	type: ViolationType;
+	phase: string;
+	timeRemainingSeconds: number;
+	recordedAt: string;
+	awardedPoints: number;
+	awardedToAlliance: 'Red' | 'Blue';
 }
 
 export interface StationClimbState {
@@ -139,6 +157,7 @@ export interface MatchScoreBreakdown {
 	autoTowerPoints: number;
 	teleopFuelPoints: number;
 	teleopTowerPoints: number;
+	penaltyPoints: number;
 	total: number;
 }
 
@@ -167,6 +186,7 @@ export interface MatchResultRecord {
 	blueBreakdown: MatchScoreBreakdown;
 	redRankingPoints: MatchResultRankingPoints;
 	blueRankingPoints: MatchResultRankingPoints;
+	violations: MatchViolation[];
 }
 
 export type LogSeverity =
@@ -333,6 +353,14 @@ class FmsConnection {
 	setEndgameTowerLevel(stationIndex: number, level: TowerEndgameLevel) {
 		const numericLevel = level === 'L1' ? 1 : level === 'L2' ? 2 : level === 'L3' ? 3 : 0;
 		return this.invoke('SetEndgameTowerLevel', stationIndex, numericLevel);
+	}
+	/** Add a referee violation to a specific station. */
+	addViolation(stationIndex: number, rule: string) {
+		return this.invoke('AddViolation', stationIndex, rule);
+	}
+	/** Remove a previously recorded referee violation by id. */
+	removeViolation(violationId: string) {
+		return this.invoke('RemoveViolation', violationId);
 	}
 	/** Load teams from a specific TBA event and merge into the local database. */
 	loadTeamsFromTba(eventKey: string): Promise<{ newTeamsCount: number; totalTeamsCount: number }> {

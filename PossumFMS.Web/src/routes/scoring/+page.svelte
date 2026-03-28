@@ -211,6 +211,7 @@
 		>
 			<div>Fuel Combined: <span class="font-bold">{breakdown?.fuelCombined ?? 0}</span></div>
 			<div>Tower Combined: <span class="font-bold">{breakdown?.towerCombined ?? 0}</span></div>
+			<div>Penalty Points: <span class="font-bold">{breakdown?.penaltyPoints ?? 0}</span></div>
 			{@render rankingPointsSummary(alliance)}
 		</div>
 	</div>

@@ -11,11 +11,13 @@ public sealed class GameLogic
     private AllianceColor? _shiftAutoWinnerAlliance;
     private readonly bool[] _autoTowerClimbed = new bool[AllianceStations.All.Count];
     private readonly TowerEndgameLevel[] _endgameTowerLevels = new TowerEndgameLevel[AllianceStations.All.Count];
+    private readonly List<MatchViolation> _violations = [];
 
     public AllianceColor? ShiftAutoWinnerAlliance => _shiftAutoWinnerAlliance;
 
     public AllianceScore RedScore  { get; } = new();
     public AllianceScore BlueScore { get; } = new();
+    public IReadOnlyList<MatchViolation> Violations => _violations;
     public event Action? ScoreChanged;
 
     public GameLogic(Arena arena)
@@ -209,6 +211,7 @@ public sealed class GameLogic
                 _shiftAutoWinnerAlliance = null;
                 Array.Fill(_autoTowerClimbed, false);
                 Array.Fill(_endgameTowerLevels, TowerEndgameLevel.None);
+                _violations.Clear();
                 _arena.SetGameData(string.Empty);
                 ScoreChanged?.Invoke();
                 break;
@@ -277,6 +280,37 @@ public sealed class GameLogic
         RecalculateTowerPoints(station.Color);
         ScoreChanged?.Invoke();
     }
+    public MatchViolation AddViolation(AllianceStation station, int teamNumber, string rule)
+    {
+        var type = ViolationRules.GetViolationTypeFromRule(rule);
+
+        var violation = new MatchViolation
+        {
+            Station = station,
+            TeamNumber = teamNumber,
+            Rule = rule,
+            Type = type,
+            Phase = _arena.Phase,
+            TimeRemainingSeconds = Math.Max(0, _arena.TimeRemaining.TotalSeconds),
+            RecordedAt = DateTimeOffset.UtcNow,
+        };
+
+        _violations.Add(violation);
+        RecalculatePenaltyPoints();
+        ScoreChanged?.Invoke();
+        return violation;
+    }
+
+    public bool RemoveViolation(Guid violationId)
+    {
+        var removed = _violations.RemoveAll(v => v.Id == violationId) > 0;
+        if (!removed)
+            return false;
+
+        RecalculatePenaltyPoints();
+        ScoreChanged?.Invoke();
+        return true;
+    }
 
     private void RecalculateTowerPoints(AllianceColor alliance)
     {
@@ -304,6 +338,19 @@ public sealed class GameLogic
 
         score.AutoTowerPoints = autoTower;
         score.TeleopTowerPoints = teleopTower;
+    }
+    private void RecalculatePenaltyPoints()
+    {
+        RedScore.PenaltyPoints = 0;
+        BlueScore.PenaltyPoints = 0;
+
+        foreach (var violation in _violations)
+        {
+            if (violation.AwardedToAlliance == AllianceColor.Red)
+                RedScore.PenaltyPoints += violation.AwardedPoints;
+            else
+                BlueScore.PenaltyPoints += violation.AwardedPoints;
+        }
     }
 
     private static int GetStationIndex(AllianceStation station)

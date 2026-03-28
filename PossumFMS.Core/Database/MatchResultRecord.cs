@@ -38,6 +38,8 @@ public sealed record MatchResultRecord
 
     public MatchRankingPoints RedRankingPoints { get; init; } = new();
     public MatchRankingPoints BlueRankingPoints { get; init; } = new();
+
+    public MatchViolationRecord[] Violations { get; init; } = [];
 }
 
 public sealed record MatchScoreBreakdown
@@ -46,6 +48,7 @@ public sealed record MatchScoreBreakdown
     public int AutoTowerPoints { get; init; }
     public int TeleopFuelPoints { get; init; }
     public int TeleopTowerPoints { get; init; }
+    public int PenaltyPoints { get; init; }
     public int Total { get; init; }
 }
 
@@ -56,4 +59,19 @@ public sealed record MatchRankingPoints
     public bool Traversal { get; init; }
     public int WinTie { get; init; }
     public int Total { get; init; }
+}
+
+public sealed record MatchViolationRecord
+{
+    public string Id { get; init; } = string.Empty;
+    public string Alliance { get; init; } = string.Empty;
+    public int Position { get; init; }
+    public int TeamNumber { get; init; }
+    public string Rule { get; init; } = string.Empty;
+    public string Type { get; init; } = string.Empty;
+    public string Phase { get; init; } = string.Empty;
+    public double TimeRemainingSeconds { get; init; }
+    public DateTimeOffset RecordedAt { get; init; }
+    public int AwardedPoints { get; init; }
+    public string AwardedToAlliance { get; init; } = string.Empty;
 }

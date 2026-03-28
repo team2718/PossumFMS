@@ -261,6 +261,76 @@ public sealed class GameLogicTests
     }
 
     [Fact]
+    public void AddViolation_MinorFoul_AwardsPointsToOpposingAlliance()
+    {
+        var (arena, logic) = Create();
+        arena.StartPreMatch();
+        arena.StartMatch();
+
+        var violation = logic.AddViolation(AllianceStations.Red2, 254, "G415");
+
+        Assert.Equal(5, logic.BlueScore.PenaltyPoints);
+        Assert.Equal(0, logic.RedScore.PenaltyPoints);
+        Assert.Single(logic.Violations);
+        Assert.Equal(254, violation.TeamNumber);
+        Assert.Equal(MatchPhase.Auto, violation.Phase);
+        Assert.InRange(violation.TimeRemainingSeconds, 19.0, 20.0);
+    }
+
+    [Fact]
+    public void AddViolation_MajorFoul_AffectsTotalScore()
+    {
+        var (arena, logic) = Create();
+        arena.StartPreMatch();
+        arena.StartMatch();
+
+        logic.AdjustFuelPoints(AllianceColor.Red, isAuto: true, delta: 10);
+        logic.AddViolation(AllianceStations.Red1, 111, "G420");
+
+        Assert.Equal(10, logic.RedScore.Total);
+        Assert.Equal(15, logic.BlueScore.Total);
+    }
+
+    [Fact]
+    public void RemoveViolation_RemovesPenaltyPoints()
+    {
+        var (arena, logic) = Create();
+        arena.StartPreMatch();
+        arena.StartMatch();
+
+        var violation = logic.AddViolation(AllianceStations.Blue3, 999, "G420");
+
+        Assert.True(logic.RemoveViolation(violation.Id));
+        Assert.Empty(logic.Violations);
+        Assert.Equal(0, logic.RedScore.PenaltyPoints);
+        Assert.Equal(0, logic.BlueScore.PenaltyPoints);
+    }
+
+    [Fact]
+    public void RemoveViolation_UnknownId_ReturnsFalse()
+    {
+        var (_, logic) = Create();
+
+        Assert.False(logic.RemoveViolation(Guid.NewGuid()));
+    }
+
+    [Fact]
+    public void Violations_ResetWhenArenaReturnsToIdle()
+    {
+        var (arena, logic) = Create();
+        arena.StartPreMatch();
+        arena.StartMatch();
+
+        logic.AddViolation(AllianceStations.Red3, 604, "G415");
+        arena.AbortMatch();
+        arena.ClearMatch();
+
+        Assert.Empty(logic.Violations);
+        Assert.Equal(0, logic.RedScore.PenaltyPoints);
+        Assert.Equal(0, logic.BlueScore.PenaltyPoints);
+    }
+
+    [Fact]
     public void AdjustFuelPoints_ZeroDelta_IsNoOp()
     {
         var (_, logic) = Create();

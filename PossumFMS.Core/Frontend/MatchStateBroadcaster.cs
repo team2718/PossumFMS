@@ -60,127 +60,132 @@ public sealed class MatchStateBroadcaster(
 
         return new
         {
-        phase         = arena.Phase.ToString(),
-        freePracticeEnabled = arena.FreePracticeEnabled,
-        matchType     = arena.MatchType.ToString(),
-        matchNumber   = arena.MatchNumber,
-        matchId       = arena.MatchId,
-        matchDurations = new
-        {
-            autoSeconds = arena.AutoDuration.TotalSeconds,
-            autoToTeleopTransitionSeconds = arena.AutoToTeleopTransitionDuration.TotalSeconds,
-            teleopSeconds = arena.TeleopDuration.TotalSeconds,
-        },
-        timeRemaining = arena.TimeRemaining.TotalSeconds,
-        arenaEstop    = arena.ArenaEstop,
-        wasAborted    = arena.WasAborted,
-        redScore      = gameLogic.RedScore.Total,
-        blueScore     = gameLogic.BlueScore.Total,
-        currentTeleopPeriod = gameLogic.CurrentTeleopPeriod.ToString(),
-        redBreakdown  = new
-        {
-            autoFuelPoints = gameLogic.RedScore.AutoFuelPoints,
-            autoTowerPoints = gameLogic.RedScore.AutoTowerPoints,
-            teleopFuelPoints = gameLogic.RedScore.TeleopFuelPoints,
-            teleopTowerPoints = gameLogic.RedScore.TeleopTowerPoints,
-            fuelCombined = redFuelCombined,
-            towerCombined = redTowerCombined,
-            total = gameLogic.RedScore.Total,
-        },
-        blueBreakdown = new
-        {
-            autoFuelPoints = gameLogic.BlueScore.AutoFuelPoints,
-            autoTowerPoints = gameLogic.BlueScore.AutoTowerPoints,
-            teleopFuelPoints = gameLogic.BlueScore.TeleopFuelPoints,
-            teleopTowerPoints = gameLogic.BlueScore.TeleopTowerPoints,
-            fuelCombined = blueFuelCombined,
-            towerCombined = blueTowerCombined,
-            total = gameLogic.BlueScore.Total,
-        },
-        stationClimbs = AllianceStations.All.Select(s => new
-        {
-            autoClimbed = gameLogic.GetAutoTowerClimbed(s),
-            endgameLevel = gameLogic.GetEndgameTowerLevel(s).ToString(),
-        }),
-        rankingPoints = new
-        {
-            red = BuildRankingPointBreakdown(redFuelCombined, redTowerCombined, redWins, tie),
-            blue = BuildRankingPointBreakdown(blueFuelCombined, blueTowerCombined, blueWins, tie),
-        },
-        hubActive = new
-        {
-            red  = gameLogic.IsHubStrictlyActive(AllianceColor.Red),
-            blue = gameLogic.IsHubStrictlyActive(AllianceColor.Blue),
-        },
-        loopTiming    = new
-        {
-            currentMs = loopTiming.CurrentMs,
-            maxMs30s  = loopTiming.MaxMs30s,
-        },
-        accessPoint   = new { status = apManager.ApStatus },
-        audienceView  = displayManager.AudienceView,
-        allianceOrder = displayManager.AllianceOrder,
-        lastCommittedMatch = BuildLastCommittedMatchObject(displayManager.LastCommittedMatch),
-        stations      = AllianceStations.All.Select((s, i) =>
-        {
-            var ds   = dsManager[s];
-            var wifi = apManager.StationStatuses[i];
-            return new
+            phase = arena.Phase.ToString(),
+            freePracticeEnabled = arena.FreePracticeEnabled,
+            matchType = arena.MatchType.ToString(),
+            matchNumber = arena.MatchNumber,
+            matchId = arena.MatchId,
+            matchDurations = new
             {
-                index         = i,
-                alliance      = s.Color.ToString(),
-                position      = (int)s.Position,
-                teamNumber    = ds.TeamNumber,
-                dsLinked      = ds.DsLinked,
-                robotLinked   = ds.RobotLinked,
-                radioLinked   = ds.RadioLinked,
-                rioLinked     = ds.RioLinked,
-                battery       = ds.BatteryVoltage,
-                tripTimeMs    = ds.DsRobotTripTimeMs,
-                missedPackets = ds.MissedPacketCount,
-                secondsSinceLastRobotLink = ds.SecondsSinceLastRobotLink,
-                estop         = ds.Estop,
-                astop         = ds.Astop,
-                bypassed      = ds.Bypassed,
-                wrongStation  = ds.WrongStation,
-                isReady       = ds.IsReady,
-                isReadyInMatch = ds.IsReadyInMatch,
-                avatarBase64  = teams.TryGetValue(ds.TeamNumber, out var teamRecord) ? teamRecord.AvatarBase64 : null,
-                wifi          = new
-                {
-                    radioLinked       = wifi.RadioLinked,
-                    bandwidthMbps     = wifi.BandwidthUsedMbps,
-                    rxRateMbps        = wifi.RxRateMbps,
-                    txRateMbps        = wifi.TxRateMbps,
-                    snr               = wifi.SignalNoiseRatio,
-                    connectionQuality = wifi.ConnectionQuality,
-                },
-            };
-        }),
-        fieldDevices  = fieldHardwareManager.Devices
-            .OrderBy(d => d.Type)
-            .ThenBy(d => d.Name, StringComparer.OrdinalIgnoreCase)
-            .Select(d => new
+                autoSeconds = arena.AutoDuration.TotalSeconds,
+                autoToTeleopTransitionSeconds = arena.AutoToTeleopTransitionDuration.TotalSeconds,
+                teleopSeconds = arena.TeleopDuration.TotalSeconds,
+            },
+            timeRemaining = arena.TimeRemaining.TotalSeconds,
+            arenaEstop = arena.ArenaEstop,
+            wasAborted = arena.WasAborted,
+            redScore = gameLogic.RedScore.Total,
+            blueScore = gameLogic.BlueScore.Total,
+            currentTeleopPeriod = gameLogic.CurrentTeleopPeriod.ToString(),
+            redBreakdown = new
             {
-                id = d.Id,
-                name = d.Name,
-                type = d.Type.ToString(),
-                status = d.Status.ToString(),
-                bypassed = d.Bypassed,
-                lastSeenUtc = d.LastSeen,
-                secondsSinceLastSeen = Math.Max(0, (nowUtc - d.LastSeen).TotalSeconds),
-                lastReplyTimeMs = d.LastReplyTimeMs,
-                replyTimeStats = new
-                {
-                    sampleCount = d.ReplySampleCount,
-                    minMs = d.ReplyTimeMinMs,
-                    maxMs = d.ReplyTimeMaxMs,
-                    avgMs = d.ReplyTimeAverageMs,
-                    stdDevMs = d.ReplyTimeStdDevMs,
-                },
-                heartbeat = BuildHeartbeatDiagnostics(d.LastHeartbeat),
+                autoFuelPoints = gameLogic.RedScore.AutoFuelPoints,
+                autoTowerPoints = gameLogic.RedScore.AutoTowerPoints,
+                teleopFuelPoints = gameLogic.RedScore.TeleopFuelPoints,
+                teleopTowerPoints = gameLogic.RedScore.TeleopTowerPoints,
+                penaltyPoints = gameLogic.RedScore.PenaltyPoints,
+                fuelCombined = redFuelCombined,
+                towerCombined = redTowerCombined,
+                total = gameLogic.RedScore.Total,
+            },
+            blueBreakdown = new
+            {
+                autoFuelPoints = gameLogic.BlueScore.AutoFuelPoints,
+                autoTowerPoints = gameLogic.BlueScore.AutoTowerPoints,
+                teleopFuelPoints = gameLogic.BlueScore.TeleopFuelPoints,
+                teleopTowerPoints = gameLogic.BlueScore.TeleopTowerPoints,
+                penaltyPoints = gameLogic.BlueScore.PenaltyPoints,
+                fuelCombined = blueFuelCombined,
+                towerCombined = blueTowerCombined,
+                total = gameLogic.BlueScore.Total,
+            },
+            violations = gameLogic.Violations
+                .OrderByDescending(v => v.RecordedAt)
+                .Select(BuildViolationObject),
+            stationClimbs = AllianceStations.All.Select(s => new
+            {
+                autoClimbed = gameLogic.GetAutoTowerClimbed(s),
+                endgameLevel = gameLogic.GetEndgameTowerLevel(s).ToString(),
             }),
-    };
+            rankingPoints = new
+            {
+                red = BuildRankingPointBreakdown(redFuelCombined, redTowerCombined, redWins, tie),
+                blue = BuildRankingPointBreakdown(blueFuelCombined, blueTowerCombined, blueWins, tie),
+            },
+            hubActive = new
+            {
+                red = gameLogic.IsHubStrictlyActive(AllianceColor.Red),
+                blue = gameLogic.IsHubStrictlyActive(AllianceColor.Blue),
+            },
+            loopTiming = new
+            {
+                currentMs = loopTiming.CurrentMs,
+                maxMs30s = loopTiming.MaxMs30s,
+            },
+            accessPoint = new { status = apManager.ApStatus },
+            audienceView = displayManager.AudienceView,
+            allianceOrder = displayManager.AllianceOrder,
+            lastCommittedMatch = BuildLastCommittedMatchObject(displayManager.LastCommittedMatch),
+            stations = AllianceStations.All.Select((s, i) =>
+            {
+                var ds = dsManager[s];
+                var wifi = apManager.StationStatuses[i];
+                return new
+                {
+                    index = i,
+                    alliance = s.Color.ToString(),
+                    position = (int)s.Position,
+                    teamNumber = ds.TeamNumber,
+                    dsLinked = ds.DsLinked,
+                    robotLinked = ds.RobotLinked,
+                    radioLinked = ds.RadioLinked,
+                    rioLinked = ds.RioLinked,
+                    battery = ds.BatteryVoltage,
+                    tripTimeMs = ds.DsRobotTripTimeMs,
+                    missedPackets = ds.MissedPacketCount,
+                    secondsSinceLastRobotLink = ds.SecondsSinceLastRobotLink,
+                    estop = ds.Estop,
+                    astop = ds.Astop,
+                    bypassed = ds.Bypassed,
+                    wrongStation = ds.WrongStation,
+                    isReady = ds.IsReady,
+                    isReadyInMatch = ds.IsReadyInMatch,
+                    avatarBase64 = teams.TryGetValue(ds.TeamNumber, out var teamRecord) ? teamRecord.AvatarBase64 : null,
+                    wifi = new
+                    {
+                        radioLinked = wifi.RadioLinked,
+                        bandwidthMbps = wifi.BandwidthUsedMbps,
+                        rxRateMbps = wifi.RxRateMbps,
+                        txRateMbps = wifi.TxRateMbps,
+                        snr = wifi.SignalNoiseRatio,
+                        connectionQuality = wifi.ConnectionQuality,
+                    },
+                };
+            }),
+            fieldDevices = fieldHardwareManager.Devices
+                .OrderBy(d => d.Type)
+                .ThenBy(d => d.Name, StringComparer.OrdinalIgnoreCase)
+                .Select(d => new
+                {
+                    id = d.Id,
+                    name = d.Name,
+                    type = d.Type.ToString(),
+                    status = d.Status.ToString(),
+                    bypassed = d.Bypassed,
+                    lastSeenUtc = d.LastSeen,
+                    secondsSinceLastSeen = Math.Max(0, (nowUtc - d.LastSeen).TotalSeconds),
+                    lastReplyTimeMs = d.LastReplyTimeMs,
+                    replyTimeStats = new
+                    {
+                        sampleCount = d.ReplySampleCount,
+                        minMs = d.ReplyTimeMinMs,
+                        maxMs = d.ReplyTimeMaxMs,
+                        avgMs = d.ReplyTimeAverageMs,
+                        stdDevMs = d.ReplyTimeStdDevMs,
+                    },
+                    heartbeat = BuildHeartbeatDiagnostics(d.LastHeartbeat),
+                }),
+        };
     }
 
     private static object? BuildHeartbeatDiagnostics(FieldDeviceHeartbeat? heartbeat)
@@ -230,50 +235,108 @@ public sealed class MatchStateBroadcaster(
 
         return new
         {
-            matchId     = match.MatchId,
-            matchType   = match.MatchType,
+            matchId = match.MatchId,
+            matchType = match.MatchType,
             matchNumber = match.MatchNumber,
             committedAt = match.CommittedAt,
-            redTeams    = match.RedTeams,
-            blueTeams   = match.BlueTeams,
-            redTeamNicknames  = match.RedTeamNicknames,
+            redTeams = match.RedTeams,
+            blueTeams = match.BlueTeams,
+            redTeamNicknames = match.RedTeamNicknames,
             blueTeamNicknames = match.BlueTeamNicknames,
-            redTeamAvatars    = match.RedTeamAvatars,
-            blueTeamAvatars   = match.BlueTeamAvatars,
-            redScore  = match.RedScore,
+            redTeamAvatars = match.RedTeamAvatars,
+            blueTeamAvatars = match.BlueTeamAvatars,
+            redScore = match.RedScore,
             blueScore = match.BlueScore,
+            violations = match.Violations
+                .OrderByDescending(v => v.RecordedAt)
+                .Select(BuildViolationObject),
             redBreakdown = new
             {
-                autoFuelPoints    = match.RedBreakdown.AutoFuelPoints,
-                autoTowerPoints   = match.RedBreakdown.AutoTowerPoints,
-                teleopFuelPoints  = match.RedBreakdown.TeleopFuelPoints,
+                autoFuelPoints = match.RedBreakdown.AutoFuelPoints,
+                autoTowerPoints = match.RedBreakdown.AutoTowerPoints,
+                teleopFuelPoints = match.RedBreakdown.TeleopFuelPoints,
                 teleopTowerPoints = match.RedBreakdown.TeleopTowerPoints,
-                total             = match.RedBreakdown.Total,
+                penaltyPoints = match.RedBreakdown.PenaltyPoints,
+                total = match.RedBreakdown.Total,
             },
             blueBreakdown = new
             {
-                autoFuelPoints    = match.BlueBreakdown.AutoFuelPoints,
-                autoTowerPoints   = match.BlueBreakdown.AutoTowerPoints,
-                teleopFuelPoints  = match.BlueBreakdown.TeleopFuelPoints,
+                autoFuelPoints = match.BlueBreakdown.AutoFuelPoints,
+                autoTowerPoints = match.BlueBreakdown.AutoTowerPoints,
+                teleopFuelPoints = match.BlueBreakdown.TeleopFuelPoints,
                 teleopTowerPoints = match.BlueBreakdown.TeleopTowerPoints,
-                total             = match.BlueBreakdown.Total,
+                penaltyPoints = match.BlueBreakdown.PenaltyPoints,
+                total = match.BlueBreakdown.Total,
             },
             redRankingPoints = new
             {
-                energized    = match.RedRankingPoints.Energized,
+                energized = match.RedRankingPoints.Energized,
                 supercharged = match.RedRankingPoints.Supercharged,
-                traversal    = match.RedRankingPoints.Traversal,
-                winTie       = match.RedRankingPoints.WinTie,
-                total        = match.RedRankingPoints.Total,
+                traversal = match.RedRankingPoints.Traversal,
+                winTie = match.RedRankingPoints.WinTie,
+                total = match.RedRankingPoints.Total,
             },
             blueRankingPoints = new
             {
-                energized    = match.BlueRankingPoints.Energized,
+                energized = match.BlueRankingPoints.Energized,
                 supercharged = match.BlueRankingPoints.Supercharged,
-                traversal    = match.BlueRankingPoints.Traversal,
-                winTie       = match.BlueRankingPoints.WinTie,
-                total        = match.BlueRankingPoints.Total,
+                traversal = match.BlueRankingPoints.Traversal,
+                winTie = match.BlueRankingPoints.WinTie,
+                total = match.BlueRankingPoints.Total,
             },
         };
+    }
+
+    private static object BuildViolationObject(MatchViolation violation)
+    {
+        return new
+        {
+            id = violation.Id.ToString(),
+            stationIndex = GetStationIndex(violation.Station.Color.ToString(), (int)violation.Station.Position),
+            alliance = violation.PenalizedAlliance.ToString(),
+            position = (int)violation.Station.Position,
+            teamNumber = violation.TeamNumber,
+            rule = violation.Rule,
+            type = violation.Type.ToString(),
+            phase = violation.Phase.ToString(),
+            timeRemainingSeconds = violation.TimeRemainingSeconds,
+            recordedAt = violation.RecordedAt,
+            awardedPoints = violation.AwardedPoints,
+            awardedToAlliance = violation.AwardedToAlliance.ToString(),
+        };
+    }
+
+    private static object BuildViolationObject(MatchViolationRecord violation)
+    {
+        return new
+        {
+            id = violation.Id,
+            stationIndex = GetStationIndex(violation.Alliance, violation.Position),
+            alliance = violation.Alliance,
+            position = violation.Position,
+            teamNumber = violation.TeamNumber,
+            rule = violation.Rule,
+            type = violation.Type,
+            phase = violation.Phase,
+            timeRemainingSeconds = violation.TimeRemainingSeconds,
+            recordedAt = violation.RecordedAt,
+            awardedPoints = violation.AwardedPoints,
+            awardedToAlliance = violation.AwardedToAlliance,
+        };
+    }
+
+    private static int GetStationIndex(string alliance, int position)
+    {
+        for (var i = 0; i < AllianceStations.All.Count; i++)
+        {
+            var station = AllianceStations.All[i];
+            if (station.Color.ToString().Equals(alliance, StringComparison.OrdinalIgnoreCase)
+                && (int)station.Position == position)
+            {
+                return i;
+            }
+        }
+
+        return -1;
     }
 }

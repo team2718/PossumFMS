@@ -7,6 +7,7 @@
 	const navLinks = [
 		{ href: '/', label: 'Match Play' },
 		{ href: '/scoring', label: 'Scoring' },
+		{ href: '/referee', label: 'Referee' },
 		{ href: '/fta', label: 'FTA' },
 		{ href: '/stops', label: 'Stops' },
 		{ href: '/audience', label: 'Audience' }
@@ -14,7 +15,7 @@
 </script>
 
 <div class="app-neutral-bg border-b border-slate-300">
-	<div class="mx-auto flex max-w-[1700px] items-end gap-0.5 overflow-x-auto px-3 pt-2 text-sm">
+	<div class="mx-auto flex max-w-425 items-end gap-0.5 overflow-x-auto px-3 pt-2 text-sm">
 		{#each navLinks as link}
 			<a
 				href={link.href}
