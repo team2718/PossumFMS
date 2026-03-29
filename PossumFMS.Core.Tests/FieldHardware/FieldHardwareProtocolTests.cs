@@ -313,6 +313,24 @@ public sealed class FieldHardwareProtocolTests : IDisposable
     }
 
     [Fact]
+    public void BuildReply_Hub_WhenPendingFuelClearSignal_ReturnsClearOnce()
+    {
+        var arena = new PossumFMS.Core.Arena.Arena(); // Idle
+        var logic = new GameLogic(arena);
+        MakeHubDevice("red");
+
+        _device.LastFuelClearSignalPhase = MatchPhase.Idle.ToString();
+        _device.PendingFuelClearSignal = true;
+
+        var firstReply = _protocol.BuildReply(_device, arena, logic, null);
+        var secondReply = _protocol.BuildReply(_device, arena, logic, null);
+
+        Assert.True(firstReply["clear_fuel_count"].AsBoolean);
+        Assert.False(secondReply["clear_fuel_count"].AsBoolean);
+        Assert.False(_device.PendingFuelClearSignal);
+    }
+
+    [Fact]
     public void BuildReply_Hub_WhenPostMatch_LedIsPurple()
     {
         var arena = new PossumFMS.Core.Arena.Arena();

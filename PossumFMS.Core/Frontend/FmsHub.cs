@@ -255,6 +255,7 @@ public sealed class FmsHub(
         dsManager.ResetAllStops();
 
         arena.ClearMatch();
+        fieldHardwareManager.RequestFuelCounterClear();
         await BroadcastMatchState();
     }
 

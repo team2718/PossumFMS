@@ -19,6 +19,9 @@ const uint32_t REPLY_BODY_TIMEOUT_MS = 200;
 const uint32_t FLASH_INTERVAL_MS = 250;
 const int BALL_DETECT_DROP_MM = 20;
 const int BALL_DETECT_RISE_MM = 10;
+const int SENSOR_VALID_MIN_MM = 30;
+const int SENSOR_VALID_MAX_MM = 400;
+const int SENSOR_MAX_STEP_MM = 700;
 const uint32_t SENSOR_STALE_MS = 500;
 const uint32_t SENSOR_STALE_LOG_INTERVAL_MS = 1000;
 
@@ -61,6 +64,7 @@ volatile uint8_t ledR = 0;
 volatile uint8_t ledG = 0;
 volatile uint8_t ledB = 0;
 volatile FlashingStatus flashingStatus = FlashingStatusOff;
+volatile bool sensorStateResetRequested = false;
 
 bool hasReceivedReplySinceConnect = false;
 
@@ -127,9 +131,35 @@ void ballCountTask(void* parameter) {
   uint32_t lastStaleLogMs[SENSOR_COUNT] = {};
   uint32_t lastDiagnosticLogMs = 0;
   uint32_t lastRecoveryAttemptMs[SENSOR_COUNT] = {};
+  int lastValidRangeMm[SENSOR_COUNT] = {};
+  uint32_t invalidRangeCount[SENSOR_COUNT] = {};
 
   while (true) {
     uint32_t now = millis();
+
+    bool resetSensorStateNow = false;
+    portENTER_CRITICAL(&stateLock);
+    if (sensorStateResetRequested) {
+      sensorStateResetRequested = false;
+      resetSensorStateNow = true;
+    }
+    portEXIT_CRITICAL(&stateLock);
+
+    if (resetSensorStateNow) {
+      for (int i = 0; i < SENSOR_COUNT; i++) {
+        peakRange[i] = 0;
+        troughRange[i] = 0;
+        hasSample[i] = false;
+        waitingForRise[i] = false;
+        lastRangeSeenMs[i] = 0;
+        lastStaleLogMs[i] = 0;
+        lastRecoveryAttemptMs[i] = now;
+        lastValidRangeMm[i] = 0;
+        invalidRangeCount[i] = 0;
+        sensors[i].startRangeContinuous();
+      }
+      Serial.println("[HUB] Sensor state reset requested by clear_fuel_count.");
+    }
 
     // Serial.printf("fuelCount: %d\n", fuelCount);
 
@@ -139,7 +169,33 @@ void ballCountTask(void* parameter) {
         lastRangeSeenMs[i] = now;
         lastRecoveryAttemptMs[i] = now; // Reset recovery timer on successful read
 
-        // Serial.printf("range[%d]: %04d mm\n", i, rangemm);
+        bool inValidBounds = rangemm >= SENSOR_VALID_MIN_MM && rangemm <= SENSOR_VALID_MAX_MM;
+        bool plausibleStep = !hasSample[i] || abs(rangemm - lastValidRangeMm[i]) <= SENSOR_MAX_STEP_MM;
+        if (!inValidBounds || !plausibleStep) {
+          invalidRangeCount[i]++;
+
+          if ((invalidRangeCount[i] % 10) == 1) {
+            Serial.printf(
+              "[HUB] Sensor %d invalid range %d mm (bounds %d-%d, plausible=%s, invalid_count=%lu); resetting state\n",
+              i,
+              rangemm,
+              SENSOR_VALID_MIN_MM,
+              SENSOR_VALID_MAX_MM,
+              plausibleStep ? "yes" : "no",
+              (unsigned long)invalidRangeCount[i]);
+          }
+
+          hasSample[i] = false;
+          waitingForRise[i] = false;
+          sensors[i].startRangeContinuous();
+          continue;
+        }
+
+        lastValidRangeMm[i] = rangemm;
+
+        // if (i == 0) {
+        //   Serial.printf("range[%d]: %04d mm\n", i, rangemm);
+        // }
 
         if (!hasSample[i]) {
           hasSample[i] = true;
@@ -218,6 +274,9 @@ void ballCountTask(void* parameter) {
             waitingForRise[i] ? "WaitingForRise" : "AcquiringPeak",
             (unsigned long)staleMs,
             staleMs >= SENSOR_STALE_MS ? "STALE" : "OK");
+        }
+        if (invalidRangeCount[i] > 0) {
+          Serial.printf("[HUB]   Sensor %d invalid samples: %lu\n", i, (unsigned long)invalidRangeCount[i]);
         }
       }
       Serial.println("[HUB] ================================");
@@ -433,6 +492,7 @@ void receiveReply(uint32_t sentAtMs) {
     shouldCountFuel = nextShouldCountFuel;
     if (clearFuelCount) {
       fuelCount = 0;
+      sensorStateResetRequested = true;
     }
     ledR = (uint8_t)dec.getInt32("led_r", 0);
     ledG = (uint8_t)dec.getInt32("led_g", 0);

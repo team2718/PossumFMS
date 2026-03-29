@@ -46,6 +46,7 @@ public sealed class FieldDevice(TcpClient client)
     public double ReplyTimeStdDevMs { get; private set; }
     public bool Bypassed { get; set; }
     public string? LastFuelClearSignalPhase { get; set; }
+    public bool PendingFuelClearSignal { get; set; }
 
     private double _replyTimeM2;
 

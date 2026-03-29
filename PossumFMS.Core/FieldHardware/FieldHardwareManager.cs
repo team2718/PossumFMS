@@ -262,6 +262,22 @@ public sealed class FieldHardwareManager : BackgroundService
         return true;
     }
 
+    public void RequestFuelCounterClear()
+    {
+        var signaledCount = 0;
+
+        foreach (var device in _devices.Values)
+        {
+            if (device.Type != FieldDeviceType.Hub)
+                continue;
+
+            device.PendingFuelClearSignal = true;
+            signaledCount++;
+        }
+
+        _logger.LogInformation("Queued fuel counter clear signal for {HubCount} hub device(s).", signaledCount);
+    }
+
     private void AbortMatchForCriticalDeviceDisconnect(FieldDevice device, string endpoint, string reason)
     {
         if (device.Bypassed)

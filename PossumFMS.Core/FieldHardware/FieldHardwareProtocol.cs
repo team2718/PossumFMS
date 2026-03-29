@@ -162,6 +162,13 @@ internal sealed class HubDeviceProtocolHandler : IFieldDeviceProtocolHandler
 
     private static bool ShouldClearFuelCount(FieldDevice device, Arena.Arena arena)
     {
+        if (device.PendingFuelClearSignal)
+        {
+            device.PendingFuelClearSignal = false;
+            device.LastFuelClearSignalPhase = arena.Phase.ToString();
+            return true;
+        }
+
         if (arena.Phase is not (MatchPhase.PreMatch or MatchPhase.Idle))
         {
             device.LastFuelClearSignalPhase = null;
