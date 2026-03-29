@@ -95,7 +95,7 @@
 		if (device.heartbeat.kind === 'Hub') {
 			return [
 				{ label: 'Alliance', value: device.heartbeat.alliance.toUpperCase() },
-				{ label: 'Fuel Delta', value: String(device.heartbeat.fuelDelta) },
+				{ label: 'Fuel Count', value: String(device.heartbeat.fuelCount) },
 				{ label: 'Heartbeat', value: formatTimestamp(device.heartbeat.receivedUtc) }
 			];
 		}

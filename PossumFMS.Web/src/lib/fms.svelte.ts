@@ -46,7 +46,7 @@ export interface HubDeviceHeartbeat {
 	kind: 'Hub';
 	receivedUtc: string;
 	alliance: string;
-	fuelDelta: number;
+	fuelCount: number;
 }
 
 export interface EstopDeviceHeartbeat {

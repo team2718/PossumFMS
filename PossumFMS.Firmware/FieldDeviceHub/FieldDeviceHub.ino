@@ -80,7 +80,8 @@ void setup() {
   flashingStatus = FlashingStatusOff;
   colorWipe(strip.Color(255, 0, 255));
 
-  Serial.println("sigma sigma sigma");
+  Wire.begin();
+  Wire.setClock(50000);
 
   // Disable all sensors first so we can address them one by one.
   for (int i = 0; i < SENSOR_COUNT; i++) {
@@ -124,6 +125,8 @@ void ballCountTask(void* parameter) {
   bool waitingForRise[SENSOR_COUNT] = {};
   uint32_t lastRangeSeenMs[SENSOR_COUNT] = {};
   uint32_t lastStaleLogMs[SENSOR_COUNT] = {};
+  uint32_t lastDiagnosticLogMs = 0;
+  uint32_t lastRecoveryAttemptMs[SENSOR_COUNT] = {};
 
   while (true) {
     uint32_t now = millis();
@@ -134,6 +137,7 @@ void ballCountTask(void* parameter) {
       if (sensors[i].isRangeComplete()) {
         int rangemm = sensors[i].readRange();
         lastRangeSeenMs[i] = now;
+        lastRecoveryAttemptMs[i] = now; // Reset recovery timer on successful read
 
         // Serial.printf("range[%d]: %04d mm\n", i, rangemm);
 
@@ -172,15 +176,51 @@ void ballCountTask(void* parameter) {
         }
       } else if (hasSample[i]) {
         uint32_t staleMs = now - lastRangeSeenMs[i];
+        
+        // Try recovery at 500ms, 2000ms, and 10000ms intervals
         if (staleMs >= SENSOR_STALE_MS) {
-          if (now - lastStaleLogMs[i] >= SENSOR_STALE_LOG_INTERVAL_MS) {
-            Serial.printf("[HUB] Sensor %d stale for %lu ms, restarting continuous mode\n", i, (unsigned long)staleMs);
-            lastStaleLogMs[i] = now;
+          bool shouldRecover = false;
+          
+          if (staleMs >= 10000 && now - lastRecoveryAttemptMs[i] >= 2000) {
+            shouldRecover = true;
+          } else if (staleMs >= 2000 && now - lastRecoveryAttemptMs[i] >= 1000) {
+            shouldRecover = true;
+          } else if (staleMs >= SENSOR_STALE_MS && now - lastRecoveryAttemptMs[i] >= 500) {
+            shouldRecover = true;
           }
-
-          sensors[i].startRangeContinuous();
+          
+          if (shouldRecover) {
+            Serial.printf("[HUB] Sensor %d stale for %lu ms, attempting recovery\n", i, (unsigned long)staleMs);
+            lastRecoveryAttemptMs[i] = now;
+            sensors[i].startRangeContinuous();
+          }
         }
       }
+    }
+
+    // Periodic diagnostic logging to track sensor health
+    if (now - lastDiagnosticLogMs >= 5000) {
+      lastDiagnosticLogMs = now;
+      Serial.println("[HUB] === Sensor Diagnostic Report ===");
+      uint32_t currentFuelCount;
+      portENTER_CRITICAL(&stateLock);
+      currentFuelCount = fuelCount;
+      portEXIT_CRITICAL(&stateLock);
+      
+      Serial.printf("[HUB] Current fuel count: %lu\n", (unsigned long)currentFuelCount);
+      for (int i = 0; i < SENSOR_COUNT; i++) {
+        if (!hasSample[i]) {
+          Serial.printf("[HUB]   Sensor %d: No samples yet\n", i);
+        } else {
+          uint32_t staleMs = now - lastRangeSeenMs[i];
+          Serial.printf("[HUB]   Sensor %d: %s (stale %lu ms, %s)\n", 
+            i,
+            waitingForRise[i] ? "WaitingForRise" : "AcquiringPeak",
+            (unsigned long)staleMs,
+            staleMs >= SENSOR_STALE_MS ? "STALE" : "OK");
+        }
+      }
+      Serial.println("[HUB] ================================");
     }
 
     // Serial.printf("fuelCount: %d, shouldCountFuel: %d\n", fuelCount, shouldCountFuel);
@@ -193,8 +233,11 @@ void networkLedTask(void* parameter) {
   (void)parameter;
 
   uint32_t lastHeartbeatMs = 0;
+  uint32_t lastTaskLogMs = 0;
 
   while (true) {
+    uint32_t now = millis();
+    
     if (WiFi.status() != WL_CONNECTED) {
       Serial.println("[HUB] WiFi lost; reconnecting.");
       connectWifi();
@@ -207,12 +250,19 @@ void networkLedTask(void* parameter) {
 
     renderLed();
 
-    uint32_t now = millis();
     if (now - lastHeartbeatMs >= HEARTBEAT_INTERVAL_MS) {
       lastHeartbeatMs = now;
 
       uint32_t sentAtMs = sendHeartbeat();
       receiveReply(sentAtMs);
+    }
+    
+    // Log network task status periodically
+    if (now - lastTaskLogMs >= 10000) {
+      lastTaskLogMs = now;
+      Serial.printf("[HUB] Network task alive - WiFi: %s, TCP: %s\n", 
+        WiFi.status() == WL_CONNECTED ? "OK" : "FAILED",
+        client.connected() ? "OK" : "DISCONNECTED");
     }
 
     vTaskDelay(pdMS_TO_TICKS(5));
