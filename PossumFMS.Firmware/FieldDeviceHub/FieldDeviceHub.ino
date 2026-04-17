@@ -42,7 +42,7 @@ WiFiClient client;
 
 Adafruit_NeoPixel strip(LED_COUNT, LED_PIN, NEO_RGBW + NEO_KHZ800);
 
-const int XSHUT_PINS[]          = { 2, 4, 18, 19 };
+const int XSHUT_PINS[]          = { 2, 4, 19 }; //{ 2, 4, 18, 19 };
 const int SENSOR_COUNT          = sizeof(XSHUT_PINS) / sizeof(XSHUT_PINS[0]);
 const uint8_t SENSOR_BASE_ADDR  = 0x30;  // sensor i gets address 0x30+i
 

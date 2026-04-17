@@ -312,6 +312,14 @@ class FmsConnection {
 	astopStation(stationIndex: number) {
 		this.hub?.invoke('AstopStation', stationIndex);
 	}
+	/** Temporarily resumes FMS packets in Free Practice mode to disable the robot(s). */
+	practiceModeDisableStation(stationIndex: number) {
+		this.hub?.invoke('PracticeModeDisableStation', stationIndex);
+	}
+	/** Temporarily resumes FMS packets in Free Practice mode to disable all robots. */
+	practiceModeDisableAll() {
+		this.hub?.invoke('PracticeModeDisableAll');
+	}
 	/** Set or clear the bypass flag on a station */
 	bypassStation(stationIndex: number, bypassed: boolean) {
 		this.hub?.invoke('BypassStation', stationIndex, bypassed);

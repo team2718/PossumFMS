@@ -83,6 +83,12 @@ builder.Services.AddCors(options =>
 var app = builder.Build();
 app.Services.GetRequiredService<GameLogic>();
 
+// Default into Free Practice mode with team 2718 on Red 1.
+var arena = app.Services.GetRequiredService<Arena>();
+var dsManager = app.Services.GetRequiredService<DriverStationManager>();
+arena.SetFreePracticeEnabled(true);
+dsManager.AssignTeams([new DriverStationManager.TeamAssignment(AllianceStations.Red1, 2718)]);
+
 // Check that the host has the required FMS IP address
 const string RequiredIp = "10.0.100.5";
 var logger = app.Services.GetRequiredService<ILogger<Program>>();

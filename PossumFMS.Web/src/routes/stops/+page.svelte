@@ -8,6 +8,7 @@
 
 	const matchState = $derived(fms.matchState);
 	const phase = $derived(matchState?.phase ?? 'Disconnected');
+	const freePracticeEnabled = $derived(matchState?.freePracticeEnabled ?? false);
 	const isMatchInProgress = $derived(
 		phase === 'Auto' || phase === 'AutoToTeleopTransition' || phase === 'Teleop'
 	);
@@ -76,6 +77,16 @@
 		}
 	}
 
+	function executePracticeDisable() {
+		if (scope === 'field') {
+			fms.practiceModeDisableAll();
+		} else {
+			for (const idx of getStationIndices(scope)) {
+				fms.practiceModeDisableStation(idx);
+			}
+		}
+	}
+
 	const scopeGroups: { label: string; scopes: StopScope[] }[] = [
 		{ label: 'Scope', scopes: ['field', 'red', 'blue'] },
 		{ label: 'Red Station', scopes: ['red1', 'red2', 'red3'] },
@@ -131,52 +142,77 @@
 
 		<!-- Large action buttons -->
 		<div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-			<!-- Match Abort -->
-			<button
-				onclick={() => fms.abortMatch()}
-				disabled={!isMatchInProgress}
-				class="flex min-h-[12rem] flex-col items-center justify-center gap-3 rounded-xl border-2 border-orange-700 bg-orange-600 px-4 py-6 text-white shadow-lg transition active:translate-y-px active:shadow-md disabled:cursor-not-allowed disabled:opacity-40 hover:bg-orange-500"
-			>
-				<svg
-					xmlns="http://www.w3.org/2000/svg"
-					viewBox="0 0 24 24"
-					fill="currentColor"
-					class="h-12 w-12"
+			{#if freePracticeEnabled}
+				<!-- Practice Mode: DISABLE spans the first two columns -->
+				<button
+					onclick={executePracticeDisable}
+					class="col-span-1 flex min-h-[12rem] flex-col items-center justify-center gap-3 rounded-xl border-2 border-amber-700 bg-amber-500 px-4 py-6 text-white shadow-lg transition active:translate-y-px active:shadow-md hover:bg-amber-400 sm:col-span-2"
 				>
-					<path
-						fill-rule="evenodd"
-						d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25Zm3 10.5a.75.75 0 0 0 0-1.5H9a.75.75 0 0 0 0 1.5h6Z"
-						clip-rule="evenodd"
-					/>
-				</svg>
-				<div class="text-center">
-					<div class="text-xl font-black tracking-wide">MATCH ABORT</div>
-					<div class="mt-1 text-xs font-semibold opacity-80">Disables all robots</div>
-				</div>
-			</button>
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						viewBox="0 0 24 24"
+						fill="currentColor"
+						class="h-12 w-12"
+					>
+						<path
+							fill-rule="evenodd"
+							d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12Zm6-2.438c0-.724.588-1.312 1.313-1.312h4.874c.725 0 1.313.588 1.313 1.313v4.874c0 .725-.588 1.313-1.313 1.313H9.564a1.312 1.312 0 0 1-1.313-1.313V9.564Z"
+							clip-rule="evenodd"
+						/>
+					</svg>
+					<div class="text-center">
+						<div class="text-xl font-black tracking-wide">DISABLE</div>
+						<div class="mt-1 text-xs font-semibold opacity-80">{scopeLabels[scope]}</div>
+					</div>
+				</button>
+			{:else}
+				<!-- Match Abort -->
+				<button
+					onclick={() => fms.abortMatch()}
+					disabled={!isMatchInProgress}
+					class="flex min-h-[12rem] flex-col items-center justify-center gap-3 rounded-xl border-2 border-orange-700 bg-orange-600 px-4 py-6 text-white shadow-lg transition active:translate-y-px active:shadow-md disabled:cursor-not-allowed disabled:opacity-40 hover:bg-orange-500"
+				>
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						viewBox="0 0 24 24"
+						fill="currentColor"
+						class="h-12 w-12"
+					>
+						<path
+							fill-rule="evenodd"
+							d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25Zm3 10.5a.75.75 0 0 0 0-1.5H9a.75.75 0 0 0 0 1.5h6Z"
+							clip-rule="evenodd"
+						/>
+					</svg>
+					<div class="text-center">
+						<div class="text-xl font-black tracking-wide">MATCH ABORT</div>
+						<div class="mt-1 text-xs font-semibold opacity-80">Disables all robots</div>
+					</div>
+				</button>
 
-			<!-- A-Stop -->
-			<button
-				onclick={executeAstop}
-				class="flex min-h-[12rem] flex-col items-center justify-center gap-3 rounded-xl border-2 border-amber-700 bg-amber-500 px-4 py-6 text-white shadow-lg transition active:translate-y-px active:shadow-md hover:bg-amber-400"
-			>
-				<svg
-					xmlns="http://www.w3.org/2000/svg"
-					viewBox="0 0 24 24"
-					fill="currentColor"
-					class="h-12 w-12"
+				<!-- A-Stop -->
+				<button
+					onclick={executeAstop}
+					class="flex min-h-[12rem] flex-col items-center justify-center gap-3 rounded-xl border-2 border-amber-700 bg-amber-500 px-4 py-6 text-white shadow-lg transition active:translate-y-px active:shadow-md hover:bg-amber-400"
 				>
-					<path
-						fill-rule="evenodd"
-						d="M9.401 3.003c1.155-2 4.043-2 5.197 0l7.355 12.748c1.154 2-.29 4.5-2.599 4.5H4.645c-2.309 0-3.752-2.5-2.598-4.5L9.4 3.003ZM12 8.25a.75.75 0 0 1 .75.75v3.75a.75.75 0 0 1-1.5 0V9a.75.75 0 0 1 .75-.75Zm0 8.25a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Z"
-						clip-rule="evenodd"
-					/>
-				</svg>
-				<div class="text-center">
-					<div class="text-xl font-black tracking-wide">Auto STOP</div>
-					<div class="mt-1 text-xs font-semibold opacity-80">{scopeLabels[scope]}</div>
-				</div>
-			</button>
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						viewBox="0 0 24 24"
+						fill="currentColor"
+						class="h-12 w-12"
+					>
+						<path
+							fill-rule="evenodd"
+							d="M9.401 3.003c1.155-2 4.043-2 5.197 0l7.355 12.748c1.154 2-.29 4.5-2.599 4.5H4.645c-2.309 0-3.752-2.5-2.598-4.5L9.4 3.003ZM12 8.25a.75.75 0 0 1 .75.75v3.75a.75.75 0 0 1-1.5 0V9a.75.75 0 0 1 .75-.75Zm0 8.25a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Z"
+							clip-rule="evenodd"
+						/>
+					</svg>
+					<div class="text-center">
+						<div class="text-xl font-black tracking-wide">Auto STOP</div>
+						<div class="mt-1 text-xs font-semibold opacity-80">{scopeLabels[scope]}</div>
+					</div>
+				</button>
+			{/if}
 
 			<!-- E-Stop -->
 			<button

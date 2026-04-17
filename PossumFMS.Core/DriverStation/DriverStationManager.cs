@@ -55,6 +55,13 @@ public sealed class DriverStationManager : BackgroundService
     private readonly TaskCompletionSource _controlLoopDone = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private Task                          _tcpListenerTask  = Task.CompletedTask;
 
+    // ── Practice mode override ─────────────────────────────────────────────────
+    // When Free Practice is enabled the FMS normally does not send control packets.
+    // To allow remote disable / e-stop we temporarily resume sending for a short
+    // window so the DS receives the stop signal, then go quiet again.
+    private static readonly TimeSpan PracticeModeOverrideDuration = TimeSpan.FromSeconds(1);
+    private DateTime _practiceModeOverrideUntil = DateTime.MinValue;
+
     public DriverStationManager(Arena.Arena arena, ILogger<DriverStationManager> logger)
     {
         _arena  = arena;
@@ -175,7 +182,12 @@ public sealed class DriverStationManager : BackgroundService
             TeamAssignmentsChanged?.Invoke();
     }
 
-    public void Estop(AllianceStation station)  => Stations[station].Estop = true;
+    public void Estop(AllianceStation station)
+    {
+        Stations[station].Estop = true;
+        if (_arena.FreePracticeEnabled)
+            TriggerPracticeModeOverride();
+    }
 
     public void Astop(AllianceStation station)
     {
@@ -202,6 +214,36 @@ public sealed class DriverStationManager : BackgroundService
 
     public void SetBypass(AllianceStation station, bool bypassed)
         => Stations[station].Bypassed = bypassed;
+
+    /// <summary>
+    /// Temporarily resumes sending FMS control packets while in Free Practice mode
+    /// so the DS receives a disable signal. The robot will be disabled for the
+    /// duration of the override window, then the FMS goes quiet and the DS
+    /// returns to standalone control.
+    /// </summary>
+    public void PracticeModeDisable(AllianceStation station)
+    {
+        if (!_arena.FreePracticeEnabled)
+            return;
+
+        TriggerPracticeModeOverride();
+        _logger.LogInformation("Practice mode disable triggered for {Station}.", station);
+    }
+
+    /// <summary>Triggers the practice mode override for all stations.</summary>
+    public void PracticeModeDisableAll()
+    {
+        if (!_arena.FreePracticeEnabled)
+            return;
+
+        TriggerPracticeModeOverride();
+        _logger.LogInformation("Practice mode disable triggered for all stations.");
+    }
+
+    private void TriggerPracticeModeOverride()
+    {
+        _practiceModeOverrideUntil = DateTime.UtcNow + PracticeModeOverrideDuration;
+    }
 
     /// <summary>Clears all e-stops and a-stops on every station (called on Clear Match).</summary>
     public void ResetAllStops()
@@ -453,7 +495,9 @@ public sealed class DriverStationManager : BackgroundService
     private void SendControlPackets()
     {
         if (_udpSocket is null) return;
-        if (!IsDriverStationCommunicationEnabled()) return;
+
+        bool practiceOverride = _arena.FreePracticeEnabled && DateTime.UtcNow < _practiceModeOverrideUntil;
+        if (!IsDriverStationCommunicationEnabled() && !practiceOverride) return;
 
         foreach (var ds in Stations.Values)
         {

@@ -292,6 +292,21 @@ public sealed class FmsHub(
         await BroadcastMatchState();
     }
 
+    public async Task PracticeModeDisableStation(int stationIndex)
+    {
+        var station = GetStationByIndex(stationIndex);
+        logger.LogWarning("Practice mode disable {Station} by {Client}.", station, Context.ConnectionId);
+        dsManager.PracticeModeDisable(station);
+        await BroadcastMatchState();
+    }
+
+    public async Task PracticeModeDisableAll()
+    {
+        logger.LogWarning("Practice mode disable all by {Client}.", Context.ConnectionId);
+        dsManager.PracticeModeDisableAll();
+        await BroadcastMatchState();
+    }
+
     public async Task BypassStation(int stationIndex, bool bypassed)
     {
         var station = AllianceStations.All[stationIndex];
