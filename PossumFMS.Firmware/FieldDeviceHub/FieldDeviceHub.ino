@@ -1,4 +1,3 @@
-#include "Adafruit_VL53L0X.h"
 #include <Adafruit_NeoPixel.h>
 #include <esp_system.h>
 #include <math.h>
@@ -17,13 +16,7 @@ const uint32_t REPLY_TIMEOUT_MS = 100;
 const uint32_t INITIAL_REPLY_TIMEOUT_MS = 500;
 const uint32_t REPLY_BODY_TIMEOUT_MS = 200;
 const uint32_t FLASH_INTERVAL_MS = 250;
-const int BALL_DETECT_DROP_MM = 20;
-const int BALL_DETECT_RISE_MM = 10;
-const int SENSOR_VALID_MIN_MM = 30;
-const int SENSOR_VALID_MAX_MM = 400;
-const int SENSOR_MAX_STEP_MM = 700;
-const uint32_t SENSOR_STALE_MS = 500;
-const uint32_t SENSOR_STALE_LOG_INTERVAL_MS = 1000;
+const uint32_t BALL_DEBOUNCE_MS = 100;
 
 const size_t RX_BUF_SIZE = 256;
 
@@ -42,11 +35,9 @@ WiFiClient client;
 
 Adafruit_NeoPixel strip(LED_COUNT, LED_PIN, NEO_RGBW + NEO_KHZ800);
 
-const int XSHUT_PINS[]          = { 2, 4, 19 }; //{ 2, 4, 18, 19 };
-const int SENSOR_COUNT          = sizeof(XSHUT_PINS) / sizeof(XSHUT_PINS[0]);
-const uint8_t SENSOR_BASE_ADDR  = 0x30;  // sensor i gets address 0x30+i
-
-Adafruit_VL53L0X sensors[SENSOR_COUNT];
+// E18-D80NK infrared photoelectric switches (NPN, active-low: LOW = ball detected)
+const int SENSOR_PINS[]  = { 2, 4, 18, 19 };
+const int SENSOR_COUNT   = sizeof(SENSOR_PINS) / sizeof(SENSOR_PINS[0]);
 
 enum FlashingStatus : uint8_t {
   FlashingStatusOff = 0,
@@ -84,25 +75,9 @@ void setup() {
   flashingStatus = FlashingStatusOff;
   colorWipe(strip.Color(255, 0, 255));
 
-  Wire.begin();
-  Wire.setClock(50000);
-
-  // Disable all sensors first so we can address them one by one.
   for (int i = 0; i < SENSOR_COUNT; i++) {
-    pinMode(XSHUT_PINS[i], OUTPUT);
-    digitalWrite(XSHUT_PINS[i], LOW);
-  }
-  delay(10);
-
-  for (int i = 0; i < SENSOR_COUNT; i++) {
-    digitalWrite(XSHUT_PINS[i], HIGH);
-    delay(10);
-    if (!sensors[i].begin(SENSOR_BASE_ADDR + i)) {
-      Serial.printf("Failed to boot VL53L0X sensor %d (XSHUT pin %d)\n", i, XSHUT_PINS[i]);
-      while (1);
-    }
-    sensors[i].startRangeContinuous();
-    Serial.printf("[HUB] Sensor %d ready at I2C 0x%02X\n", i, SENSOR_BASE_ADDR + i);
+    pinMode(SENSOR_PINS[i], INPUT_PULLUP);
+    Serial.printf("[HUB] Photoelectric sensor %d on pin %d\n", i, SENSOR_PINS[i]);
   }
 
   xTaskCreatePinnedToCore(networkLedTask, "network_led", 6144, nullptr, 1, nullptr, NETWORK_LED_CORE);
@@ -123,16 +98,15 @@ void colorWipe(uint32_t color) {
 void ballCountTask(void* parameter) {
   (void)parameter;
 
-  int peakRange[SENSOR_COUNT] = {};
-  int troughRange[SENSOR_COUNT] = {};
-  bool hasSample[SENSOR_COUNT] = {};
-  bool waitingForRise[SENSOR_COUNT] = {};
-  uint32_t lastRangeSeenMs[SENSOR_COUNT] = {};
-  uint32_t lastStaleLogMs[SENSOR_COUNT] = {};
+  // true = beam clear (no ball), false = beam blocked (ball present)
+  bool lastState[SENSOR_COUNT];
+  uint32_t lastCountMs[SENSOR_COUNT];
   uint32_t lastDiagnosticLogMs = 0;
-  uint32_t lastRecoveryAttemptMs[SENSOR_COUNT] = {};
-  int lastValidRangeMm[SENSOR_COUNT] = {};
-  uint32_t invalidRangeCount[SENSOR_COUNT] = {};
+
+  for (int i = 0; i < SENSOR_COUNT; i++) {
+    lastState[i] = (digitalRead(SENSOR_PINS[i]) == HIGH);
+    lastCountMs[i] = 0;
+  }
 
   while (true) {
     uint32_t now = millis();
@@ -147,142 +121,44 @@ void ballCountTask(void* parameter) {
 
     if (resetSensorStateNow) {
       for (int i = 0; i < SENSOR_COUNT; i++) {
-        peakRange[i] = 0;
-        troughRange[i] = 0;
-        hasSample[i] = false;
-        waitingForRise[i] = false;
-        lastRangeSeenMs[i] = 0;
-        lastStaleLogMs[i] = 0;
-        lastRecoveryAttemptMs[i] = now;
-        lastValidRangeMm[i] = 0;
-        invalidRangeCount[i] = 0;
-        sensors[i].startRangeContinuous();
+        lastState[i] = (digitalRead(SENSOR_PINS[i]) == HIGH);
+        lastCountMs[i] = 0;
       }
       Serial.println("[HUB] Sensor state reset requested by clear_fuel_count.");
     }
 
-    // Serial.printf("fuelCount: %d\n", fuelCount);
-
     for (int i = 0; i < SENSOR_COUNT; i++) {
-      if (sensors[i].isRangeComplete()) {
-        int rangemm = sensors[i].readRange();
-        lastRangeSeenMs[i] = now;
-        lastRecoveryAttemptMs[i] = now; // Reset recovery timer on successful read
+      // E18-D80NK: LOW = ball detected (beam blocked), HIGH = clear
+      bool currentState = (digitalRead(SENSOR_PINS[i]) == HIGH);
 
-        bool inValidBounds = rangemm >= SENSOR_VALID_MIN_MM && rangemm <= SENSOR_VALID_MAX_MM;
-        bool plausibleStep = !hasSample[i] || abs(rangemm - lastValidRangeMm[i]) <= SENSOR_MAX_STEP_MM;
-        if (!inValidBounds || !plausibleStep) {
-          invalidRangeCount[i]++;
-
-          if ((invalidRangeCount[i] % 10) == 1) {
-            Serial.printf(
-              "[HUB] Sensor %d invalid range %d mm (bounds %d-%d, plausible=%s, invalid_count=%lu); resetting state\n",
-              i,
-              rangemm,
-              SENSOR_VALID_MIN_MM,
-              SENSOR_VALID_MAX_MM,
-              plausibleStep ? "yes" : "no",
-              (unsigned long)invalidRangeCount[i]);
+      // Count on falling edge (clear -> blocked), subject to debounce
+      if (!currentState && lastState[i]) {
+        if (now - lastCountMs[i] >= BALL_DEBOUNCE_MS) {
+          portENTER_CRITICAL(&stateLock);
+          if (shouldCountFuel) {
+            fuelCount++;
           }
-
-          hasSample[i] = false;
-          waitingForRise[i] = false;
-          sensors[i].startRangeContinuous();
-          continue;
-        }
-
-        lastValidRangeMm[i] = rangemm;
-
-        // if (i == 0) {
-        //   Serial.printf("range[%d]: %04d mm\n", i, rangemm);
-        // }
-
-        if (!hasSample[i]) {
-          hasSample[i] = true;
-          peakRange[i] = rangemm;
-          troughRange[i] = rangemm;
-          continue;
-        }
-
-        if (!waitingForRise[i]) {
-          if (rangemm > peakRange[i]) {
-            peakRange[i] = rangemm;
-          }
-
-          if ((peakRange[i] - rangemm) >= BALL_DETECT_DROP_MM) {
-            waitingForRise[i] = true;
-            troughRange[i] = rangemm;
-          }
-        } else {
-          if (rangemm < troughRange[i]) {
-            troughRange[i] = rangemm;
-          }
-
-          if ((rangemm - troughRange[i]) >= BALL_DETECT_RISE_MM) {
-            portENTER_CRITICAL(&stateLock);
-            if (shouldCountFuel) {
-              fuelCount++;
-            }
-            portEXIT_CRITICAL(&stateLock);
-
-            waitingForRise[i] = false;
-            peakRange[i] = rangemm;
-            troughRange[i] = rangemm;
-          }
-        }
-      } else if (hasSample[i]) {
-        uint32_t staleMs = now - lastRangeSeenMs[i];
-        
-        // Try recovery at 500ms, 2000ms, and 10000ms intervals
-        if (staleMs >= SENSOR_STALE_MS) {
-          bool shouldRecover = false;
-          
-          if (staleMs >= 10000 && now - lastRecoveryAttemptMs[i] >= 2000) {
-            shouldRecover = true;
-          } else if (staleMs >= 2000 && now - lastRecoveryAttemptMs[i] >= 1000) {
-            shouldRecover = true;
-          } else if (staleMs >= SENSOR_STALE_MS && now - lastRecoveryAttemptMs[i] >= 500) {
-            shouldRecover = true;
-          }
-          
-          if (shouldRecover) {
-            Serial.printf("[HUB] Sensor %d stale for %lu ms, attempting recovery\n", i, (unsigned long)staleMs);
-            lastRecoveryAttemptMs[i] = now;
-            sensors[i].startRangeContinuous();
-          }
+          portEXIT_CRITICAL(&stateLock);
+          lastCountMs[i] = now;
         }
       }
+
+      lastState[i] = currentState;
     }
 
-    // Periodic diagnostic logging to track sensor health
+    // Periodic diagnostic logging
     if (now - lastDiagnosticLogMs >= 5000) {
       lastDiagnosticLogMs = now;
-      Serial.println("[HUB] === Sensor Diagnostic Report ===");
       uint32_t currentFuelCount;
       portENTER_CRITICAL(&stateLock);
       currentFuelCount = fuelCount;
       portEXIT_CRITICAL(&stateLock);
-      
-      Serial.printf("[HUB] Current fuel count: %lu\n", (unsigned long)currentFuelCount);
+      Serial.printf("[HUB] Fuel count: %lu | Sensors:", (unsigned long)currentFuelCount);
       for (int i = 0; i < SENSOR_COUNT; i++) {
-        if (!hasSample[i]) {
-          Serial.printf("[HUB]   Sensor %d: No samples yet\n", i);
-        } else {
-          uint32_t staleMs = now - lastRangeSeenMs[i];
-          Serial.printf("[HUB]   Sensor %d: %s (stale %lu ms, %s)\n", 
-            i,
-            waitingForRise[i] ? "WaitingForRise" : "AcquiringPeak",
-            (unsigned long)staleMs,
-            staleMs >= SENSOR_STALE_MS ? "STALE" : "OK");
-        }
-        if (invalidRangeCount[i] > 0) {
-          Serial.printf("[HUB]   Sensor %d invalid samples: %lu\n", i, (unsigned long)invalidRangeCount[i]);
-        }
+        Serial.printf(" [%d]=%s", i, lastState[i] ? "clear" : "blocked");
       }
-      Serial.println("[HUB] ================================");
+      Serial.println();
     }
-
-    // Serial.printf("fuelCount: %d, shouldCountFuel: %d\n", fuelCount, shouldCountFuel);
 
     vTaskDelay(pdMS_TO_TICKS(1));
   }
