@@ -17,6 +17,7 @@ const uint32_t INITIAL_REPLY_TIMEOUT_MS = 500;
 const uint32_t REPLY_BODY_TIMEOUT_MS = 200;
 const uint32_t FLASH_INTERVAL_MS = 250;
 const uint32_t BALL_DEBOUNCE_MS = 100;
+const uint32_t BALL_MIN_BLOCKED_MS = 50;
 
 const size_t RX_BUF_SIZE = 256;
 
@@ -101,11 +102,15 @@ void ballCountTask(void* parameter) {
   // true = beam clear (no ball), false = beam blocked (ball present)
   bool lastState[SENSOR_COUNT];
   uint32_t lastCountMs[SENSOR_COUNT];
+  uint32_t sensorCount[SENSOR_COUNT];
+  uint32_t blockedSinceMs[SENSOR_COUNT];
   uint32_t lastDiagnosticLogMs = 0;
 
   for (int i = 0; i < SENSOR_COUNT; i++) {
     lastState[i] = (digitalRead(SENSOR_PINS[i]) == HIGH);
     lastCountMs[i] = 0;
+    sensorCount[i] = 0;
+    blockedSinceMs[i] = 0;
   }
 
   while (true) {
@@ -123,6 +128,8 @@ void ballCountTask(void* parameter) {
       for (int i = 0; i < SENSOR_COUNT; i++) {
         lastState[i] = (digitalRead(SENSOR_PINS[i]) == HIGH);
         lastCountMs[i] = 0;
+        sensorCount[i] = 0;
+        blockedSinceMs[i] = 0;
       }
       Serial.println("[HUB] Sensor state reset requested by clear_fuel_count.");
     }
@@ -131,15 +138,25 @@ void ballCountTask(void* parameter) {
       // E18-D80NK: LOW = ball detected (beam blocked), HIGH = clear
       bool currentState = (digitalRead(SENSOR_PINS[i]) == HIGH);
 
-      // Count on falling edge (clear -> blocked), subject to debounce
       if (!currentState && lastState[i]) {
-        if (now - lastCountMs[i] >= BALL_DEBOUNCE_MS) {
+        // Falling edge: beam just blocked — record when it started
+        blockedSinceMs[i] = now;
+      } else if (currentState && !lastState[i]) {
+        // Rising edge: beam just cleared — count only if blocked long enough and debounce has elapsed
+        uint32_t blockedDurationMs = now - blockedSinceMs[i];
+        if (blockedDurationMs >= BALL_MIN_BLOCKED_MS && now - lastCountMs[i] >= BALL_DEBOUNCE_MS) {
           portENTER_CRITICAL(&stateLock);
           if (shouldCountFuel) {
             fuelCount++;
           }
           portEXIT_CRITICAL(&stateLock);
+          sensorCount[i]++;
+          Serial.printf("[HUB] Ball detected on sensor %d (blocked %lu ms, sensor total: %lu)\n",
+            i, (unsigned long)blockedDurationMs, (unsigned long)sensorCount[i]);
           lastCountMs[i] = now;
+        } else if (blockedDurationMs < BALL_MIN_BLOCKED_MS) {
+          Serial.printf("[HUB] Sensor %d: pulse ignored (blocked only %lu ms, below %lu ms minimum)\n",
+            i, (unsigned long)blockedDurationMs, (unsigned long)BALL_MIN_BLOCKED_MS);
         }
       }
 
@@ -153,11 +170,11 @@ void ballCountTask(void* parameter) {
       portENTER_CRITICAL(&stateLock);
       currentFuelCount = fuelCount;
       portEXIT_CRITICAL(&stateLock);
-      Serial.printf("[HUB] Fuel count: %lu | Sensors:", (unsigned long)currentFuelCount);
+      Serial.printf("[HUB] Fuel count: %lu\n", (unsigned long)currentFuelCount);
       for (int i = 0; i < SENSOR_COUNT; i++) {
-        Serial.printf(" [%d]=%s", i, lastState[i] ? "clear" : "blocked");
+        Serial.printf("[HUB]   Sensor %d (pin %d): %lu counts, currently %s\n",
+          i, SENSOR_PINS[i], (unsigned long)sensorCount[i], lastState[i] ? "clear" : "blocked");
       }
-      Serial.println();
     }
 
     vTaskDelay(pdMS_TO_TICKS(1));
