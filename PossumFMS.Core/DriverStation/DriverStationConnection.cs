@@ -30,6 +30,7 @@ public sealed class DriverStationConnection
     /// Set from the TCP connection's remote IP; null until DS connects via TCP.
     /// </summary>
     internal IPEndPoint? UdpEndpoint { get; set; }
+    internal IPEndPoint? ValidatedEndpoint { get; set; }
 
     internal TcpClient? TcpClient { get; set; }
 

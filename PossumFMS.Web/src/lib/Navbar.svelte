@@ -3,6 +3,22 @@
 	import { page } from '$app/state';
 
 	const matchState = $derived(fms.matchState);
+	let password = $state('');
+	let loginError = $state('');
+	let isSigningIn = $state(false);
+
+	async function signIn() {
+		loginError = '';
+		isSigningIn = true;
+		try {
+			await fms.signIn(password);
+			password = '';
+		} catch (error) {
+			loginError = error instanceof Error ? error.message : 'Unable to sign in.';
+		} finally {
+			isSigningIn = false;
+		}
+	}
 
 	const navLinks = [
 		{ href: '/', label: 'Match Play' },
@@ -37,6 +53,34 @@
 				></span>{fms.connected ? 'Connected' : 'Connecting'}</span
 			>
 			<span>{matchState?.matchType ?? 'None'} #{matchState?.matchNumber ?? 0}</span>
+			{#if fms.operatorAuthenticated}
+				<button
+					onclick={() => void fms.signOut()}
+					class="rounded border border-emerald-700 bg-emerald-50 px-2 py-1 font-bold text-emerald-800 hover:bg-emerald-100"
+				>
+					Operator signed in
+				</button>
+			{:else}
+				<form class="flex items-center gap-1" onsubmit={(event) => { event.preventDefault(); void signIn(); }}>
+					<label class="sr-only" for="operator-password">Operator password</label>
+					<input
+						id="operator-password"
+						type="password"
+						bind:value={password}
+						autocomplete="current-password"
+						placeholder="Operator password"
+						class="h-7 w-36 rounded border border-slate-400 bg-white px-2 text-xs text-slate-900"
+					/>
+					<button
+						type="submit"
+						disabled={isSigningIn || password.length === 0}
+						class="h-7 rounded bg-slate-800 px-2 font-bold text-white hover:bg-slate-700 disabled:opacity-50"
+					>
+						{isSigningIn ? 'Signing in' : 'Sign in'}
+					</button>
+				</form>
+			{/if}
+			{#if loginError}<span class="max-w-48 text-rose-700">{loginError}</span>{/if}
 		</div>
 	</div>
 </div>

@@ -36,6 +36,16 @@ public sealed class FieldHardwareManager : BackgroundService
 
     public IReadOnlyList<FieldDevice> Devices => _devices.Values.ToList();
 
+    public bool HasHealthyEstopDevice()
+    {
+        var freshnessCutoff = DateTime.UtcNow - _clientTimeout;
+        return _devices.Values.Any(device =>
+            device.Type == FieldDeviceType.Estop
+            && !device.Bypassed
+            && device.IsConnected
+            && device.LastSeen >= freshnessCutoff);
+    }
+
     public FieldHardwareManager(
         IConfiguration config,
         Arena.Arena arena,
@@ -257,6 +267,17 @@ public sealed class FieldHardwareManager : BackgroundService
     {
         if (!_devices.TryGetValue(deviceId, out var device))
             return false;
+
+        if (bypassed && device.Type == FieldDeviceType.Estop && HasHealthyEstopDevice()
+            && _devices.Values.Count(other => other.Id != deviceId
+                && other.Type == FieldDeviceType.Estop
+                && !other.Bypassed
+                && other.IsConnected
+                && other.LastSeen >= DateTime.UtcNow - _clientTimeout) == 0)
+        {
+            _logger.LogWarning("Refused bypass for {DeviceName}: it is the last healthy E-stop device.", device.Name);
+            return false;
+        }
 
         device.Bypassed = bypassed;
         return true;

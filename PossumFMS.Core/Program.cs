@@ -1,6 +1,9 @@
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using Microsoft.Extensions.FileProviders;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Identity;
 using PossumFMS.Core.Arena;
 using PossumFMS.Core.Database;
 using PossumFMS.Core.Display;
@@ -9,6 +12,16 @@ using PossumFMS.Core.FieldHardware;
 using PossumFMS.Core.Frontend;
 using PossumFMS.Core.Network;
 using PossumFMS.Core.TheBlueAlliance;
+using PossumFMS.Core.Security;
+
+if (args.Contains("--set-operator-password", StringComparer.OrdinalIgnoreCase))
+{
+    var configPath = Path.Combine(Directory.GetCurrentDirectory(), "appsettings.json");
+    if (!File.Exists(configPath))
+        configPath = Path.Combine(AppContext.BaseDirectory, "appsettings.json");
+    Environment.ExitCode = OperatorPasswordConfigurator.Configure(configPath);
+    return;
+}
 
 // Check that this is the only instance of PossumFMS.Core running
 const string SingleInstanceMutexName = "PossumFMS.Core.Singleton";
@@ -20,6 +33,19 @@ if (!isPrimaryInstance)
 }
 
 var builder = WebApplication.CreateBuilder(args);
+
+var operatorPasswordHash = builder.Configuration["Security:OperatorPasswordHash"];
+builder.Services.AddSingleton(new PasswordHasher<object>());
+builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(options =>
+    {
+        options.LoginPath = "/login";
+        options.Cookie.Name = "PossumFMS.Operator";
+        options.Cookie.HttpOnly = true;
+        options.Cookie.SameSite = SameSiteMode.Strict;
+    });
+builder.Services.AddAuthorization(options =>
+    options.AddPolicy(FieldAuthorization.OperatorPolicy, policy => policy.RequireAuthenticatedUser()));
 
 builder.WebHost.ConfigureKestrel(serverOptions => 
 {
@@ -106,6 +132,29 @@ if (!hasRequiredIp)
         RequiredIp, RequiredIp);
 
 app.UseCors();
+app.UseAuthentication();
+app.UseAuthorization();
+
+app.MapPost("/auth/login", async (OperatorLoginRequest request, HttpContext context, PasswordHasher<object> passwordHasher) =>
+{
+    if (string.IsNullOrWhiteSpace(operatorPasswordHash)
+        || passwordHasher.VerifyHashedPassword(new object(), operatorPasswordHash, request.Password ?? string.Empty)
+            == PasswordVerificationResult.Failed)
+        return Results.Unauthorized();
+
+    var identity = new System.Security.Claims.ClaimsIdentity(
+        [new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.Name, FieldAuthorization.OperatorName)],
+        CookieAuthenticationDefaults.AuthenticationScheme);
+    await context.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new System.Security.Claims.ClaimsPrincipal(identity));
+    return Results.NoContent();
+});
+app.MapGet("/auth/status", (HttpContext context) =>
+    Results.Ok(new { authenticated = context.User.Identity?.IsAuthenticated == true }));
+app.MapPost("/auth/logout", async (HttpContext context) =>
+{
+    await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+    return Results.NoContent();
+});
 app.MapHub<FmsHub>("/fmshub");
 
 var webBuildPath = Path.GetFullPath(Path.Combine(app.Environment.ContentRootPath, "..", "PossumFMS.Web", "build"));
@@ -169,3 +218,5 @@ else
 }
 
 app.Run();
+
+public sealed record OperatorLoginRequest(string? Password);

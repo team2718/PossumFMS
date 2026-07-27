@@ -211,6 +211,7 @@ export interface RecentLogEntry {
 class FmsConnection {
 	matchState = $state<MatchState | null>(null);
 	connected = $state(false);
+	operatorAuthenticated = $state(false);
 	logEntries = $state<RecentLogEntry[]>([]);
 
 	private hub: signalR.HubConnection | null = null;
@@ -256,6 +257,33 @@ class FmsConnection {
 				return Promise.all([this.hub!.invoke('RequestMatchState'), this.hub!.invoke('RequestRecentLogs')]);
 			})
 			.catch(console.error);
+
+		void this.refreshOperatorSession();
+	}
+
+	async refreshOperatorSession() {
+		try {
+			const response = await fetch('/auth/status', { credentials: 'same-origin' });
+			this.operatorAuthenticated = response.ok && (await response.json()).authenticated === true;
+		} catch {
+			this.operatorAuthenticated = false;
+		}
+	}
+
+	async signIn(password: string) {
+		const response = await fetch('/auth/login', {
+			method: 'POST',
+			credentials: 'same-origin',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ password })
+		});
+		if (!response.ok) throw new Error('Operator password was not accepted.');
+		this.operatorAuthenticated = true;
+	}
+
+	async signOut() {
+		await fetch('/auth/logout', { method: 'POST', credentials: 'same-origin' });
+		this.operatorAuthenticated = false;
 	}
 
 	private mergeLogs(entries: RecentLogEntry[]): RecentLogEntry[] {
@@ -282,11 +310,11 @@ class FmsConnection {
 	}
 	/** Move arena to PreMatch phase so teams can connect */
 	startPreMatch() {
-		this.hub?.invoke('StartPreMatch');
+		return this.invoke('StartPreMatch');
 	}
 	/** Start the match (must be in PreMatch) */
 	startMatch() {
-		this.hub?.invoke('StartMatch');
+		return this.invoke('StartMatch');
 	}
 	/** Abort a running match */
 	abortMatch() {
@@ -302,7 +330,7 @@ class FmsConnection {
 	}
 	/** Clear the arena-wide e-stop */
 	resetArenaEstop() {
-		this.hub?.invoke('ResetArenaEstop');
+		return this.invoke('ResetArenaEstop');
 	}
 	/** E-stop a single station's robot (0=Red1 … 5=Blue3) */
 	estopStation(stationIndex: number) {

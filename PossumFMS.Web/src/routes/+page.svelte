@@ -113,6 +113,7 @@
 	let configureWarning = $state('');
 	let configureSuccess = $state('');
 	let isConfiguring = $state(false);
+	let matchControlWarning = $state('');
 
 	type StationStatus = {
 		teamNumber: number;
@@ -445,6 +446,24 @@
 					: 'Failed to update Free Practice. Please try again.';
 		} finally {
 			isTogglingFreePractice = false;
+		}
+	}
+
+	async function startMatch() {
+		matchControlWarning = '';
+		try {
+			await fms.startMatch();
+		} catch (error) {
+			matchControlWarning = error instanceof Error ? error.message : 'Unable to start the match.';
+		}
+	}
+
+	async function resetArenaEstop() {
+		matchControlWarning = '';
+		try {
+			await fms.resetArenaEstop();
+		} catch (error) {
+			matchControlWarning = error instanceof Error ? error.message : 'Unable to reset arena E-stop.';
 		}
 	}
 
@@ -1132,7 +1151,7 @@
 						Prestart Match
 					</button>
 					<button
-						onclick={() => fms.startMatch()}
+						onclick={() => void startMatch()}
 						disabled={phase !== 'PreMatch' || !blueReady || !redReady || !!matchState?.arenaEstop}
 						class="h-14 min-w-44 rounded px-5 text-sm font-black disabled:cursor-not-allowed {phase ===
 							'PreMatch' &&
@@ -1144,6 +1163,9 @@
 					>
 						Start Match
 					</button>
+					{#if matchControlWarning}
+						<span class="max-w-80 text-center text-xs font-semibold text-rose-700">{matchControlWarning}</span>
+					{/if}
 					<button
 						onclick={() => fms.abortMatch()}
 						disabled={phase !== 'Auto' && phase !== 'AutoToTeleopTransition' && phase !== 'Teleop'}
@@ -1175,9 +1197,10 @@
 					</button>
 					{#if matchState?.arenaEstop}
 						<button
+							onclick={() => void resetArenaEstop()}
 							class="h-14 min-w-44 rounded bg-[repeating-linear-gradient(-45deg,#e7ca4f_0px,#e7ca4f_8px,#9a9a9a_8px,#9a9a9a_16px)] px-5 text-sm font-black text-black"
 						>
-							Arena is E-STOPPED!
+							Reset Arena E-Stop
 						</button>
 					{:else}
 						<button

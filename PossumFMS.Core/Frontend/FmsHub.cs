@@ -1,4 +1,6 @@
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.AspNetCore.Authorization;
+using PossumFMS.Core.Security;
 using PossumFMS.Core.Arena;
 using PossumFMS.Core.Database;
 using PossumFMS.Core.Display;
@@ -91,6 +93,7 @@ public sealed class FmsHub(
         await BroadcastMatchState();
     }
 
+    [Authorize(Policy = FieldAuthorization.OperatorPolicy)]
     public async Task SetFreePracticeEnabled(bool enabled)
     {
         logger.LogInformation(
@@ -225,15 +228,20 @@ public sealed class FmsHub(
         await BroadcastMatchState();
     }
 
+    [Authorize(Policy = FieldAuthorization.OperatorPolicy)]
     public async Task StartMatch()
     {
         logger.LogInformation("StartMatch requested by {Client}.", Context.ConnectionId);
 
-        // Only start if every non-bypassed station has a driver station linked.
-        if (!dsManager.Stations.Values.All(s => s.IsReady))
+        var readinessFailures = dsManager.GetMatchStartReadinessFailures().ToList();
+        if (!arena.FreePracticeEnabled && !fieldHardwareManager.HasHealthyEstopDevice())
+            readinessFailures.Add("No healthy field E-stop device is connected.");
+
+        if (readinessFailures.Count > 0)
         {
-            logger.LogWarning("StartMatch blocked — not all stations ready.");
-            return;
+            var details = string.Join(" ", readinessFailures);
+            logger.LogWarning("StartMatch blocked: {Details}", details);
+            throw new HubException($"Match start blocked: {details}");
         }
 
         arena.StartMatch();
@@ -268,10 +276,20 @@ public sealed class FmsHub(
         await BroadcastMatchState();
     }
 
+    [Authorize(Policy = FieldAuthorization.OperatorPolicy)]
     public async Task ResetArenaEstop()
     {
         arena.ResetArenaEstop();
         
+        await BroadcastMatchState();
+    }
+
+    [Authorize(Policy = FieldAuthorization.OperatorPolicy)]
+    public async Task ResetDriverStationControlFault()
+    {
+        if (!dsManager.ResetControlFault())
+            throw new HubException("Driver Station control fault cannot be reset until the field is idle and the transport is healthy.");
+
         await BroadcastMatchState();
     }
 

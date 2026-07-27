@@ -29,7 +29,6 @@ public sealed class DriverStationManager : BackgroundService
 
     // ── Ports ──────────────────────────────────────────────────────────────────
 
-    private const int FmsUdpListenPort = 1160;
     private const int DsUdpReceivePort = 1121;
     private const int FmsTcpListenPort = 1750;
     private const string DriverStationEventCode = "POSM";
@@ -44,11 +43,18 @@ public sealed class DriverStationManager : BackgroundService
 
     private readonly object _loopTimingLock = new();
     private readonly object _stationStateLock = new();
+    private readonly object _controlHealthLock = new();
     private readonly Queue<(long Timestamp, double DurationMs)> _loopTimingSamples = new();
+    private readonly Func<IDriverStationUdpTransport> _udpTransportFactory;
     private double _currentLoopMs;
     private double _maxLoopMs30s;
 
-    private Socket?            _udpSocket;
+    private IDriverStationUdpTransport? _udpTransport;
+    private DriverStationControlHealth _controlHealth = new(
+        DriverStationControlState.Stopped,
+        TransportAvailable: false,
+        LastFaultUtc: null,
+        LastFault: null);
     private CancellationToken  _ct;
 
     // Completion signals so StopAsync can wait for both loops to fully clean up.
@@ -63,9 +69,18 @@ public sealed class DriverStationManager : BackgroundService
     private DateTime _practiceModeOverrideUntil = DateTime.MinValue;
 
     public DriverStationManager(Arena.Arena arena, ILogger<DriverStationManager> logger)
+        : this(arena, logger, () => new SocketDriverStationUdpTransport())
+    {
+    }
+
+    internal DriverStationManager(
+        Arena.Arena arena,
+        ILogger<DriverStationManager> logger,
+        Func<IDriverStationUdpTransport> udpTransportFactory)
     {
         _arena  = arena;
         _logger = logger;
+        _udpTransportFactory = udpTransportFactory;
         Stations = AllianceStations.All
             .ToFrozenDictionary(s => s, s => new DriverStationConnection(s));
     }
@@ -78,6 +93,66 @@ public sealed class DriverStationManager : BackgroundService
     {
         lock (_loopTimingLock)
             return (_currentLoopMs, _maxLoopMs30s);
+    }
+
+    public DriverStationControlHealth GetControlHealthSnapshot()
+    {
+        lock (_controlHealthLock)
+            return _controlHealth;
+    }
+
+    public bool IsControlChannelOperational()
+    {
+        lock (_controlHealthLock)
+            return _controlHealth.State == DriverStationControlState.Operational
+                && _controlHealth.TransportAvailable;
+    }
+
+    public bool ResetControlFault()
+    {
+        if (_arena.Phase != MatchPhase.Idle)
+            return false;
+
+        lock (_controlHealthLock)
+        {
+            if (_controlHealth.State != DriverStationControlState.Faulted
+                || !_controlHealth.TransportAvailable)
+                return false;
+
+            _controlHealth = new DriverStationControlHealth(
+                DriverStationControlState.Operational,
+                TransportAvailable: true,
+                LastFaultUtc: null,
+                LastFault: null);
+            return true;
+        }
+    }
+
+    public IReadOnlyList<string> GetMatchStartReadinessFailures()
+    {
+        var failures = new List<string>();
+        if (!IsControlChannelOperational())
+            failures.Add("Driver Station UDP control channel is not operational.");
+
+        lock (_stationStateLock)
+        {
+            foreach (var ds in Stations.Values)
+            {
+                if (ds.Bypassed)
+                    continue;
+
+                if (ds.TeamNumber <= 0)
+                    failures.Add($"{ds.Station} has no assigned team.");
+                else if (!ds.IsLinked)
+                    failures.Add($"{ds.Station} is not linked to its robot.");
+                else if (ds.TcpClient is null || ds.UdpEndpoint is null)
+                    failures.Add($"{ds.Station} has no validated FMS control endpoint.");
+                else if (ds.Estop)
+                    failures.Add($"{ds.Station} is e-stopped.");
+            }
+        }
+
+        return failures;
     }
 
     /// <summary>Raised whenever any station's team assignment changes.</summary>
@@ -320,20 +395,41 @@ public sealed class DriverStationManager : BackgroundService
 
     private void RunControlLoop(CancellationToken ct)
     {
-        _udpSocket = TryCreateAndBindUdpSocket();
-        if (_udpSocket is null)
+        while (!ct.IsCancellationRequested)
         {
-            _logger.LogError(
-                "Driver Station UDP control loop disabled because port {Port} could not be bound.",
-                FmsUdpListenPort);
-            return;
+            IDriverStationUdpTransport? transport = null;
+            try
+            {
+                SetControlStarting();
+                transport = _udpTransportFactory();
+                transport.Bind();
+                _udpTransport = transport;
+                SetTransportAvailable();
+
+                _logger.LogInformation("DS control loop started (target {Period} ms).", LoopPeriod.TotalMilliseconds);
+                RunBoundControlLoop(ct);
+            }
+            catch (Exception ex) when (!ct.IsCancellationRequested)
+            {
+                HandleControlFault(ex);
+                ct.WaitHandle.WaitOne(TimeSpan.FromMilliseconds(500));
+            }
+            finally
+            {
+                if (ReferenceEquals(_udpTransport, transport))
+                    _udpTransport = null;
+
+                transport?.Dispose();
+            }
         }
 
-        _udpSocket.Blocking = false;
+        SetControlStopped();
+        _logger.LogInformation("DS control loop stopped.");
+    }
 
-        _logger.LogInformation("DS control loop started (target {Period} ms).", LoopPeriod.TotalMilliseconds);
-
-        var sw   = Stopwatch.StartNew();
+    private void RunBoundControlLoop(CancellationToken ct)
+    {
+        var sw = Stopwatch.StartNew();
         var next = sw.Elapsed + LoopPeriod;
 
         while (!ct.IsCancellationRequested)
@@ -352,39 +448,6 @@ public sealed class DriverStationManager : BackgroundService
             var loopMs = (loopEnd - loopStart) * 1000.0 / Stopwatch.Frequency;
             RecordLoopTiming(loopEnd, loopMs);
         }
-
-        _udpSocket.Dispose();
-        _logger.LogInformation("DS control loop stopped.");
-    }
-
-    private Socket? TryCreateAndBindUdpSocket()
-    {
-        var socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-        socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
-
-        try
-        {
-            socket.Bind(new IPEndPoint(IPAddress.Any, FmsUdpListenPort));
-            return socket;
-        }
-        catch (SocketException ex) when (ex.SocketErrorCode == SocketError.AccessDenied)
-        {
-            _logger.LogError(ex,
-                "Access denied while binding UDP port {Port}. On Windows this is usually a reserved/excluded port range or security policy. " +
-                "Run 'netsh int ipv4 show excludedportrange protocol=udp' and choose a non-excluded port for local testing, " +
-                "or run with elevated privileges if required by policy.",
-                FmsUdpListenPort);
-            socket.Dispose();
-            return null;
-        }
-        catch (SocketException ex) when (ex.SocketErrorCode == SocketError.AddressAlreadyInUse)
-        {
-            _logger.LogError(ex,
-                "UDP port {Port} is already in use by another process. Stop the conflicting process or change the DS port.",
-                FmsUdpListenPort);
-            socket.Dispose();
-            return null;
-        }
     }
 
     // ── UDP receive ────────────────────────────────────────────────────────────
@@ -393,15 +456,15 @@ public sealed class DriverStationManager : BackgroundService
 
     private void DrainUdpReceiveBuffer()
     {
-        if (_udpSocket is null) return;
+        var transport = _udpTransport ?? throw new InvalidOperationException("Driver Station UDP transport is unavailable.");
 
-        EndPoint remote = new IPEndPoint(IPAddress.Any, 0);
         while (true)
         {
             int bytes;
+            IPEndPoint remoteEndpoint;
             try
             {
-                bytes = _udpSocket.ReceiveFrom(_rxBuf, ref remote);
+                bytes = transport.Receive(_rxBuf, out remoteEndpoint);
             }
             catch (SocketException ex) when (ex.SocketErrorCode == SocketError.WouldBlock)
             {
@@ -409,12 +472,14 @@ public sealed class DriverStationManager : BackgroundService
             }
 
             if (bytes < 8) continue;
-
-            ParseStatusPacket(_rxBuf.AsSpan(0, bytes));
+            ParseStatusPacket(_rxBuf.AsSpan(0, bytes), remoteEndpoint);
         }
     }
 
     internal void ParseStatusPacket(ReadOnlySpan<byte> packet)
+        => ParseStatusPacket(packet, remoteEndpoint: null);
+
+    internal void ParseStatusPacket(ReadOnlySpan<byte> packet, IPEndPoint? remoteEndpoint)
     {
         // DS → FMS UDP status packet layout:
         //   [0-1]  Sequence number (not used by FMS)
@@ -431,6 +496,9 @@ public sealed class DriverStationManager : BackgroundService
         int teamNumber = (packet[4] << 8) | packet[5];
         var ds = FindStationByTeamNumber(teamNumber);
         if (ds is null) return;
+        if (remoteEndpoint is not null
+            && (ds.ValidatedEndpoint is null || !ds.ValidatedEndpoint.Address.Equals(remoteEndpoint.Address)))
+            return;
 
         ds.LastPacketTime = DateTime.UtcNow;
         ds.DsLinked       = true;
@@ -494,7 +562,7 @@ public sealed class DriverStationManager : BackgroundService
 
     private void SendControlPackets()
     {
-        if (_udpSocket is null) return;
+        var transport = _udpTransport ?? throw new InvalidOperationException("Driver Station UDP transport is unavailable.");
 
         bool practiceOverride = _arena.FreePracticeEnabled && DateTime.UtcNow < _practiceModeOverrideUntil;
         if (!IsDriverStationCommunicationEnabled() && !practiceOverride) return;
@@ -505,14 +573,7 @@ public sealed class DriverStationManager : BackgroundService
 
             EncodeControlPacket(_txBuf, ds);
 
-            try
-            {
-                _udpSocket.SendTo(_txBuf, ds.UdpEndpoint);
-            }
-            catch (SocketException ex)
-            {
-                _logger.LogWarning("UDP send failed for {Station}: {Error}", ds.Station, ex.SocketErrorCode);
-            }
+            transport.Send(_txBuf, ds.UdpEndpoint);
 
             ds.TxSequence++;
         }
@@ -664,6 +725,7 @@ public sealed class DriverStationManager : BackgroundService
         stream.ReadTimeout = (int)TcpReadTimeout.TotalMilliseconds;
 
         DriverStationConnection? ds = null;
+        var ownsStation = false;
         try
         {
             // ── Handshake: read initial DS→FMS identification packet ───────────
@@ -723,6 +785,10 @@ public sealed class DriverStationManager : BackgroundService
             {
                 var endpoint = new IPEndPoint(remoteIp, DsUdpReceivePort);
 
+                if (ds.TcpClient is not null
+                    && ds.ValidatedEndpoint?.Address.Equals(remoteIp) != true)
+                    throw new InvalidOperationException($"Station {ds.Station} already has an active Driver Station connection.");
+
                 foreach (var other in Stations.Values)
                 {
                     if (ReferenceEquals(other, ds))
@@ -737,7 +803,9 @@ public sealed class DriverStationManager : BackgroundService
 
                 ds.TcpClient   = tcpClient;
                 ds.UdpEndpoint = endpoint;
+                ds.ValidatedEndpoint = endpoint;
                 ds.TeamNumber  = teamNumber;
+                ownsStation = true;
             }
 
             _logger.LogInformation("Team {Team} connected in station {Station} ({IP}).",
@@ -757,7 +825,7 @@ public sealed class DriverStationManager : BackgroundService
         }
         finally
         {
-            if (ds is not null)
+            if (ds is not null && ownsStation)
             {
                 ClearStationConnectionState(ds, "TCP disconnected", closeTcpClient: false);
                 _logger.LogInformation("DS {Station} (team {Team}) TCP disconnected.", ds.Station, ds.TeamNumber);
@@ -851,6 +919,62 @@ public sealed class DriverStationManager : BackgroundService
     private static Task<bool> ReadExactAsync(NetworkStream stream, byte[] buf, CancellationToken ct) =>
         ReadExactAsync(stream, buf.AsMemory(), ct);
 
+    private void SetControlStarting()
+    {
+        lock (_controlHealthLock)
+        {
+            if (_controlHealth.State != DriverStationControlState.Faulted)
+            {
+                _controlHealth = new DriverStationControlHealth(
+                    DriverStationControlState.Starting,
+                    TransportAvailable: false,
+                    LastFaultUtc: null,
+                    LastFault: null);
+            }
+        }
+    }
+
+    private void SetTransportAvailable()
+    {
+        lock (_controlHealthLock)
+        {
+            _controlHealth = _controlHealth.State == DriverStationControlState.Faulted
+                ? _controlHealth with { TransportAvailable = true }
+                : new DriverStationControlHealth(
+                    DriverStationControlState.Operational,
+                    TransportAvailable: true,
+                    LastFaultUtc: null,
+                    LastFault: null);
+        }
+    }
+
+    private void SetControlStopped()
+    {
+        lock (_controlHealthLock)
+        {
+            _controlHealth = new DriverStationControlHealth(
+                DriverStationControlState.Stopped,
+                TransportAvailable: false,
+                LastFaultUtc: _controlHealth.LastFaultUtc,
+                LastFault: _controlHealth.LastFault);
+        }
+    }
+
+    private void HandleControlFault(Exception ex)
+    {
+        lock (_controlHealthLock)
+        {
+            _controlHealth = new DriverStationControlHealth(
+                DriverStationControlState.Faulted,
+                TransportAvailable: false,
+                LastFaultUtc: DateTime.UtcNow,
+                LastFault: ex.Message);
+        }
+
+        _logger.LogCritical(ex, "Driver Station UDP control channel faulted; asserting arena e-stop.");
+        _arena.TriggerArenaEstop();
+    }
+
     internal bool IsDriverStationCommunicationEnabled() => !_arena.FreePracticeEnabled;
 
     private static void SpinUntil(Stopwatch sw, TimeSpan target)
@@ -898,6 +1022,7 @@ public sealed class DriverStationManager : BackgroundService
             tcpClientToClose = station.TcpClient;
             station.TcpClient   = null;
             station.UdpEndpoint = null;
+            station.ValidatedEndpoint = null;
             station.DsLinked    = false;
             station.RobotLinked = false;
             station.RadioLinked = false;
