@@ -85,6 +85,45 @@
 		);
 	}
 
+	// Calculate reasons why prestart/start might be blocked
+	const unreadyReasons = $derived(
+		(() => {
+			if (!matchState) return ['Connecting to FMS…'];
+			if (matchState.arenaEstop) return ['Arena E-Stop is active'];
+
+			if (phase === 'PreMatch') {
+				const issues: string[] = [];
+				for (let i = 0; i < 6; i++) {
+					const s = matchState.stations[i];
+					if (!s || s.bypassed) continue;
+					const name = stationLabel(i);
+
+					if (s.estop) {
+						issues.push(`${name} is E-Stopped`);
+					} else if (s.astop) {
+						issues.push(`${name} is A-Stopped`);
+					} else if (!s.dsLinked) {
+						issues.push(`${name} no DS link`);
+					} else if (!s.robotLinked) {
+						issues.push(`${name} no Robot link`);
+					} else if (!hasActiveEstopHardware(i)) {
+						issues.push(`${name} no HW E-Stop`);
+					}
+				}
+
+				if (issues.length === 0) return ['✓ All stations ready to start'];
+				return issues;
+			}
+
+			if (phase === 'Idle') {
+				if (matchState.freePracticeEnabled) return ['Free Practice Mode'];
+				return ['Arena Idle — Ready for Prestart'];
+			}
+
+			return [];
+		})()
+	);
+
 	const blueInputIndices = [3, 4, 5];
 	const redInputIndices = [0, 1, 2];
 
@@ -174,7 +213,7 @@
 
 {#snippet readinessHeaderRow()}
 	<div
-		class="hidden items-center gap-1 px-1 py-1 text-center font-bold text-slate-600 sm:grid sm:grid-cols-[68px_66px_minmax(128px,1fr)_48px_44px_44px_88px_80px]"
+		class="hidden items-center gap-1 border-b border-slate-200/80 px-1.5 py-1 text-center text-[10px] font-bold text-slate-500 uppercase sm:grid sm:grid-cols-[68px_66px_minmax(128px,1fr)_48px_44px_44px_88px_80px] dark:border-slate-700/80 dark:text-slate-400"
 	>
 		<div>E-Stop HW</div>
 		<div>Station</div>
@@ -189,7 +228,7 @@
 
 {#snippet readinessStatusCell(online: boolean)}
 	<div
-		class="mx-auto flex h-7 w-10 items-center justify-center rounded font-bold text-white {online
+		class="mx-auto flex h-7 w-10 items-center justify-center rounded font-bold text-white shadow-xs {online
 			? 'bg-emerald-600'
 			: 'bg-rose-700'}"
 	>
@@ -199,14 +238,14 @@
 
 {#snippet robotEnabledCell(estop: boolean, astop: boolean, robotLinked: boolean, bypassed: boolean)}
 	{@const state = estop
-		? { label: 'E-Stopped', classes: 'bg-rose-700 text-white' }
+		? { label: 'E-Stopped', classes: 'bg-rose-700 text-white shadow-xs' }
 		: astop
-			? { label: 'A-Stopped', classes: 'bg-rose-700 text-white' }
+			? { label: 'A-Stopped', classes: 'bg-rose-700 text-white shadow-xs' }
 			: bypassed
-				? { label: 'Bypassed', classes: 'bg-slate-500 text-white' }
+				? { label: 'Bypassed', classes: 'bg-slate-500 text-white shadow-xs' }
 				: !robotLinked
-					? { label: 'No Robot', classes: 'bg-slate-500 text-white' }
-					: { label: 'Enabled', classes: 'bg-emerald-600 text-white' }}
+					? { label: 'No Robot', classes: 'bg-slate-500 text-white shadow-xs' }
+					: { label: 'Enabled', classes: 'bg-emerald-600 text-white shadow-xs' }}
 	<div
 		class="mx-auto flex h-7 w-20 items-center justify-center rounded px-1 text-[10px] font-bold whitespace-nowrap {state.classes}"
 	>
@@ -226,16 +265,30 @@
 	</button>
 {/snippet}
 
-<div class="rounded border border-slate-300 bg-white shadow-xs">
+<div
+	class="rounded border border-slate-300 bg-white shadow-xs transition-colors dark:border-slate-700 dark:bg-slate-800"
+>
 	<!-- Team Configuration Toolbar -->
-	<div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 text-xs">
+	<div
+		class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 text-xs dark:border-slate-700 dark:bg-slate-900/60"
+	>
 		<div class="flex items-center gap-2">
-			<span class="font-bold text-slate-700 uppercase tracking-wider">Field Stations & Teams</span>
+			<span class="font-bold tracking-wider text-slate-700 uppercase dark:text-slate-300">
+				Field Stations & Teams
+			</span>
 			{#if configureWarning}
-				<span class="rounded bg-rose-100 px-2 py-0.5 font-semibold text-rose-800">{configureWarning}</span>
+				<span
+					class="rounded bg-rose-100 px-2 py-0.5 font-semibold text-rose-800 dark:bg-rose-950/80 dark:text-rose-300"
+				>
+					{configureWarning}
+				</span>
 			{/if}
 			{#if configureSuccess}
-				<span class="rounded bg-emerald-100 px-2 py-0.5 font-semibold text-emerald-800">{configureSuccess}</span>
+				<span
+					class="rounded bg-emerald-100 px-2 py-0.5 font-semibold text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300"
+				>
+					{configureSuccess}
+				</span>
 			{/if}
 		</div>
 		<div class="flex items-center gap-2">
@@ -243,7 +296,7 @@
 				<button
 					type="button"
 					onclick={onOpenWpaModal}
-					class="cursor-pointer rounded border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+					class="cursor-pointer rounded border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
 				>
 					Edit WPA Keys
 				</button>
@@ -252,7 +305,7 @@
 				type="button"
 				onclick={clearAllTeams}
 				disabled={phase !== 'Idle' || isConfiguring}
-				class="cursor-pointer rounded border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+				class="cursor-pointer rounded border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-100 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
 			>
 				Clear Teams
 			</button>
@@ -260,7 +313,7 @@
 				type="button"
 				onclick={configureAccessPoint}
 				disabled={phase !== 'Idle' || isConfiguring}
-				class="brand-secondary-bg cursor-pointer rounded px-3 py-1 text-xs font-bold text-white hover:opacity-90 disabled:opacity-50"
+				class="brand-secondary-bg cursor-pointer rounded px-3 py-1 text-xs font-bold text-white shadow-xs hover:opacity-90 disabled:opacity-50"
 			>
 				{isConfiguring ? 'Configuring AP…' : 'Assign Teams & Configure AP'}
 			</button>
@@ -268,13 +321,15 @@
 	</div>
 
 	<!-- Readiness Matrix -->
-	<div class="grid grid-cols-1 xl:grid-cols-[1fr_170px_1fr]">
+	<div class="grid grid-cols-1 xl:grid-cols-[1fr_210px_1fr]">
 		<!-- Blue Alliance -->
-		<div class="alliance-blue-bg-soft border-b border-slate-300 xl:border-r xl:border-b-0">
+		<div
+			class="alliance-blue-bg-soft border-b border-slate-300 xl:border-r xl:border-b-0 dark:border-slate-700"
+		>
 			<div class="alliance-blue-border-soft flex items-center justify-between border-b px-3 py-2">
 				<span class="alliance-blue-text text-sm font-bold tracking-wide">BLUE ALLIANCE</span>
 				<span
-					class="rounded px-2 py-0.5 text-xs font-bold text-white {blueReady
+					class="rounded px-2 py-0.5 text-xs font-bold text-white shadow-xs {blueReady
 						? 'bg-emerald-700'
 						: 'bg-rose-700'}"
 				>
@@ -286,7 +341,7 @@
 				{#each blueStations as s, i (s.index)}
 					{@const idx = blueInputIndices[i]}
 					<div
-						class="alliance-blue-border-soft mt-1 grid grid-cols-[68px_66px_minmax(128px,1fr)_48px_44px_44px_88px_80px] items-center gap-1 rounded border bg-white/75 px-1.5 py-1.5"
+						class="alliance-blue-border-soft mt-1.5 grid grid-cols-[68px_66px_minmax(128px,1fr)_48px_44px_44px_88px_80px] items-center gap-1 rounded border bg-white/80 px-1.5 py-1.5 shadow-xs dark:bg-slate-900/70"
 					>
 						{@render readinessStatusCell(hasActiveEstopHardware(idx))}
 						<div class="alliance-blue-text text-center font-bold">Station {i + 1}</div>
@@ -298,7 +353,7 @@
 								placeholder="Team"
 								bind:value={inputs[idx].team}
 								disabled={phase !== 'Idle'}
-								class="h-7 w-full min-w-[8rem] rounded border border-slate-300 bg-white px-2 text-xs"
+								class="h-7 w-full min-w-[8rem] rounded border border-slate-300 bg-white px-2 text-xs text-slate-900 placeholder-slate-400 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
 							/>
 						</div>
 						<input
@@ -306,7 +361,7 @@
 							checked={s.bypassed}
 							disabled={phase !== 'Idle'}
 							onchange={() => fms.bypassStation(idx, !s.bypassed)}
-							class="mx-auto h-4 w-4 cursor-pointer rounded border-slate-300"
+							class="mx-auto h-4 w-4 cursor-pointer rounded border-slate-300 dark:border-slate-600"
 						/>
 						{@render readinessStatusCell(s.dsLinked)}
 						{@render readinessStatusCell(s.robotLinked)}
@@ -317,24 +372,103 @@
 			</div>
 		</div>
 
-		<!-- Center Column: Match Status -->
+		<!-- Center Column: Match Status & Diagnostics -->
 		<div
-			class="order-first flex flex-col items-center justify-center gap-2 border-b border-slate-300 bg-slate-50 px-4 py-4 text-center xl:order-none xl:border-b-0"
+			class="order-first flex flex-col items-center justify-center gap-2 border-b border-slate-300 bg-slate-50 px-3 py-4 text-center xl:order-none xl:border-b-0 dark:border-slate-700 dark:bg-slate-900/60"
 		>
-			<div class="text-xs font-bold tracking-widest text-slate-500 uppercase">Match Status</div>
-			<div class="text-xl font-black tracking-tight text-slate-800">
+			<div
+				class="text-[11px] font-bold tracking-widest text-slate-500 uppercase dark:text-slate-400"
+			>
+				Match Status
+			</div>
+			<div class="text-lg font-black tracking-tight text-slate-800 dark:text-slate-100">
 				{matchState?.matchType ?? 'Test'} Match {matchState?.matchNumber ?? 1}
 			</div>
 
+			<!-- Phase Pill -->
 			<div
-				class="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-3 py-1 shadow-xs"
+				class="inline-flex items-center gap-1.5 rounded-full border border-slate-300 bg-white px-3 py-0.5 shadow-xs dark:border-slate-600 dark:bg-slate-800"
 			>
-				<span class="text-[11px] font-bold tracking-wider text-slate-600 uppercase">
+				<span
+					class="h-2 w-2 rounded-full {isMatchStartingOrRunning
+						? 'animate-pulse bg-emerald-500'
+						: 'bg-slate-400'}"
+				></span>
+				<span
+					class="text-[11px] font-bold tracking-wider text-slate-700 uppercase dark:text-slate-200"
+				>
 					{displayPhase}
 				</span>
 			</div>
-			<div class="font-mono text-2xl font-black text-slate-800 tabular-nums">
+
+			<!-- Big Countdown Clock -->
+			<div class="font-mono text-3xl font-black text-slate-900 tabular-nums dark:text-slate-100">
 				{matchState ? formatTime(matchState.timeRemaining) : '0:00'}
+			</div>
+
+			<!-- Match Phase Segmented Progress Bar -->
+			<div class="w-full max-w-[180px] space-y-1">
+				<div
+					class="flex h-2 w-full overflow-hidden rounded-full bg-slate-200 shadow-inner dark:bg-slate-700"
+				>
+					<div
+						class="transition-all duration-300 {phase === 'Auto'
+							? 'bg-amber-500'
+							: phase === 'AutoToTeleopTransition' || phase === 'Teleop' || phase === 'PostMatch'
+								? 'bg-amber-600/80'
+								: 'bg-transparent'}"
+						style="width: 15%;"
+						title="Autonomous (15s)"
+					></div>
+					<div
+						class="border-x border-slate-300 transition-all duration-300 dark:border-slate-800 {phase ===
+						'AutoToTeleopTransition'
+							? 'bg-sky-400'
+							: phase === 'Teleop' || phase === 'PostMatch'
+								? 'bg-sky-500/80'
+								: 'bg-transparent'}"
+						style="width: 5%;"
+						title="Transition (3s)"
+					></div>
+					<div
+						class="transition-all duration-300 {phase === 'Teleop'
+							? 'bg-emerald-500'
+							: phase === 'PostMatch'
+								? 'bg-emerald-600/80'
+								: 'bg-transparent'}"
+						style="width: 80%;"
+						title="Teleop (135s)"
+					></div>
+				</div>
+				<div
+					class="flex justify-between text-[9px] font-bold tracking-tight text-slate-400 dark:text-slate-500"
+				>
+					<span>AUTO</span>
+					<span>TRANS</span>
+					<span>TELEOP</span>
+				</div>
+			</div>
+
+			<!-- Readiness & Diagnostic Reason Pill -->
+			<div class="mt-1 w-full px-1">
+				{#if unreadyReasons.length > 0}
+					<div
+						class="rounded-md border px-2 py-1 text-[10px] leading-tight font-bold shadow-xs {unreadyReasons[0].startsWith(
+							'✓'
+						)
+							? 'border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300'
+							: phase === 'PreMatch'
+								? 'border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/80 dark:text-amber-300'
+								: 'border-slate-200 bg-slate-100 text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400'}"
+					>
+						{#each unreadyReasons.slice(0, 2) as reason}
+							<div>{reason}</div>
+						{/each}
+						{#if unreadyReasons.length > 2}
+							<div class="text-[9px] opacity-75">+{unreadyReasons.length - 2} more</div>
+						{/if}
+					</div>
+				{/if}
 			</div>
 		</div>
 
@@ -342,7 +476,7 @@
 		<div class="alliance-red-bg-soft">
 			<div class="alliance-red-border-soft flex items-center justify-between border-b px-3 py-2">
 				<span
-					class="rounded px-2 py-0.5 text-xs font-bold text-white {redReady
+					class="rounded px-2 py-0.5 text-xs font-bold text-white shadow-xs {redReady
 						? 'bg-emerald-700'
 						: 'bg-rose-700'}"
 				>
@@ -355,7 +489,7 @@
 				{#each redStations as s, i (s.index)}
 					{@const idx = redInputIndices[i]}
 					<div
-						class="alliance-red-border-soft mt-1 grid grid-cols-[68px_66px_minmax(128px,1fr)_48px_44px_44px_88px_80px] items-center gap-1 rounded border bg-white/75 px-1.5 py-1.5"
+						class="alliance-red-border-soft mt-1.5 grid grid-cols-[68px_66px_minmax(128px,1fr)_48px_44px_44px_88px_80px] items-center gap-1 rounded border bg-white/80 px-1.5 py-1.5 shadow-xs dark:bg-slate-900/70"
 					>
 						{@render readinessStatusCell(hasActiveEstopHardware(idx))}
 						<div class="alliance-red-text text-center font-bold">Station {i + 1}</div>
@@ -367,7 +501,7 @@
 								placeholder="Team"
 								bind:value={inputs[idx].team}
 								disabled={phase !== 'Idle'}
-								class="h-7 w-full min-w-[8rem] rounded border border-slate-300 bg-white px-2 text-xs"
+								class="h-7 w-full min-w-[8rem] rounded border border-slate-300 bg-white px-2 text-xs text-slate-900 placeholder-slate-400 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
 							/>
 						</div>
 						<input
@@ -375,7 +509,7 @@
 							checked={s.bypassed}
 							disabled={phase !== 'Idle'}
 							onchange={() => fms.bypassStation(idx, !s.bypassed)}
-							class="mx-auto h-4 w-4 cursor-pointer rounded border-slate-300"
+							class="mx-auto h-4 w-4 cursor-pointer rounded border-slate-300 dark:border-slate-600"
 						/>
 						{@render readinessStatusCell(s.dsLinked)}
 						{@render readinessStatusCell(s.robotLinked)}
@@ -387,4 +521,3 @@
 		</div>
 	</div>
 </div>
-

@@ -153,7 +153,7 @@
 	}
 </script>
 
-<div class="app-neutral-bg min-h-screen text-slate-900">
+<div class="app-neutral-bg min-h-screen text-slate-900 transition-colors dark:text-slate-100">
 	<Navbar />
 
 	<main class="mx-auto flex max-w-[1700px] flex-col gap-3 px-3 py-3">
@@ -170,14 +170,18 @@
 		<MatchControlPanel />
 
 		<!-- Tab Navigation & Panels -->
-		<div class="rounded border border-slate-300 bg-white shadow-xs">
-			<div class="flex items-center gap-0 border-b border-slate-300 px-3 pt-2 text-sm">
+		<div
+			class="rounded border border-slate-300 bg-white shadow-xs transition-colors dark:border-slate-700 dark:bg-slate-800"
+		>
+			<div
+				class="flex items-center gap-0 border-b border-slate-300 px-3 pt-2 text-sm dark:border-slate-700"
+			>
 				<button
 					type="button"
 					onclick={() => (activeTab = 'score')}
 					class="mr-6 cursor-pointer pb-2 {activeTab === 'score'
 						? 'brand-secondary-border brand-secondary-text border-b-2 font-semibold'
-						: 'text-slate-500 hover:text-slate-800'}"
+						: 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'}"
 				>
 					Score
 				</button>
@@ -186,7 +190,7 @@
 					onclick={() => (activeTab = 'status')}
 					class="mr-6 cursor-pointer pb-2 {activeTab === 'status'
 						? 'brand-secondary-border brand-secondary-text border-b-2 font-semibold'
-						: 'text-slate-500 hover:text-slate-800'}"
+						: 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'}"
 				>
 					Status
 				</button>
@@ -195,7 +199,7 @@
 					onclick={() => (activeTab = 'field')}
 					class="mr-6 cursor-pointer pb-2 {activeTab === 'field'
 						? 'brand-secondary-border brand-secondary-text border-b-2 font-semibold'
-						: 'text-slate-500 hover:text-slate-800'}"
+						: 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'}"
 				>
 					Field
 				</button>
@@ -204,7 +208,7 @@
 					onclick={() => (activeTab = 'options')}
 					class="mr-6 cursor-pointer pb-2 {activeTab === 'options'
 						? 'brand-secondary-border brand-secondary-text border-b-2 font-semibold'
-						: 'text-slate-500 hover:text-slate-800'}"
+						: 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'}"
 				>
 					Options
 				</button>
@@ -213,7 +217,7 @@
 					onclick={() => (activeTab = 'event')}
 					class="mr-6 cursor-pointer pb-2 {activeTab === 'event'
 						? 'brand-secondary-border brand-secondary-text border-b-2 font-semibold'
-						: 'text-slate-500 hover:text-slate-800'}"
+						: 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'}"
 				>
 					Event
 				</button>
@@ -222,7 +226,7 @@
 					onclick={() => (activeTab = 'log')}
 					class="mr-6 cursor-pointer pb-2 {activeTab === 'log'
 						? 'brand-secondary-border brand-secondary-text border-b-2 font-semibold'
-						: 'text-slate-500 hover:text-slate-800'}"
+						: 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'}"
 				>
 					Log
 				</button>
@@ -234,25 +238,27 @@
 
 				<!-- Tab 2: Detailed Station Status Cards -->
 			{:else if activeTab === 'status'}
-				<div class="grid grid-cols-1 lg:grid-cols-2">
-					<!-- Blue Alliance -->
-					<div class="alliance-blue-bg-soft border-r border-slate-200 p-3">
-						<div class="alliance-blue-text mb-2 text-xs font-bold tracking-wider uppercase">
-							Blue Alliance
+				<div class="p-3">
+					<div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+						<!-- Blue Alliance -->
+						<div class="alliance-blue-border-soft alliance-blue-bg-soft rounded border p-3">
+							<div class="alliance-blue-text mb-3 text-xs font-bold tracking-wider uppercase">
+								Blue Alliance
+							</div>
+							{#each blueStations as s, i (s.index)}
+								<StationCard station={s} stationNumber={i + 1} alliance="blue" />
+							{/each}
 						</div>
-						{#each blueStations as s, i (s.index)}
-							<StationCard station={s} stationNumber={i + 1} alliance="blue" />
-						{/each}
-					</div>
 
-					<!-- Red Alliance -->
-					<div class="alliance-red-bg-soft p-3">
-						<div class="alliance-red-text mb-2 text-xs font-bold tracking-wider uppercase">
-							Red Alliance
+						<!-- Red Alliance -->
+						<div class="alliance-red-border-soft alliance-red-bg-soft rounded border p-3">
+							<div class="alliance-red-text mb-3 text-xs font-bold tracking-wider uppercase">
+								Red Alliance
+							</div>
+							{#each redStations as s, i (s.index)}
+								<StationCard station={s} stationNumber={3 - i} alliance="red" />
+							{/each}
 						</div>
-						{#each redStations as s, i (s.index)}
-							<StationCard station={s} stationNumber={3 - i} alliance="red" />
-						{/each}
 					</div>
 				</div>
 
@@ -262,33 +268,39 @@
 
 				<!-- Tab 4: Field Options & Configuration -->
 			{:else if activeTab === 'options'}
-				<div class="p-4">
+				<div class="p-3">
 					{#if optionsWarning}
 						<div
-							class="mb-3 rounded border border-rose-300 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700"
+							class="mb-3 rounded border border-rose-300 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 dark:border-rose-700 dark:bg-rose-950/60 dark:text-rose-300"
 						>
 							{optionsWarning}
 						</div>
 					{/if}
 					{#if optionsSuccess}
 						<div
-							class="mb-3 rounded border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700"
+							class="mb-3 rounded border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 dark:border-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300"
 						>
 							{optionsSuccess}
 						</div>
 					{/if}
 					<div class="flex flex-wrap gap-3">
 						<!-- Free Practice -->
-						<div class="min-w-[320px] rounded border border-slate-200 bg-slate-50 px-4 py-3">
+						<div
+							class="min-w-[320px] rounded border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-900/60"
+						>
 							<div class="flex items-start justify-between gap-4">
 								<div>
-									<div class="text-sm font-bold text-slate-900">Free Practice</div>
-									<div class="mt-1 max-w-xl text-xs text-slate-600">
+									<div class="text-sm font-bold text-slate-900 dark:text-slate-100">
+										Free Practice
+									</div>
+									<div class="mt-1 max-w-xl text-xs text-slate-600 dark:text-slate-400">
 										Stops FMS communication to driver stations while leaving AP configuration and
 										Hub counting available.
 									</div>
 								</div>
-								<label class="flex items-center gap-2 text-sm font-semibold text-slate-800">
+								<label
+									class="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-200"
+								>
 									<input
 										type="checkbox"
 										checked={matchState?.freePracticeEnabled ?? false}
@@ -300,7 +312,7 @@
 									<span>{matchState?.freePracticeEnabled ? 'Enabled' : 'Disabled'}</span>
 								</label>
 							</div>
-							<div class="mt-3 text-[11px] font-medium text-slate-500">
+							<div class="mt-3 text-[11px] font-medium text-slate-500 dark:text-slate-400">
 								{phase === 'Idle'
 									? 'Free Practice can be toggled while the arena is idle.'
 									: 'Return the arena to Idle before changing Free Practice.'}
@@ -308,14 +320,18 @@
 						</div>
 
 						<!-- Match Durations -->
-						<div class="min-w-[420px] rounded border border-slate-200 bg-slate-50 px-4 py-3">
-							<div class="text-sm font-bold text-slate-900">Match Durations</div>
-							<div class="mt-1 text-xs text-slate-600">
+						<div
+							class="min-w-[420px] rounded border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-900/60"
+						>
+							<div class="text-sm font-bold text-slate-900 dark:text-slate-100">
+								Match Durations
+							</div>
+							<div class="mt-1 text-xs text-slate-600 dark:text-slate-400">
 								Configure Auto, Auto to Teleop transition, and Teleop durations in seconds. Enter 0
 								for instant progression.
 							</div>
 							<div class="mt-3 grid grid-cols-3 gap-3">
-								<label class="text-xs font-semibold text-slate-700">
+								<label class="text-xs font-semibold text-slate-700 dark:text-slate-300">
 									<span>Auto (s)</span>
 									<input
 										type="number"
@@ -323,10 +339,10 @@
 										step="1"
 										bind:value={autoDurationSecondsInput}
 										disabled={phase !== 'Idle' || isSavingMatchDurations}
-										class="mt-1 w-full rounded border border-slate-300 bg-white px-2 py-1 text-sm"
+										class="mt-1 w-full rounded border border-slate-300 bg-white px-2 py-1 text-sm text-slate-900 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
 									/>
 								</label>
-								<label class="text-xs font-semibold text-slate-700">
+								<label class="text-xs font-semibold text-slate-700 dark:text-slate-300">
 									<span>Auto→Teleop (s)</span>
 									<input
 										type="number"
@@ -334,10 +350,10 @@
 										step="1"
 										bind:value={autoToTeleopTransitionDurationSecondsInput}
 										disabled={phase !== 'Idle' || isSavingMatchDurations}
-										class="mt-1 w-full rounded border border-slate-300 bg-white px-2 py-1 text-sm"
+										class="mt-1 w-full rounded border border-slate-300 bg-white px-2 py-1 text-sm text-slate-900 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
 									/>
 								</label>
-								<label class="text-xs font-semibold text-slate-700">
+								<label class="text-xs font-semibold text-slate-700 dark:text-slate-300">
 									<span>Teleop (s)</span>
 									<input
 										type="number"
@@ -345,12 +361,12 @@
 										step="1"
 										bind:value={teleopDurationSecondsInput}
 										disabled={phase !== 'Idle' || isSavingMatchDurations}
-										class="mt-1 w-full rounded border border-slate-300 bg-white px-2 py-1 text-sm"
+										class="mt-1 w-full rounded border border-slate-300 bg-white px-2 py-1 text-sm text-slate-900 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
 									/>
 								</label>
 							</div>
 							<div class="mt-3 flex items-center justify-between gap-3">
-								<div class="text-[11px] font-medium text-slate-500">
+								<div class="text-[11px] font-medium text-slate-500 dark:text-slate-400">
 									{phase === 'Idle'
 										? 'Durations can be changed while the arena is idle.'
 										: 'Return the arena to Idle before changing durations.'}
@@ -367,13 +383,19 @@
 						</div>
 
 						<!-- Alliance Display Order -->
-						<div class="min-w-[320px] rounded border border-slate-200 bg-slate-50 px-4 py-3">
-							<div class="text-sm font-bold text-slate-900">Alliance Display Order</div>
-							<div class="mt-1 text-xs text-slate-600">
+						<div
+							class="min-w-[320px] rounded border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-900/60"
+						>
+							<div class="text-sm font-bold text-slate-900 dark:text-slate-100">
+								Alliance Display Order
+							</div>
+							<div class="mt-1 text-xs text-slate-600 dark:text-slate-400">
 								Configure which alliance is shown on the left side of all audience views.
 							</div>
 							<div class="mt-3 flex items-center gap-6">
-								<label class="flex cursor-pointer items-center gap-2 text-sm text-slate-800">
+								<label
+									class="flex cursor-pointer items-center gap-2 text-sm text-slate-800 dark:text-slate-200"
+								>
 									<input
 										type="radio"
 										name="allianceOrder"
@@ -384,7 +406,9 @@
 									/>
 									<span>Red Left, Blue Right</span>
 								</label>
-								<label class="flex cursor-pointer items-center gap-2 text-sm text-slate-800">
+								<label
+									class="flex cursor-pointer items-center gap-2 text-sm text-slate-800 dark:text-slate-200"
+								>
 									<input
 										type="radio"
 										name="allianceOrder"
@@ -402,22 +426,24 @@
 
 				<!-- Tab 5: Event / The Blue Alliance Import -->
 			{:else if activeTab === 'event'}
-				<div class="p-4">
+				<div class="p-3">
 					<div class="max-w-lg">
-						<div class="text-sm font-bold text-slate-900">Load Teams from The Blue Alliance</div>
-						<div class="mt-1 text-xs text-slate-600">
+						<div class="text-sm font-bold text-slate-900 dark:text-slate-100">
+							Load Teams from The Blue Alliance
+						</div>
+						<div class="mt-1 text-xs text-slate-600 dark:text-slate-400">
 							Enter an event key (e.g. <span class="font-mono font-bold">2026nyny</span>) to fetch
 							all teams and avatars at that event into the local database.
 						</div>
 						<div class="mt-3 flex items-end gap-2">
-							<label class="flex-1 text-xs font-semibold text-slate-700">
+							<label class="flex-1 text-xs font-semibold text-slate-700 dark:text-slate-300">
 								<span>Event Key</span>
 								<input
 									type="text"
 									bind:value={tbaEventKeyInput}
 									placeholder="e.g. 2026nyny"
 									disabled={isLoadingTeams}
-									class="mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2 font-mono text-sm disabled:opacity-50"
+									class="mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2 font-mono text-sm text-slate-900 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
 								/>
 							</label>
 							<button
@@ -430,15 +456,15 @@
 							</button>
 						</div>
 						{#if isLoadingTeams}
-							<div class="mt-2 text-xs text-slate-500">
+							<div class="mt-2 text-xs text-slate-500 dark:text-slate-400">
 								Fetching teams and avatars — this may take 10–30 seconds…
 							</div>
 						{/if}
 						{#if teamLoadResult}
 							<div
 								class="mt-3 rounded border px-3 py-2 text-xs font-semibold {teamLoadResult.success
-									? 'border-emerald-300 bg-emerald-50 text-emerald-800'
-									: 'border-rose-300 bg-rose-50 text-rose-700'}"
+									? 'border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
+									: 'border-rose-300 bg-rose-50 text-rose-700 dark:border-rose-700 dark:bg-rose-950/60 dark:text-rose-300'}"
 							>
 								{teamLoadResult.message}
 							</div>
@@ -459,7 +485,7 @@
 
 	<!-- Footer -->
 	<footer
-		class="app-neutral-bg fixed right-0 bottom-0 left-0 border-t border-slate-300 px-3 py-1 text-xs text-slate-600"
+		class="app-neutral-bg fixed right-0 bottom-0 left-0 border-t border-slate-300 px-3 py-1 text-xs text-slate-600 transition-colors dark:border-slate-700 dark:text-slate-400"
 	>
 		<div class="relative mx-auto max-w-[1700px]">
 			<span

@@ -110,4 +110,3 @@ export function deviceSpecificValues(
 		{ label: 'Heartbeat', value: formatTimestamp(device.heartbeat.receivedUtc) }
 	];
 }
-

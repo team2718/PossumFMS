@@ -78,55 +78,63 @@
 	<button
 		onclick={() => addViolation(station.index)}
 		disabled={!canEditViolations}
-		class="flex min-h-40 w-full flex-col items-start justify-between rounded-2xl border-2 bg-white px-5 py-5 text-left shadow-md transition active:translate-y-px active:shadow-sm disabled:cursor-not-allowed disabled:opacity-40 {station.alliance ===
+		class="flex min-h-40 w-full flex-col items-start justify-between rounded-2xl border-2 bg-white px-5 py-5 text-left shadow-md transition active:translate-y-px active:shadow-sm disabled:cursor-not-allowed disabled:opacity-40 dark:bg-slate-800 {station.alliance ===
 		'Red'
-			? 'border-rose-300 hover:border-rose-400'
-			: 'border-blue-300 hover:border-blue-400'}"
+			? 'alliance-red-border-soft hover:opacity-90'
+			: 'alliance-blue-border-soft hover:opacity-90'}"
 	>
 		<div>
-			<div class="text-sm font-black tracking-widest text-slate-500 uppercase">
+			<div class="text-sm font-black tracking-widest text-slate-500 uppercase dark:text-slate-400">
 				{formatStationLabel(station)}
 			</div>
-			<div class="mt-2 text-4xl font-black text-slate-900">
+			<div class="mt-2 text-4xl font-black text-slate-900 dark:text-slate-100">
 				{station.teamNumber > 0 ? station.teamNumber : '----'}
 			</div>
-			<div class="mt-2 text-base font-semibold text-slate-600">{stationDetail(station)}</div>
+			<div class="mt-2 text-base font-semibold text-slate-600 dark:text-slate-400">
+				{stationDetail(station)}
+			</div>
 		</div>
 	</button>
 {/snippet}
 
-<div class="app-neutral-bg min-h-screen text-slate-900">
+<div class="app-neutral-bg min-h-screen text-slate-900 transition-colors dark:text-slate-100">
 	<Navbar />
 
 	<main class="mx-auto flex max-w-425 flex-col gap-4 px-3 py-4">
 		<div
-			class="flex flex-wrap items-center gap-3 rounded border border-slate-200 bg-white px-4 py-3 shadow-sm"
+			class="flex flex-wrap items-center gap-3 rounded border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-700 dark:bg-slate-800"
 		>
-			<span class="text-base font-black text-slate-800">Referee Panel</span>
+			<span class="text-base font-black text-slate-800 dark:text-slate-100">Referee Panel</span>
 			<span
 				class="rounded-full border px-3 py-1 text-sm font-semibold {canEditViolations
-					? 'border-emerald-300 bg-emerald-50 text-emerald-800'
-					: 'border-slate-300 bg-slate-50 text-slate-600'}"
+					? 'border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300'
+					: 'border-slate-300 bg-slate-50 text-slate-600 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-300'}"
 			>
 				{phase}
 			</span>
 			{#if matchState}
-				<span class="text-sm text-slate-500">{matchState.matchType} #{matchState.matchNumber}</span>
+				<span class="text-sm text-slate-500 dark:text-slate-400"
+					>{matchState.matchType} #{matchState.matchNumber}</span
+				>
 			{/if}
 			{#if !canEditViolations}
-				<span class="text-sm font-semibold text-amber-700">
+				<span class="text-sm font-semibold text-amber-700 dark:text-amber-400">
 					Violations can be edited only during the match or in PostMatch.
 				</span>
 			{/if}
 		</div>
 
-		<div class="rounded border border-slate-200 bg-white p-4 shadow-sm">
-			<div class="mb-3 text-sm font-black tracking-widest text-slate-500 uppercase">
+		<div
+			class="rounded border border-slate-200 bg-white p-4 shadow-sm transition-colors dark:border-slate-700 dark:bg-slate-800"
+		>
+			<div
+				class="mb-3 text-sm font-black tracking-widest text-slate-500 uppercase dark:text-slate-400"
+			>
 				Selected Violation
 			</div>
 			<select
 				bind:value={selectedPenaltyIndex}
-				class="w-full rounded-xl border-2 border-slate-300 bg-white px-4 py-4 text-2xl font-black text-slate-900"
+				class="w-full rounded-xl border-2 border-slate-300 bg-white px-4 py-4 text-2xl font-black text-slate-900 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
 			>
 				{#each penalties as penalty, index}
 					<option value={index}>{penalty.name}</option>
@@ -136,7 +144,7 @@
 
 		{#if refereeWarning}
 			<div
-				class="rounded border border-rose-300 bg-rose-50 px-4 py-3 text-base font-semibold text-rose-700"
+				class="rounded border border-rose-300 bg-rose-50 px-4 py-3 text-base font-semibold text-rose-700 dark:border-rose-700 dark:bg-rose-950/80 dark:text-rose-300"
 			>
 				{refereeWarning}
 			</div>
@@ -144,15 +152,15 @@
 
 		{#if !matchState}
 			<div
-				class="rounded border border-slate-200 bg-white px-4 py-10 text-center text-base text-slate-500 shadow-sm"
+				class="rounded border border-slate-200 bg-white px-4 py-10 text-center text-base text-slate-500 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400"
 			>
 				Waiting for FMS connection…
 			</div>
 		{:else}
 			<div class="grid grid-cols-1 gap-4 xl:grid-cols-[1.35fr_1fr]">
 				<div class="grid grid-cols-1 gap-4">
-					<div class="rounded border border-rose-200 bg-rose-50/60 p-4 shadow-sm">
-						<div class="mb-3 text-lg font-black tracking-widest text-rose-700 uppercase">
+					<div class="alliance-red-border-soft alliance-red-bg-soft rounded border p-4 shadow-sm">
+						<div class="alliance-red-text mb-3 text-lg font-black tracking-widest uppercase">
 							Red Alliance
 						</div>
 						<div class="grid grid-cols-1 gap-3 md:grid-cols-3">
@@ -162,8 +170,8 @@
 						</div>
 					</div>
 
-					<div class="rounded border border-blue-200 bg-blue-50/60 p-4 shadow-sm">
-						<div class="mb-3 text-lg font-black tracking-widest text-blue-700 uppercase">
+					<div class="alliance-blue-border-soft alliance-blue-bg-soft rounded border p-4 shadow-sm">
+						<div class="alliance-blue-text mb-3 text-lg font-black tracking-widest uppercase">
 							Blue Alliance
 						</div>
 						<div class="grid grid-cols-1 gap-3 md:grid-cols-3">
@@ -174,15 +182,23 @@
 					</div>
 				</div>
 
-				<div class="rounded border border-slate-200 bg-white p-4 shadow-sm">
+				<div
+					class="rounded border border-slate-200 bg-white p-4 shadow-sm transition-colors dark:border-slate-700 dark:bg-slate-800"
+				>
 					<div class="mb-3 flex items-center justify-between gap-3">
 						<div>
-							<div class="text-lg font-black tracking-widest text-slate-800 uppercase">
+							<div
+								class="text-lg font-black tracking-widest text-slate-800 uppercase dark:text-slate-100"
+							>
 								Match Violations
 							</div>
-							<div class="text-sm font-semibold text-slate-500">Most recent first</div>
+							<div class="text-sm font-semibold text-slate-500 dark:text-slate-400">
+								Most recent first
+							</div>
 						</div>
-						<div class="rounded-full bg-slate-100 px-3 py-1 text-sm font-bold text-slate-700">
+						<div
+							class="rounded-full bg-slate-100 px-3 py-1 text-sm font-bold text-slate-700 dark:bg-slate-700 dark:text-slate-200"
+						>
 							{violations.length}
 						</div>
 					</div>
@@ -190,22 +206,26 @@
 					<div class="max-h-[60vh] space-y-3 overflow-y-auto pr-1">
 						{#if violations.length === 0}
 							<div
-								class="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-base text-slate-500"
+								class="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-base text-slate-500 dark:border-slate-600 dark:bg-slate-900/60 dark:text-slate-400"
 							>
 								No fouls recorded for this match.
 							</div>
 						{:else}
 							{#each violations as violation}
-								<div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+								<div
+									class="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900/60"
+								>
 									<div class="flex items-start justify-between gap-3">
 										<div>
-											<div class="text-sm font-black tracking-widest text-slate-500 uppercase">
+											<div
+												class="text-sm font-black tracking-widest text-slate-500 uppercase dark:text-slate-400"
+											>
 												{formatMatchClock(violation)}
 											</div>
-											<div class="mt-1 text-2xl font-black text-slate-900">
+											<div class="mt-1 text-2xl font-black text-slate-900 dark:text-slate-100">
 												{violation.rule} - {violation.type === 'MajorFoul' ? 'Major' : 'Minor'}
 											</div>
-											<div class="mt-2 text-base font-semibold text-slate-700">
+											<div class="mt-2 text-base font-semibold text-slate-700 dark:text-slate-300">
 												{violation.alliance}
 												{violation.position}
 												{violation.teamNumber > 0
@@ -216,7 +236,7 @@
 										<button
 											onclick={() => removeViolation(violation.id)}
 											disabled={!canEditViolations}
-											class="min-h-18 min-w-28 rounded-xl border-2 border-rose-300 bg-white px-4 py-3 text-lg font-black text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-40"
+											class="min-h-18 min-w-28 rounded-xl border-2 border-rose-300 bg-white px-4 py-3 text-lg font-black text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-rose-700 dark:bg-slate-800 dark:text-rose-400 dark:hover:bg-rose-950/60"
 										>
 											Delete
 										</button>

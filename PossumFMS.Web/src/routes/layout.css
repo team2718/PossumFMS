@@ -2,12 +2,21 @@
 @plugin '@tailwindcss/forms';
 @plugin '@tailwindcss/typography';
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
 	--color-primary: #1ca5a5;
 	--color-secondary: #1f7ec6;
 	--color-tertiary: #a51c1c;
 	--color-neutral: #f8f9fa;
 	--color-highlight: #bb1fc6;
+}
+
+.dark {
+	--color-neutral: #0f172a;
+	--color-secondary: #38bdf8;
+	--color-primary: #2dd4bf;
+	--color-tertiary: #f87171;
 }
 
 .app-neutral-bg {
@@ -38,16 +47,32 @@
 	color: color-mix(in srgb, var(--color-primary) 70%, black);
 }
 
+.dark .alliance-blue-text {
+	color: #5eead4;
+}
+
 .alliance-red-text {
 	color: color-mix(in srgb, var(--color-tertiary) 70%, black);
+}
+
+.dark .alliance-red-text {
+	color: #fca5a5;
 }
 
 .alliance-blue-bg-soft {
 	background-color: color-mix(in srgb, var(--color-primary) 25%, white);
 }
 
+.dark .alliance-blue-bg-soft {
+	background-color: color-mix(in srgb, var(--color-primary) 15%, #0f172a);
+}
+
 .alliance-red-bg-soft {
 	background-color: color-mix(in srgb, var(--color-tertiary) 30%, white);
+}
+
+.dark .alliance-red-bg-soft {
+	background-color: color-mix(in srgb, var(--color-tertiary) 15%, #0f172a);
 }
 
 .alliance-blue-border {
@@ -62,8 +87,16 @@
 	border-color: color-mix(in srgb, var(--color-primary) 35%, white);
 }
 
+.dark .alliance-blue-border-soft {
+	border-color: color-mix(in srgb, var(--color-primary) 30%, #334155);
+}
+
 .alliance-red-border-soft {
 	border-color: color-mix(in srgb, var(--color-tertiary) 35%, white);
+}
+
+.dark .alliance-red-border-soft {
+	border-color: color-mix(in srgb, var(--color-tertiary) 30%, #334155);
 }
 
 .alliance-blue-bg-dark {
