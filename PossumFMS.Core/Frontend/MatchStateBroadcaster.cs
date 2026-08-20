@@ -62,6 +62,7 @@ public sealed class MatchStateBroadcaster(
         return new MatchStateDto(
             Phase: arena.Phase.ToString(),
             FreePracticeEnabled: arena.FreePracticeEnabled,
+            RequireFieldEstopForMatchStart: arena.RequireFieldEstopForMatchStart,
             MatchType: arena.MatchType.ToString(),
             MatchNumber: arena.MatchNumber,
             MatchId: arena.MatchId,

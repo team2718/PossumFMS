@@ -23,11 +23,34 @@ public sealed class ArenaTests
         Assert.False(arena.WasAborted);
         Assert.False(arena.ArenaEstop);
         Assert.False(arena.FreePracticeEnabled);
+        Assert.True(arena.RequireFieldEstopForMatchStart);
         Assert.Equal(TimeSpan.FromSeconds(20), arena.AutoDuration);
         Assert.Equal(TimeSpan.FromSeconds(3), arena.AutoToTeleopTransitionDuration);
         Assert.Equal(TimeSpan.FromSeconds(140), arena.TeleopDuration);
         Assert.Equal(string.Empty, arena.GameData);
     }
+
+    [Fact]
+    public void SetRequireFieldEstopForMatchStart_FromIdle_UpdatesValue()
+    {
+        var arena = new PossumFMS.Core.Arena.Arena();
+        arena.SetRequireFieldEstopForMatchStart(false);
+        Assert.False(arena.RequireFieldEstopForMatchStart);
+
+        arena.SetRequireFieldEstopForMatchStart(true);
+        Assert.True(arena.RequireFieldEstopForMatchStart);
+    }
+
+    [Fact]
+    public void SetRequireFieldEstopForMatchStart_WhenNotIdle_Throws()
+    {
+        var arena = new PossumFMS.Core.Arena.Arena();
+        arena.StartPreMatch();
+
+        Assert.Throws<InvalidOperationException>(() =>
+            arena.SetRequireFieldEstopForMatchStart(false));
+    }
+
 
     [Fact]
     public void SetMatchDurations_FromIdle_UpdatesDurations()

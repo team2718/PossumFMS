@@ -5,6 +5,7 @@ namespace PossumFMS.Core.Frontend.Dtos;
 public sealed record MatchStateDto(
     [property: JsonPropertyName("phase")] string Phase,
     [property: JsonPropertyName("freePracticeEnabled")] bool FreePracticeEnabled,
+    [property: JsonPropertyName("requireFieldEstopForMatchStart")] bool RequireFieldEstopForMatchStart,
     [property: JsonPropertyName("matchType")] string MatchType,
     [property: JsonPropertyName("matchNumber")] int MatchNumber,
     [property: JsonPropertyName("matchId")] string MatchId,

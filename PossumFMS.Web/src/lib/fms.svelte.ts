@@ -76,6 +76,7 @@ export interface FieldDeviceDiagnostics {
 export interface MatchState {
 	phase: string; // e.g. "Idle", "PreMatch", "MatchRunning", "MatchOver"
 	freePracticeEnabled: boolean;
+	requireFieldEstopForMatchStart?: boolean;
 	matchType: string; // e.g. "Practice", "Qualification", "Playoff"
 	matchNumber: number;
 	matchId: string;
@@ -364,6 +365,11 @@ class FmsConnection {
 	setFreePracticeEnabled(enabled: boolean) {
 		return this.invoke('SetFreePracticeEnabled', enabled);
 	}
+	/** Toggle whether a healthy physical field E-Stop is required to start matches. */
+	setRequireFieldEstopForMatchStart(required: boolean) {
+		return this.invoke('SetRequireFieldEstopForMatchStart', required);
+	}
+
 	/** Set Auto, Auto→Teleop transition, and Teleop durations in seconds (idle only). */
 	setMatchDurations(
 		autoDurationSeconds: number,

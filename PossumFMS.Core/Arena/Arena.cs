@@ -53,6 +53,14 @@ public sealed class Arena
     }
     private bool _freePracticeEnabled;
 
+    public bool RequireFieldEstopForMatchStart
+    {
+        get { lock (_stateLock) return _requireFieldEstopForMatchStart; }
+        private set { lock (_stateLock) _requireFieldEstopForMatchStart = value; }
+    }
+    private bool _requireFieldEstopForMatchStart = true;
+
+
     // ── Match metadata (encoded in every control packet) ───────────────────────
 
     public MatchType MatchType
@@ -245,6 +253,18 @@ public sealed class Arena
             _freePracticeEnabled = enabled;
         }
     }
+
+    public void SetRequireFieldEstopForMatchStart(bool required)
+    {
+        lock (_stateLock)
+        {
+            if (_phase != MatchPhase.Idle)
+                throw new InvalidOperationException("Field E-Stop requirement can only be changed while the arena is idle.");
+
+            _requireFieldEstopForMatchStart = required;
+        }
+    }
+
 
     public void SetMatchDurations(
         TimeSpan autoDuration,

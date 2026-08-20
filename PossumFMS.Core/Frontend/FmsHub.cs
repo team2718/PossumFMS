@@ -105,6 +105,22 @@ public sealed class FmsHub(
         await BroadcastMatchState();
     }
 
+    [Authorize(Policy = FieldAuthorization.OperatorPolicy)]
+    public async Task SetRequireFieldEstopForMatchStart(bool required)
+    {
+        if (arena.Phase != MatchPhase.Idle)
+            throw new HubException("Field E-Stop requirement can only be changed while the arena is idle.");
+
+        logger.LogWarning(
+            "SetRequireFieldEstopForMatchStart requested by {Client}: Required={Required}.",
+            Context.ConnectionId,
+            required);
+
+        arena.SetRequireFieldEstopForMatchStart(required);
+        await BroadcastMatchState();
+    }
+
+
     public async Task SetMatchDurations(
         double autoDurationSeconds,
         double autoToTeleopTransitionDurationSeconds,
@@ -234,7 +250,7 @@ public sealed class FmsHub(
         logger.LogInformation("StartMatch requested by {Client}.", Context.ConnectionId);
 
         var readinessFailures = dsManager.GetMatchStartReadinessFailures().ToList();
-        if (!arena.FreePracticeEnabled && !fieldHardwareManager.HasHealthyEstopDevice())
+        if (!arena.FreePracticeEnabled && arena.RequireFieldEstopForMatchStart && !fieldHardwareManager.HasHealthyEstopDevice())
             readinessFailures.Add("No healthy field E-stop device is connected.");
 
         if (readinessFailures.Count > 0)

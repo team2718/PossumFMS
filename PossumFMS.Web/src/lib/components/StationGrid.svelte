@@ -40,8 +40,8 @@
 			blueStations.every((s) => (isMatchStartingOrRunning ? s.isReadyInMatch : s.isReady))
 	);
 
-	const readinessPositiveLabel = $derived(isMatchStartingOrRunning ? 'READY' : 'LINKED');
-	const readinessNegativeLabel = $derived(isMatchStartingOrRunning ? 'NOT READY' : 'NOT LINKED');
+	const readinessPositiveLabel = 'READY';
+	const readinessNegativeLabel = 'NOT READY';
 
 	const displayPhase = $derived(
 		(() => {
@@ -61,6 +61,49 @@
 				default:
 					return phase;
 			}
+		})()
+	);
+
+	// Phase duration calculations for animated progress bar
+	const autoDuration = $derived(matchState?.matchDurations?.autoSeconds ?? 20);
+	const transDuration = $derived(matchState?.matchDurations?.autoToTeleopTransitionSeconds ?? 3);
+	const teleopDuration = $derived(matchState?.matchDurations?.teleopSeconds ?? 140);
+	const totalDuration = $derived(autoDuration + transDuration + teleopDuration || 163);
+
+	const autoWidthPercent = $derived((autoDuration / totalDuration) * 100);
+	const transWidthPercent = $derived((transDuration / totalDuration) * 100);
+	const teleopWidthPercent = $derived((teleopDuration / totalDuration) * 100);
+
+	const autoFillPercent = $derived(
+		(() => {
+			if (phase === 'Idle' || phase === 'PreMatch') return 0;
+			if (phase === 'Auto') {
+				const elapsed = Math.max(0, autoDuration - (matchState?.timeRemaining ?? 0));
+				return Math.min(100, Math.max(0, (elapsed / (autoDuration || 1)) * 100));
+			}
+			return 100;
+		})()
+	);
+
+	const transFillPercent = $derived(
+		(() => {
+			if (phase === 'Idle' || phase === 'PreMatch' || phase === 'Auto') return 0;
+			if (phase === 'AutoToTeleopTransition') {
+				const elapsed = Math.max(0, transDuration - (matchState?.timeRemaining ?? 0));
+				return Math.min(100, Math.max(0, (elapsed / (transDuration || 1)) * 100));
+			}
+			return 100;
+		})()
+	);
+
+	const teleopFillPercent = $derived(
+		(() => {
+			if (phase === 'Teleop') {
+				const elapsed = Math.max(0, teleopDuration - (matchState?.timeRemaining ?? 0));
+				return Math.min(100, Math.max(0, (elapsed / (teleopDuration || 1)) * 100));
+			}
+			if (phase === 'PostMatch') return 100;
+			return 0;
 		})()
 	);
 
@@ -106,7 +149,10 @@
 						issues.push(`${name} no DS link`);
 					} else if (!s.robotLinked) {
 						issues.push(`${name} no Robot link`);
-					} else if (!hasActiveEstopHardware(i)) {
+					} else if (
+						matchState.requireFieldEstopForMatchStart !== false &&
+						!hasActiveEstopHardware(i)
+					) {
 						issues.push(`${name} no HW E-Stop`);
 					}
 				}
@@ -276,6 +322,27 @@
 			<span class="font-bold tracking-wider text-slate-700 uppercase dark:text-slate-300">
 				Field Stations & Teams
 			</span>
+			{#if phase !== 'Idle'}
+				<span
+					class="inline-flex items-center gap-1 rounded bg-slate-200 px-2 py-0.5 text-[10px] font-bold text-slate-700 dark:bg-slate-700 dark:text-slate-200"
+				>
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						class="h-3 w-3"
+						fill="none"
+						viewBox="0 0 24 24"
+						stroke="currentColor"
+					>
+						<path
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							stroke-width="2"
+							d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+						/>
+					</svg>
+					Locked ({displayPhase})
+				</span>
+			{/if}
 			{#if configureWarning}
 				<span
 					class="rounded bg-rose-100 px-2 py-0.5 font-semibold text-rose-800 dark:bg-rose-950/80 dark:text-rose-300"
@@ -305,7 +372,7 @@
 				type="button"
 				onclick={clearAllTeams}
 				disabled={phase !== 'Idle' || isConfiguring}
-				class="cursor-pointer rounded border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-100 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+				class="cursor-pointer rounded border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
 			>
 				Clear Teams
 			</button>
@@ -313,7 +380,7 @@
 				type="button"
 				onclick={configureAccessPoint}
 				disabled={phase !== 'Idle' || isConfiguring}
-				class="brand-secondary-bg cursor-pointer rounded px-3 py-1 text-xs font-bold text-white shadow-xs hover:opacity-90 disabled:opacity-50"
+				class="brand-secondary-bg cursor-pointer rounded px-3 py-1 text-xs font-bold text-white shadow-xs hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
 			>
 				{isConfiguring ? 'Configuring AP…' : 'Assign Teams & Configure AP'}
 			</button>
@@ -353,7 +420,7 @@
 								placeholder="Team"
 								bind:value={inputs[idx].team}
 								disabled={phase !== 'Idle'}
-								class="h-7 w-full min-w-[8rem] rounded border border-slate-300 bg-white px-2 text-xs text-slate-900 placeholder-slate-400 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+								class="h-7 w-full min-w-[8rem] rounded border border-slate-300 bg-white px-2 text-xs text-slate-900 placeholder-slate-400 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:opacity-60 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:disabled:bg-slate-900/60"
 							/>
 						</div>
 						<input
@@ -361,7 +428,7 @@
 							checked={s.bypassed}
 							disabled={phase !== 'Idle'}
 							onchange={() => fms.bypassStation(idx, !s.bypassed)}
-							class="mx-auto h-4 w-4 cursor-pointer rounded border-slate-300 dark:border-slate-600"
+							class="mx-auto h-4 w-4 cursor-pointer rounded border-slate-300 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-600"
 						/>
 						{@render readinessStatusCell(s.dsLinked)}
 						{@render readinessStatusCell(s.robotLinked)}
@@ -406,46 +473,62 @@
 				{matchState ? formatTime(matchState.timeRemaining) : '0:00'}
 			</div>
 
-			<!-- Match Phase Segmented Progress Bar -->
-			<div class="w-full max-w-[180px] space-y-1">
+			<!-- Match Phase Segmented Progress Bar (Animated Proportional Fills) -->
+			<div class="w-full max-w-[190px] space-y-1">
 				<div
-					class="flex h-2 w-full overflow-hidden rounded-full bg-slate-200 shadow-inner dark:bg-slate-700"
+					class="flex h-2.5 w-full overflow-hidden rounded-full bg-slate-200 p-0.5 shadow-inner dark:bg-slate-700/80"
 				>
+					<!-- Auto Segment Track -->
 					<div
-						class="transition-all duration-300 {phase === 'Auto'
-							? 'bg-amber-500'
-							: phase === 'AutoToTeleopTransition' || phase === 'Teleop' || phase === 'PostMatch'
-								? 'bg-amber-600/80'
-								: 'bg-transparent'}"
-						style="width: 15%;"
-						title="Autonomous (15s)"
-					></div>
+						class="relative h-full overflow-hidden rounded-l-full bg-slate-300/40 dark:bg-slate-800/60"
+						style="width: {autoWidthPercent}%;"
+						title="Autonomous ({autoDuration}s)"
+					>
+						<div
+							class="h-full bg-amber-500 transition-all duration-200 ease-linear"
+							style="width: {autoFillPercent}%;"
+						></div>
+					</div>
+
+					<!-- Transition Segment Track -->
 					<div
-						class="border-x border-slate-300 transition-all duration-300 dark:border-slate-800 {phase ===
-						'AutoToTeleopTransition'
-							? 'bg-sky-400'
-							: phase === 'Teleop' || phase === 'PostMatch'
-								? 'bg-sky-500/80'
-								: 'bg-transparent'}"
-						style="width: 5%;"
-						title="Transition (3s)"
-					></div>
+						class="relative mx-0.5 h-full overflow-hidden bg-slate-300/40 dark:bg-slate-800/60"
+						style="width: {transWidthPercent}%;"
+						title="Transition ({transDuration}s)"
+					>
+						<div
+							class="h-full bg-sky-400 transition-all duration-200 ease-linear"
+							style="width: {transFillPercent}%;"
+						></div>
+					</div>
+
+					<!-- Teleop Segment Track -->
 					<div
-						class="transition-all duration-300 {phase === 'Teleop'
-							? 'bg-emerald-500'
-							: phase === 'PostMatch'
-								? 'bg-emerald-600/80'
-								: 'bg-transparent'}"
-						style="width: 80%;"
-						title="Teleop (135s)"
-					></div>
+						class="relative h-full overflow-hidden rounded-r-full bg-slate-300/40 dark:bg-slate-800/60"
+						style="width: {teleopWidthPercent}%;"
+						title="Teleop ({teleopDuration}s)"
+					>
+						<div
+							class="h-full bg-emerald-500 transition-all duration-200 ease-linear"
+							style="width: {teleopFillPercent}%;"
+						></div>
+					</div>
 				</div>
 				<div
 					class="flex justify-between text-[9px] font-bold tracking-tight text-slate-400 dark:text-slate-500"
 				>
-					<span>AUTO</span>
-					<span>TRANS</span>
-					<span>TELEOP</span>
+					<span class={phase === 'Auto' ? 'font-black text-amber-600 dark:text-amber-400' : ''}
+						>AUTO ({autoDuration}s)</span
+					>
+					<span
+						class={phase === 'AutoToTeleopTransition'
+							? 'font-black text-sky-600 dark:text-sky-400'
+							: ''}>TRANS ({transDuration}s)</span
+					>
+					<span
+						class={phase === 'Teleop' ? 'font-black text-emerald-600 dark:text-emerald-400' : ''}
+						>TELEOP ({teleopDuration}s)</span
+					>
 				</div>
 			</div>
 
@@ -501,7 +584,7 @@
 								placeholder="Team"
 								bind:value={inputs[idx].team}
 								disabled={phase !== 'Idle'}
-								class="h-7 w-full min-w-[8rem] rounded border border-slate-300 bg-white px-2 text-xs text-slate-900 placeholder-slate-400 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+								class="h-7 w-full min-w-[8rem] rounded border border-slate-300 bg-white px-2 text-xs text-slate-900 placeholder-slate-400 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:opacity-60 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:disabled:bg-slate-900/60"
 							/>
 						</div>
 						<input
@@ -509,7 +592,7 @@
 							checked={s.bypassed}
 							disabled={phase !== 'Idle'}
 							onchange={() => fms.bypassStation(idx, !s.bypassed)}
-							class="mx-auto h-4 w-4 cursor-pointer rounded border-slate-300 dark:border-slate-600"
+							class="mx-auto h-4 w-4 cursor-pointer rounded border-slate-300 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-600"
 						/>
 						{@render readinessStatusCell(s.dsLinked)}
 						{@render readinessStatusCell(s.robotLinked)}

@@ -9,6 +9,7 @@
 	import ScoringControlPanel from '$lib/components/ScoringControlPanel.svelte';
 	import FieldHardwarePanel from '$lib/components/FieldHardwarePanel.svelte';
 	import LogConsole from '$lib/components/LogConsole.svelte';
+	import EstopSafetyModal from '$lib/components/EstopSafetyModal.svelte';
 
 	// Connect to the FMS hub when the page loads
 	$effect(() => {
@@ -33,10 +34,33 @@
 	const matchState = $derived(fms.matchState);
 	const phase = $derived(matchState?.phase ?? 'Disconnected');
 
+	const displayPhase = $derived(
+		(() => {
+			switch (phase) {
+				case 'PreMatch':
+					return 'Pre-Match';
+				case 'Auto':
+					return 'Autonomous';
+				case 'AutoToTeleopTransition':
+					return 'Transition';
+				case 'Teleop':
+					return 'Teleop';
+				case 'PostMatch':
+					return 'Post-Match';
+				case 'Idle':
+					return 'Idle';
+				default:
+					return phase;
+			}
+		})()
+	);
+
 	let activeTab = $state<'score' | 'status' | 'field' | 'options' | 'event' | 'log'>('score');
 
 	let isWpaModalOpen = $state(false);
 	let isAuthModalOpen = $state(false);
+	let isEstopSafetyModalOpen = $state(false);
+	let isTogglingEstopCheck = $state(false);
 
 	let isConfiguring = $state(false);
 	let configureWarning = $state('');
@@ -91,6 +115,34 @@
 					: 'Failed to update Free Practice. Please try again.';
 		} finally {
 			isTogglingFreePractice = false;
+		}
+	}
+
+	function handleToggleEstopCheck(enabled: boolean) {
+		if (!enabled) {
+			isEstopSafetyModalOpen = true;
+			return;
+		}
+		void setRequireFieldEstop(true);
+	}
+
+	async function setRequireFieldEstop(required: boolean) {
+		optionsWarning = '';
+		optionsSuccess = '';
+		isTogglingEstopCheck = true;
+
+		try {
+			await fms.setRequireFieldEstopForMatchStart(required);
+			optionsSuccess = required
+				? 'Field hardware E-Stop requirement enabled (Standard safety mode).'
+				: 'Field hardware E-Stop requirement disabled (Offline testing mode).';
+		} catch (error) {
+			optionsWarning =
+				error instanceof Error
+					? error.message
+					: 'Failed to update field E-Stop requirement. Please try again.';
+		} finally {
+			isTogglingEstopCheck = false;
 		}
 	}
 
@@ -269,6 +321,31 @@
 				<!-- Tab 4: Field Options & Configuration -->
 			{:else if activeTab === 'options'}
 				<div class="p-3">
+					{#if phase !== 'Idle'}
+						<div
+							class="mb-3 flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3.5 py-2.5 text-xs font-semibold text-amber-900 shadow-xs dark:border-amber-700/80 dark:bg-amber-950/70 dark:text-amber-300"
+						>
+							<svg
+								xmlns="http://www.w3.org/2000/svg"
+								class="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400"
+								fill="none"
+								viewBox="0 0 24 24"
+								stroke="currentColor"
+							>
+								<path
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									stroke-width="2"
+									d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+								/>
+							</svg>
+							<span
+								>Arena options are locked during match play (<strong>{displayPhase}</strong>).
+								Return the arena to <strong>Idle</strong> to modify field settings.</span
+							>
+						</div>
+					{/if}
+
 					{#if optionsWarning}
 						<div
 							class="mb-3 rounded border border-rose-300 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 dark:border-rose-700 dark:bg-rose-950/60 dark:text-rose-300"
@@ -286,12 +363,19 @@
 					<div class="flex flex-wrap gap-3">
 						<!-- Free Practice -->
 						<div
-							class="min-w-[320px] rounded border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-900/60"
+							class="min-w-[320px] rounded border px-4 py-3 transition-all {phase !== 'Idle'
+								? 'border-dashed border-slate-300 bg-slate-100/60 opacity-60 dark:border-slate-700 dark:bg-slate-900/40'
+								: 'border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900/60'}"
 						>
 							<div class="flex items-start justify-between gap-4">
 								<div>
-									<div class="text-sm font-bold text-slate-900 dark:text-slate-100">
-										Free Practice
+									<div
+										class="flex items-center gap-1.5 text-sm font-bold text-slate-900 dark:text-slate-100"
+									>
+										<span>Free Practice</span>
+										{#if phase !== 'Idle'}
+											<span class="text-[10px] text-slate-400 dark:text-slate-500">🔒</span>
+										{/if}
 									</div>
 									<div class="mt-1 max-w-xl text-xs text-slate-600 dark:text-slate-400">
 										Stops FMS communication to driver stations while leaving AP configuration and
@@ -299,7 +383,10 @@
 									</div>
 								</div>
 								<label
-									class="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-200"
+									class="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-200 {phase !==
+									'Idle'
+										? 'cursor-not-allowed'
+										: 'cursor-pointer'}"
 								>
 									<input
 										type="checkbox"
@@ -307,7 +394,7 @@
 										disabled={!matchState || phase !== 'Idle' || isTogglingFreePractice}
 										onchange={(event) =>
 											setFreePracticeEnabled((event.currentTarget as HTMLInputElement).checked)}
-										class="h-4 w-4 cursor-pointer"
+										class="h-4 w-4 cursor-pointer disabled:cursor-not-allowed"
 									/>
 									<span>{matchState?.freePracticeEnabled ? 'Enabled' : 'Disabled'}</span>
 								</label>
@@ -315,16 +402,86 @@
 							<div class="mt-3 text-[11px] font-medium text-slate-500 dark:text-slate-400">
 								{phase === 'Idle'
 									? 'Free Practice can be toggled while the arena is idle.'
-									: 'Return the arena to Idle before changing Free Practice.'}
+									: '🔒 Locked: Return the arena to Idle before changing Free Practice.'}
+							</div>
+						</div>
+
+						<!-- Field Hardware E-Stop Safety Check -->
+						<div
+							class="min-w-[340px] rounded border px-4 py-3 transition-all {phase !== 'Idle'
+								? 'border-dashed border-slate-300 bg-slate-100/60 opacity-60 dark:border-slate-700 dark:bg-slate-900/40'
+								: 'border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900/60'}"
+						>
+							<div class="flex items-start justify-between gap-4">
+								<div>
+									<div
+										class="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-slate-100"
+									>
+										<span>Field Hardware E-Stop Check</span>
+										{#if matchState?.requireFieldEstopForMatchStart === false}
+											<span
+												class="rounded bg-amber-100 px-2 py-0.5 text-[10px] font-black text-amber-800 uppercase dark:bg-amber-950 dark:text-amber-300"
+											>
+												Testing Mode
+											</span>
+										{/if}
+										{#if phase !== 'Idle'}
+											<span class="text-[10px] text-slate-400 dark:text-slate-500">🔒</span>
+										{/if}
+									</div>
+									<div class="mt-1 max-w-xl text-xs text-slate-600 dark:text-slate-400">
+										Enforces that at least one healthy physical field E-Stop is connected before
+										matches can start.
+									</div>
+								</div>
+								<label
+									class="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-200 {phase !==
+									'Idle'
+										? 'cursor-not-allowed'
+										: 'cursor-pointer'}"
+								>
+									<input
+										type="checkbox"
+										checked={matchState?.requireFieldEstopForMatchStart ?? true}
+										disabled={!matchState || phase !== 'Idle' || isTogglingEstopCheck}
+										onchange={(event) =>
+											handleToggleEstopCheck((event.currentTarget as HTMLInputElement).checked)}
+										class="h-4 w-4 cursor-pointer disabled:cursor-not-allowed"
+									/>
+									<span
+										>{(matchState?.requireFieldEstopForMatchStart ?? true)
+											? 'Enabled'
+											: 'Disabled'}</span
+									>
+								</label>
+							</div>
+							<div
+								class="mt-3 text-[11px] font-medium {matchState?.requireFieldEstopForMatchStart ===
+								false
+									? 'font-bold text-amber-700 dark:text-amber-400'
+									: 'text-slate-500 dark:text-slate-400'}"
+							>
+								{matchState?.requireFieldEstopForMatchStart === false
+									? '⚠️ Safety check is disabled. Matches can start without hardware E-Stops.'
+									: phase === 'Idle'
+										? 'Hardware E-Stop check is active for live matches.'
+										: '🔒 Locked: Return the arena to Idle before changing E-Stop requirement.'}
 							</div>
 						</div>
 
 						<!-- Match Durations -->
 						<div
-							class="min-w-[420px] rounded border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-900/60"
+							class="min-w-[420px] rounded border px-4 py-3 transition-all {phase !== 'Idle'
+								? 'border-dashed border-slate-300 bg-slate-100/60 opacity-60 dark:border-slate-700 dark:bg-slate-900/40'
+								: 'border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900/60'}"
 						>
-							<div class="text-sm font-bold text-slate-900 dark:text-slate-100">
-								Match Durations
+							<div
+								class="flex items-center gap-1.5 text-sm font-bold text-slate-900 dark:text-slate-100"
+							>
+								<span>Match Durations</span>
+								{#if phase !== 'Idle'}
+									<span class="text-[10px] text-slate-400 dark:text-slate-500">🔒</span>
+								{/if}
 							</div>
 							<div class="mt-1 text-xs text-slate-600 dark:text-slate-400">
 								Configure Auto, Auto to Teleop transition, and Teleop durations in seconds. Enter 0
@@ -339,7 +496,7 @@
 										step="1"
 										bind:value={autoDurationSecondsInput}
 										disabled={phase !== 'Idle' || isSavingMatchDurations}
-										class="mt-1 w-full rounded border border-slate-300 bg-white px-2 py-1 text-sm text-slate-900 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+										class="mt-1 w-full rounded border border-slate-300 bg-white px-2 py-1 text-sm text-slate-900 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:opacity-60 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:disabled:bg-slate-900/60"
 									/>
 								</label>
 								<label class="text-xs font-semibold text-slate-700 dark:text-slate-300">
@@ -350,7 +507,7 @@
 										step="1"
 										bind:value={autoToTeleopTransitionDurationSecondsInput}
 										disabled={phase !== 'Idle' || isSavingMatchDurations}
-										class="mt-1 w-full rounded border border-slate-300 bg-white px-2 py-1 text-sm text-slate-900 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+										class="mt-1 w-full rounded border border-slate-300 bg-white px-2 py-1 text-sm text-slate-900 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:opacity-60 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:disabled:bg-slate-900/60"
 									/>
 								</label>
 								<label class="text-xs font-semibold text-slate-700 dark:text-slate-300">
@@ -361,7 +518,7 @@
 										step="1"
 										bind:value={teleopDurationSecondsInput}
 										disabled={phase !== 'Idle' || isSavingMatchDurations}
-										class="mt-1 w-full rounded border border-slate-300 bg-white px-2 py-1 text-sm text-slate-900 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+										class="mt-1 w-full rounded border border-slate-300 bg-white px-2 py-1 text-sm text-slate-900 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:opacity-60 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:disabled:bg-slate-900/60"
 									/>
 								</label>
 							</div>
@@ -369,13 +526,13 @@
 								<div class="text-[11px] font-medium text-slate-500 dark:text-slate-400">
 									{phase === 'Idle'
 										? 'Durations can be changed while the arena is idle.'
-										: 'Return the arena to Idle before changing durations.'}
+										: '🔒 Locked: Return the arena to Idle before changing durations.'}
 								</div>
 								<button
 									type="button"
 									onclick={saveMatchDurations}
 									disabled={phase !== 'Idle' || isSavingMatchDurations}
-									class="brand-secondary-bg cursor-pointer rounded px-3 py-1.5 text-sm font-bold text-white hover:opacity-90 disabled:opacity-50"
+									class="brand-secondary-bg cursor-pointer rounded px-3 py-1.5 text-sm font-bold text-white shadow-xs hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
 								>
 									{isSavingMatchDurations ? 'Saving...' : 'Save Durations'}
 								</button>
@@ -482,6 +639,16 @@
 	<!-- Modals -->
 	<AccessPointModal bind:isOpen={isWpaModalOpen} bind:inputs />
 	<OperatorAuthModal bind:isOpen={isAuthModalOpen} />
+	<EstopSafetyModal
+		isOpen={isEstopSafetyModalOpen}
+		onConfirm={async () => {
+			isEstopSafetyModalOpen = false;
+			await setRequireFieldEstop(false);
+		}}
+		onCancel={() => {
+			isEstopSafetyModalOpen = false;
+		}}
+	/>
 
 	<!-- Footer -->
 	<footer
