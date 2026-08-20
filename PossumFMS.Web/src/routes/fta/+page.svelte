@@ -85,8 +85,8 @@
 						: 'alliance-red-text'}">Station {stationNumber} — Team {s.teamNumber || '—'}</span
 			>
 			<div class="flex gap-1">
-				{#if s.estop}<span class="rounded bg-rose-700 px-1.5 py-0.5 text-[10px] font-bold text-white"
-						>E-STOP</span
+				{#if s.estop}<span
+						class="rounded bg-rose-700 px-1.5 py-0.5 text-[10px] font-bold text-white">E-STOP</span
 					>{/if}
 				{#if s.astop}<span
 						class="rounded bg-orange-600 px-1.5 py-0.5 text-[10px] font-bold text-white"
@@ -122,13 +122,13 @@
 					? 'bg-emerald-600'
 					: 'bg-slate-400'}">RIO</span
 			>
-            {#if s.isReady}
-                <span
-                    class="ml-1 rounded px-1.5 py-0.5 text-[10px] font-bold {s.isReady
-                        ? 'bg-emerald-100 text-emerald-800'
-                        : 'bg-slate-100 text-slate-600'}">Ready</span
-                >
-            {/if}
+			{#if s.isReady}
+				<span
+					class="ml-1 rounded px-1.5 py-0.5 text-[10px] font-bold {s.isReady
+						? 'bg-emerald-100 text-emerald-800'
+						: 'bg-slate-100 text-slate-600'}">Ready</span
+				>
+			{/if}
 		</div>
 		<div class="mt-1.5 grid grid-cols-4 gap-1 text-slate-600">
 			<div class="rounded bg-slate-50 px-1.5 py-1">
@@ -174,9 +174,7 @@
 				</div>
 				<div class="rounded bg-slate-50 px-1.5 py-1">
 					<div class="text-[10px] text-slate-400">WiFi Link</div>
-					<div
-						class="font-semibold {s.wifi.radioLinked ? 'text-emerald-700' : 'text-rose-700'}"
-					>
+					<div class="font-semibold {s.wifi.radioLinked ? 'text-emerald-700' : 'text-rose-700'}">
 						{s.wifi.radioLinked ? 'Linked' : 'Not Linked'}
 					</div>
 				</div>
@@ -215,9 +213,13 @@
 
 	<main class="mx-auto flex max-w-[1700px] flex-col gap-3 px-3 py-3">
 		<!-- Phase banner -->
-		<div class="flex items-center gap-3 rounded border border-slate-200 bg-white px-4 py-2 shadow-sm">
+		<div
+			class="flex items-center gap-3 rounded border border-slate-200 bg-white px-4 py-2 shadow-sm"
+		>
 			<span class="text-sm font-bold text-slate-700">FTA Status</span>
-			<span class="rounded-full border border-slate-300 bg-slate-50 px-3 py-0.5 text-xs font-semibold text-slate-600">
+			<span
+				class="rounded-full border border-slate-300 bg-slate-50 px-3 py-0.5 text-xs font-semibold text-slate-600"
+			>
 				{phase}
 			</span>
 			{#if matchState}
@@ -226,29 +228,31 @@
 		</div>
 
 		{#if !matchState}
-			<div class="rounded border border-slate-200 bg-white px-4 py-8 text-center text-sm text-slate-500 shadow-sm">
+			<div
+				class="rounded border border-slate-200 bg-white px-4 py-8 text-center text-sm text-slate-500 shadow-sm"
+			>
 				Waiting for FMS connection…
 			</div>
 		{:else}
 			<!-- Station status cards -->
-            <div class="grid grid-cols-1 gap-3 lg:grid-cols-2">
-                <div class="rounded border p-3 alliance-blue-border-soft alliance-blue-bg-soft">
-                    <div class="mb-3 text-xs font-bold tracking-wider uppercase alliance-blue-text">
-                        Blue Alliance
-                    </div>
-                    {#each blueStations as s, i}
-                        {@render stationCard(s, i + 1, 'blue')}
-                    {/each}
-                </div>
-                <div class="rounded border p-3 alliance-red-border-soft alliance-red-bg-soft">
-                    <div class="mb-3 text-xs font-bold tracking-wider uppercase alliance-red-text">
-                        Red Alliance
-                    </div>
-                    {#each redStations as s, i}
-                        {@render stationCard(s, 3 - i, 'red')}
-                    {/each}
-                </div>
-            </div>
+			<div class="grid grid-cols-1 gap-3 lg:grid-cols-2">
+				<div class="alliance-blue-border-soft alliance-blue-bg-soft rounded border p-3">
+					<div class="alliance-blue-text mb-3 text-xs font-bold tracking-wider uppercase">
+						Blue Alliance
+					</div>
+					{#each blueStations as s, i}
+						{@render stationCard(s, i + 1, 'blue')}
+					{/each}
+				</div>
+				<div class="alliance-red-border-soft alliance-red-bg-soft rounded border p-3">
+					<div class="alliance-red-text mb-3 text-xs font-bold tracking-wider uppercase">
+						Red Alliance
+					</div>
+					{#each redStations as s, i}
+						{@render stationCard(s, 3 - i, 'red')}
+					{/each}
+				</div>
+			</div>
 
 			<!-- Field Devices -->
 			<div class="rounded border border-slate-300 bg-white shadow-sm">
@@ -258,7 +262,9 @@
 				</div>
 				<div class="p-3">
 					{#if fieldDevices.length === 0}
-						<div class="rounded border border-slate-200 bg-slate-50 px-3 py-6 text-center text-sm text-slate-500">
+						<div
+							class="rounded border border-slate-200 bg-slate-50 px-3 py-6 text-center text-sm text-slate-500"
+						>
 							No field devices connected.
 						</div>
 					{:else}

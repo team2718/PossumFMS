@@ -597,4 +597,31 @@ public sealed class GameLogicTests
         Assert.Equal(10, logic.RedScore.AutoFuelPoints);
         Assert.Equal(5, logic.BlueScore.AutoFuelPoints);
     }
+
+    [Fact]
+    public async Task ConcurrentScoringAndViolations_NoExceptions()
+    {
+        var (_, logic) = Create();
+        var tasks = new List<Task>();
+
+        for (int i = 0; i < 20; i++)
+        {
+            var threadId = i;
+            tasks.Add(Task.Run(() =>
+            {
+                for (int j = 0; j < 50; j++)
+                {
+                    logic.AdjustFuelPoints(AllianceColor.Red, isAuto: false, delta: 1);
+                    logic.AdjustFuelPoints(AllianceColor.Blue, isAuto: false, delta: 1);
+                    var v = logic.AddViolation(AllianceStations.Red1, 2718, "G405");
+                    _ = logic.Violations.Count;
+                    logic.RemoveViolation(v.Id);
+                }
+            }));
+        }
+
+        await Task.WhenAll(tasks);
+        Assert.Equal(1000, logic.RedScore.TeleopFuelPoints);
+        Assert.Equal(1000, logic.BlueScore.TeleopFuelPoints);
+    }
 }

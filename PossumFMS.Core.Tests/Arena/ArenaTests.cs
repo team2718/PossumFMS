@@ -509,4 +509,30 @@ public sealed class ArenaTests
 
         Assert.Equal(42, arena.MatchNumber);
     }
+
+    [Fact]
+    public async Task ConcurrentAccess_StateRemainsConsistent()
+    {
+        var arena = new PossumFMS.Core.Arena.Arena();
+        var tasks = new List<Task>();
+
+        for (int i = 0; i < 20; i++)
+        {
+            tasks.Add(Task.Run(() =>
+            {
+                for (int j = 0; j < 100; j++)
+                {
+                    _ = arena.Phase;
+                    _ = arena.TimeRemaining;
+                    _ = arena.IsMatchRunning;
+                    _ = arena.IsMatchInProgress;
+                    _ = arena.MatchId;
+                    arena.Tick();
+                }
+            }));
+        }
+
+        await Task.WhenAll(tasks);
+        Assert.NotNull(arena.MatchId);
+    }
 }

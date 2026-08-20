@@ -189,13 +189,7 @@ export interface MatchResultRecord {
 	violations: MatchViolation[];
 }
 
-export type LogSeverity =
-	| 'Trace'
-	| 'Debug'
-	| 'Information'
-	| 'Warning'
-	| 'Error'
-	| 'Critical';
+export type LogSeverity = 'Trace' | 'Debug' | 'Information' | 'Warning' | 'Error' | 'Critical';
 
 export interface RecentLogEntry {
 	id: number;
@@ -247,14 +241,20 @@ class FmsConnection {
 		});
 		this.hub.onreconnected(() => {
 			this.connected = true;
-			void Promise.all([this.hub!.invoke('RequestMatchState'), this.hub!.invoke('RequestRecentLogs')]);
+			void Promise.all([
+				this.hub!.invoke('RequestMatchState'),
+				this.hub!.invoke('RequestRecentLogs')
+			]);
 		});
 
 		this.hub
 			.start()
 			.then(() => {
 				this.connected = true;
-				return Promise.all([this.hub!.invoke('RequestMatchState'), this.hub!.invoke('RequestRecentLogs')]);
+				return Promise.all([
+					this.hub!.invoke('RequestMatchState'),
+					this.hub!.invoke('RequestRecentLogs')
+				]);
 			})
 			.catch(console.error);
 

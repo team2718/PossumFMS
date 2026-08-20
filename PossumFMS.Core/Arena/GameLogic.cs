@@ -6,6 +6,7 @@ namespace PossumFMS.Core.Arena;
 /// </summary>
 public sealed class GameLogic
 {
+    private readonly object _scoreLock = new();
     private readonly Arena _arena;
     private static readonly TimeSpan HubInactiveGracePeriod = TimeSpan.FromSeconds(3);
     private AllianceColor? _shiftAutoWinnerAlliance;
@@ -13,11 +14,23 @@ public sealed class GameLogic
     private readonly TowerEndgameLevel[] _endgameTowerLevels = new TowerEndgameLevel[AllianceStations.All.Count];
     private readonly List<MatchViolation> _violations = [];
 
-    public AllianceColor? ShiftAutoWinnerAlliance => _shiftAutoWinnerAlliance;
+    public AllianceColor? ShiftAutoWinnerAlliance
+    {
+        get { lock (_scoreLock) return _shiftAutoWinnerAlliance; }
+    }
 
     public AllianceScore RedScore  { get; } = new();
     public AllianceScore BlueScore { get; } = new();
-    public IReadOnlyList<MatchViolation> Violations => _violations;
+
+    public IReadOnlyList<MatchViolation> Violations
+    {
+        get
+        {
+            lock (_scoreLock)
+                return _violations.ToList();
+        }
+    }
+
     public event Action? ScoreChanged;
 
     public GameLogic(Arena arena)
@@ -30,12 +43,14 @@ public sealed class GameLogic
 
     public bool GetAutoTowerClimbed(AllianceStation station)
     {
-        return _autoTowerClimbed[GetStationIndex(station)];
+        lock (_scoreLock)
+            return _autoTowerClimbed[GetStationIndex(station)];
     }
 
     public TowerEndgameLevel GetEndgameTowerLevel(AllianceStation station)
     {
-        return _endgameTowerLevels[GetStationIndex(station)];
+        lock (_scoreLock)
+            return _endgameTowerLevels[GetStationIndex(station)];
     }
 
     // ── Teleop period ──────────────────────────────────────────────────────────
@@ -90,9 +105,6 @@ public sealed class GameLogic
 
     public bool IsHubStrictlyActive(AllianceColor alliance)
     {
-        // if (_arena.Phase == MatchPhase.Idle)
-        //     return true;
-
         if (_arena.Phase is MatchPhase.Auto or MatchPhase.AutoToTeleopTransition)
             return true;
 
@@ -133,12 +145,16 @@ public sealed class GameLogic
         if (_arena.Phase != MatchPhase.Teleop)
             return false;
 
+        AllianceColor? autoWinner;
+        lock (_scoreLock)
+            autoWinner = _shiftAutoWinnerAlliance;
+
         return period switch
         {
             TeleopPeriod.TransitionShift or TeleopPeriod.EndGame => true,
 
-            TeleopPeriod.Shift1 or TeleopPeriod.Shift3 => alliance != _shiftAutoWinnerAlliance,
-            TeleopPeriod.Shift2 or TeleopPeriod.Shift4 => alliance == _shiftAutoWinnerAlliance,
+            TeleopPeriod.Shift1 or TeleopPeriod.Shift3 => alliance != autoWinner,
+            TeleopPeriod.Shift2 or TeleopPeriod.Shift4 => alliance == autoWinner,
 
             _ => false,
         };
@@ -202,30 +218,40 @@ public sealed class GameLogic
 
     private void OnPhaseChanged(MatchPhase phase)
     {
+        string? gameDataToSet = null;
         switch (phase)
         {
             case MatchPhase.Idle:
             case MatchPhase.PreMatch:
-                RedScore.Reset();
-                BlueScore.Reset();
-                _shiftAutoWinnerAlliance = null;
-                Array.Fill(_autoTowerClimbed, false);
-                Array.Fill(_endgameTowerLevels, TowerEndgameLevel.None);
-                _violations.Clear();
+                lock (_scoreLock)
+                {
+                    RedScore.Reset();
+                    BlueScore.Reset();
+                    _shiftAutoWinnerAlliance = null;
+                    Array.Fill(_autoTowerClimbed, false);
+                    Array.Fill(_endgameTowerLevels, TowerEndgameLevel.None);
+                    _violations.Clear();
+                }
                 _arena.SetGameData(string.Empty);
                 ScoreChanged?.Invoke();
                 break;
 
             case MatchPhase.Teleop:
-                // The alliance that scored more fuel in Auto has their hub inactive in Shift 1.
-                // A tie is broken randomly.
-                _shiftAutoWinnerAlliance =
-                    RedScore.AutoFuelPoints > BlueScore.AutoFuelPoints ? AllianceColor.Red
-                    : BlueScore.AutoFuelPoints > RedScore.AutoFuelPoints ? AllianceColor.Blue
-                    : (new Random().Next(2) == 0 ? AllianceColor.Red : AllianceColor.Blue);
+                lock (_scoreLock)
+                {
+                    // The alliance that scored more fuel in Auto has their hub inactive in Shift 1.
+                    // A tie is broken randomly.
+                    _shiftAutoWinnerAlliance =
+                        RedScore.AutoFuelPoints > BlueScore.AutoFuelPoints ? AllianceColor.Red
+                        : BlueScore.AutoFuelPoints > RedScore.AutoFuelPoints ? AllianceColor.Blue
+                        : (new Random().Next(2) == 0 ? AllianceColor.Red : AllianceColor.Blue);
+
+                    gameDataToSet = _shiftAutoWinnerAlliance == AllianceColor.Red ? "R" : "B";
+                }
 
                 // Encode into game data for driver station packets.
-                _arena.SetGameData(_shiftAutoWinnerAlliance == AllianceColor.Red ? "R" : "B");
+                if (gameDataToSet is not null)
+                    _arena.SetGameData(gameDataToSet);
                 break;
         }
     }
@@ -252,11 +278,14 @@ public sealed class GameLogic
     {
         if (delta == 0) return;
 
-        var score = alliance == AllianceColor.Red ? RedScore : BlueScore;
-        if (isAuto)
-            score.AutoFuelPoints = Math.Max(0, score.AutoFuelPoints + delta);
-        else
-            score.TeleopFuelPoints = Math.Max(0, score.TeleopFuelPoints + delta);
+        lock (_scoreLock)
+        {
+            var score = alliance == AllianceColor.Red ? RedScore : BlueScore;
+            if (isAuto)
+                score.AutoFuelPoints = Math.Max(0, score.AutoFuelPoints + delta);
+            else
+                score.TeleopFuelPoints = Math.Max(0, score.TeleopFuelPoints + delta);
+        }
 
         ScoreChanged?.Invoke();
     }
@@ -264,22 +293,31 @@ public sealed class GameLogic
     public void SetAutoTowerClimbed(AllianceStation station, bool climbed)
     {
         var idx = GetStationIndex(station);
-        if (_autoTowerClimbed[idx] == climbed) return;
+        lock (_scoreLock)
+        {
+            if (_autoTowerClimbed[idx] == climbed) return;
 
-        _autoTowerClimbed[idx] = climbed;
-        RecalculateTowerPoints(station.Color);
+            _autoTowerClimbed[idx] = climbed;
+            RecalculateTowerPointsLocked(station.Color);
+        }
+
         ScoreChanged?.Invoke();
     }
 
     public void SetEndgameTowerLevel(AllianceStation station, TowerEndgameLevel level)
     {
         var idx = GetStationIndex(station);
-        if (_endgameTowerLevels[idx] == level) return;
+        lock (_scoreLock)
+        {
+            if (_endgameTowerLevels[idx] == level) return;
 
-        _endgameTowerLevels[idx] = level;
-        RecalculateTowerPoints(station.Color);
+            _endgameTowerLevels[idx] = level;
+            RecalculateTowerPointsLocked(station.Color);
+        }
+
         ScoreChanged?.Invoke();
     }
+
     public MatchViolation AddViolation(AllianceStation station, int teamNumber, string rule)
     {
         var type = ViolationRules.GetViolationTypeFromRule(rule);
@@ -295,24 +333,34 @@ public sealed class GameLogic
             RecordedAt = DateTimeOffset.UtcNow,
         };
 
-        _violations.Add(violation);
-        RecalculatePenaltyPoints();
+        lock (_scoreLock)
+        {
+            _violations.Add(violation);
+            RecalculatePenaltyPointsLocked();
+        }
+
         ScoreChanged?.Invoke();
         return violation;
     }
 
     public bool RemoveViolation(Guid violationId)
     {
-        var removed = _violations.RemoveAll(v => v.Id == violationId) > 0;
+        bool removed;
+        lock (_scoreLock)
+        {
+            removed = _violations.RemoveAll(v => v.Id == violationId) > 0;
+            if (removed)
+                RecalculatePenaltyPointsLocked();
+        }
+
         if (!removed)
             return false;
 
-        RecalculatePenaltyPoints();
         ScoreChanged?.Invoke();
         return true;
     }
 
-    private void RecalculateTowerPoints(AllianceColor alliance)
+    private void RecalculateTowerPointsLocked(AllianceColor alliance)
     {
         var score = alliance == AllianceColor.Red ? RedScore : BlueScore;
 
@@ -339,7 +387,8 @@ public sealed class GameLogic
         score.AutoTowerPoints = autoTower;
         score.TeleopTowerPoints = teleopTower;
     }
-    private void RecalculatePenaltyPoints()
+
+    private void RecalculatePenaltyPointsLocked()
     {
         RedScore.PenaltyPoints = 0;
         BlueScore.PenaltyPoints = 0;
@@ -363,5 +412,4 @@ public sealed class GameLogic
 
         throw new ArgumentOutOfRangeException(nameof(station), "Unknown alliance station.");
     }
-
 }

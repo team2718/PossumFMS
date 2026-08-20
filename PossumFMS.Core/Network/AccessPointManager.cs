@@ -55,13 +55,11 @@ public sealed class AccessPointManager : BackgroundService
     public AccessPointManager(
         DriverStationManager dsManager,
         IConfiguration config,
+        IHttpClientFactory httpClientFactory,
         ILogger<AccessPointManager> logger)
     {
         _dsManager = dsManager;
         _logger    = logger;
-
-        var address  = config["AccessPoint:Address"] ?? "10.0.100.2";
-        var password = config["AccessPoint:Password"] ?? "";
 
         var configuredChannel = config.GetValue("AccessPoint:Channel", DefaultChannel);
         if (configuredChannel is < 1 or > 200)
@@ -74,11 +72,7 @@ public sealed class AccessPointManager : BackgroundService
         }
 
         _channel = configuredChannel;
-
-        _http = new HttpClient { BaseAddress = new Uri($"http://{address}") };
-        if (!string.IsNullOrEmpty(password))
-            _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", password);
-
+        _http = httpClientFactory.CreateClient("AccessPoint");
     }
 
     /// <summary>

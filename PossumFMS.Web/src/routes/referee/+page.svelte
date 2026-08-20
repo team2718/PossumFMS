@@ -10,15 +10,15 @@
 	}
 
 	const penalties: Penalty[] = [
-        { name: "G403: Limited AUTO opponent interaction", rule: "G403", type: 'MajorFoul'},
-        { name: "G405: Keep SCORING ELEMENTS in bounds", rule: "G405", type: 'MinorFoul' },
-        { name: "G407: Only score while in your ALLIANCE ZONE.", rule: "G407", type: 'MajorFoul'},
-        { name: "G408: Don't catch FUEL", rule: "G408", type: 'MinorFoul' },
-		{ name: "G415: Stay out of other ROBOTS", rule: "G415", type: 'MinorFoul' },
-        { name: "G416: This isn't combat robotics", rule: "G416", type: 'MajorFoul' },
-        { name: "G417: Don't tip or entangle", rule: "G417", type: 'MajorFoul' },
-        { name: "G418: There's a 3-count on PINS", rule: "G418", type: 'MinorFoul' },
-		{ name: "G420: TOWER protection", rule: "G420", type: 'MajorFoul' },
+		{ name: 'G403: Limited AUTO opponent interaction', rule: 'G403', type: 'MajorFoul' },
+		{ name: 'G405: Keep SCORING ELEMENTS in bounds', rule: 'G405', type: 'MinorFoul' },
+		{ name: 'G407: Only score while in your ALLIANCE ZONE.', rule: 'G407', type: 'MajorFoul' },
+		{ name: "G408: Don't catch FUEL", rule: 'G408', type: 'MinorFoul' },
+		{ name: 'G415: Stay out of other ROBOTS', rule: 'G415', type: 'MinorFoul' },
+		{ name: "G416: This isn't combat robotics", rule: 'G416', type: 'MajorFoul' },
+		{ name: "G417: Don't tip or entangle", rule: 'G417', type: 'MajorFoul' },
+		{ name: "G418: There's a 3-count on PINS", rule: 'G418', type: 'MinorFoul' },
+		{ name: 'G420: TOWER protection', rule: 'G420', type: 'MajorFoul' }
 	];
 
 	$effect(() => {
@@ -59,9 +59,7 @@
 			await fms.addViolation(stationIndex, selectedPenalty.rule);
 		} catch (error) {
 			refereeWarning =
-				error instanceof Error
-					? error.message
-					: 'Failed to record violation. Please try again.';
+				error instanceof Error ? error.message : 'Failed to record violation. Please try again.';
 		}
 	}
 
@@ -71,9 +69,7 @@
 			await fms.removeViolation(violationId);
 		} catch (error) {
 			refereeWarning =
-				error instanceof Error
-					? error.message
-					: 'Failed to delete violation. Please try again.';
+				error instanceof Error ? error.message : 'Failed to delete violation. Please try again.';
 		}
 	}
 </script>
@@ -103,7 +99,9 @@
 	<Navbar />
 
 	<main class="mx-auto flex max-w-425 flex-col gap-4 px-3 py-4">
-		<div class="flex flex-wrap items-center gap-3 rounded border border-slate-200 bg-white px-4 py-3 shadow-sm">
+		<div
+			class="flex flex-wrap items-center gap-3 rounded border border-slate-200 bg-white px-4 py-3 shadow-sm"
+		>
 			<span class="text-base font-black text-slate-800">Referee Panel</span>
 			<span
 				class="rounded-full border px-3 py-1 text-sm font-semibold {canEditViolations
@@ -137,20 +135,26 @@
 		</div>
 
 		{#if refereeWarning}
-			<div class="rounded border border-rose-300 bg-rose-50 px-4 py-3 text-base font-semibold text-rose-700">
+			<div
+				class="rounded border border-rose-300 bg-rose-50 px-4 py-3 text-base font-semibold text-rose-700"
+			>
 				{refereeWarning}
 			</div>
 		{/if}
 
 		{#if !matchState}
-			<div class="rounded border border-slate-200 bg-white px-4 py-10 text-center text-base text-slate-500 shadow-sm">
+			<div
+				class="rounded border border-slate-200 bg-white px-4 py-10 text-center text-base text-slate-500 shadow-sm"
+			>
 				Waiting for FMS connection…
 			</div>
 		{:else}
 			<div class="grid grid-cols-1 gap-4 xl:grid-cols-[1.35fr_1fr]">
 				<div class="grid grid-cols-1 gap-4">
 					<div class="rounded border border-rose-200 bg-rose-50/60 p-4 shadow-sm">
-						<div class="mb-3 text-lg font-black tracking-widest text-rose-700 uppercase">Red Alliance</div>
+						<div class="mb-3 text-lg font-black tracking-widest text-rose-700 uppercase">
+							Red Alliance
+						</div>
 						<div class="grid grid-cols-1 gap-3 md:grid-cols-3">
 							{#each redStations as station}
 								{@render stationCard(station)}
@@ -159,7 +163,9 @@
 					</div>
 
 					<div class="rounded border border-blue-200 bg-blue-50/60 p-4 shadow-sm">
-						<div class="mb-3 text-lg font-black tracking-widest text-blue-700 uppercase">Blue Alliance</div>
+						<div class="mb-3 text-lg font-black tracking-widest text-blue-700 uppercase">
+							Blue Alliance
+						</div>
 						<div class="grid grid-cols-1 gap-3 md:grid-cols-3">
 							{#each blueStations as station}
 								{@render stationCard(station)}
@@ -174,9 +180,7 @@
 							<div class="text-lg font-black tracking-widest text-slate-800 uppercase">
 								Match Violations
 							</div>
-							<div class="text-sm font-semibold text-slate-500">
-								Most recent first
-							</div>
+							<div class="text-sm font-semibold text-slate-500">Most recent first</div>
 						</div>
 						<div class="rounded-full bg-slate-100 px-3 py-1 text-sm font-bold text-slate-700">
 							{violations.length}
@@ -185,7 +189,9 @@
 
 					<div class="max-h-[60vh] space-y-3 overflow-y-auto pr-1">
 						{#if violations.length === 0}
-							<div class="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-base text-slate-500">
+							<div
+								class="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-base text-slate-500"
+							>
 								No fouls recorded for this match.
 							</div>
 						{:else}
@@ -200,7 +206,9 @@
 												{violation.rule} - {violation.type === 'MajorFoul' ? 'Major' : 'Minor'}
 											</div>
 											<div class="mt-2 text-base font-semibold text-slate-700">
-												{violation.alliance} {violation.position} {violation.teamNumber > 0
+												{violation.alliance}
+												{violation.position}
+												{violation.teamNumber > 0
 													? `• Team ${violation.teamNumber}`
 													: '• No team assigned'}
 											</div>

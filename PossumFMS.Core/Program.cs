@@ -63,6 +63,15 @@ builder.Services.AddSingleton<DriverStationManager>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<DriverStationManager>());
 
 // VH-113 access point configuration manager
+builder.Services.AddHttpClient("AccessPoint", (sp, client) =>
+{
+    var config = sp.GetRequiredService<IConfiguration>();
+    var address = config["AccessPoint:Address"] ?? "10.0.100.2";
+    var password = config["AccessPoint:Password"] ?? "";
+    client.BaseAddress = new Uri($"http://{address}");
+    if (!string.IsNullOrEmpty(password))
+        client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", password);
+});
 builder.Services.AddSingleton<AccessPointManager>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<AccessPointManager>());
 

@@ -6,8 +6,8 @@
 	--color-primary: #1ca5a5;
 	--color-secondary: #1f7ec6;
 	--color-tertiary: #a51c1c;
-	--color-neutral: #F8F9FA;
-    --color-highlight: #bb1fc6;
+	--color-neutral: #f8f9fa;
+	--color-highlight: #bb1fc6;
 }
 
 .app-neutral-bg {
@@ -83,15 +83,15 @@
 }
 
 .alliance-red-bg-dark-transparent {
-    background-color: rgb(from color-mix(in srgb, var(--color-tertiary) 85%, black) r g b / 0.8);
+	background-color: rgb(from color-mix(in srgb, var(--color-tertiary) 85%, black) r g b / 0.8);
 }
 
 .alliance-blue-bg-dark-transparent {
-    background-color: rgb(from color-mix(in srgb, var(--color-primary) 85%, black) r g b / 0.8);
+	background-color: rgb(from color-mix(in srgb, var(--color-primary) 85%, black) r g b / 0.8);
 }
 
 /* white softly glowing text, for use on dark backgrounds */
 .text-white-glow {
-    color: white;
-    text-shadow: 0 0 5px white;
+	color: white;
+	text-shadow: 0 0 5px white;
 }

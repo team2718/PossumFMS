@@ -3,11 +3,11 @@
 //
 //  Behaviour:
 //    • Connects to WiFi, then opens a TCP socket to the FMS server.
-//    • Every 20 ms sends a BSON heartbeat:
+//    • Every 50 ms sends a BSON heartbeat:
 //        { name, type:"estop", estop_activated, astop_activated }
 //    • Both buttons are active-low (pulled high internally; press = GND).
-//    • Hardware debounce is handled in software (50 ms).
-//    • Auto-reconnects WiFi and TCP if either drops.
+//    • Hardware debounce is handled in software.
+//    • Non-blocking state machine for WiFi and TCP auto-reconnection.
 //
 //  Wiring (change pin numbers to match your board):
 //    ESTOP_PIN   GPIO 15  – E-Stop button (NO contact, other leg to GND)
@@ -33,14 +33,23 @@ const uint32_t HEARTBEAT_INTERVAL_MS = 50;
 const uint32_t REPLY_TIMEOUT_MS = 50;
 const uint32_t INITIAL_REPLY_TIMEOUT_MS = 500;
 const uint32_t REPLY_BODY_TIMEOUT_MS = 200;
+const uint32_t TCP_RECONNECT_INTERVAL_MS = 1000;
+const uint32_t WIFI_RECONNECT_INTERVAL_MS = 10000;
 
-// GPIO pins (active-low with internal pull-up)
+// GPIO pins (active-low with internal pull-up / pull-down)
 const int ESTOP_PIN = 15;
 const int ASTOP_PIN = 18;
 
 // Receive buffer
 const size_t RX_BUF_SIZE = 256;
 // ─────────────────────────────────────────────────────────────────────────────
+
+enum ConnectionState {
+    CONN_STATE_WIFI_DISCONNECTED,
+    CONN_STATE_WIFI_CONNECTING,
+    CONN_STATE_TCP_CONNECTING,
+    CONN_STATE_CONNECTED
+};
 
 WiFiClient client;
 
@@ -49,6 +58,8 @@ volatile boolean astopped = false;
 
 uint32_t lastReplyTimeMs = 0;
 bool hasReceivedReplySinceConnect = false;
+ConnectionState connState = CONN_STATE_WIFI_DISCONNECTED;
+uint32_t lastStateActionMs = 0;
 
 void ARDUINO_ISR_ATTR estopBtnCallback() {
     estopped = true;
@@ -57,6 +68,11 @@ void ARDUINO_ISR_ATTR estopBtnCallback() {
 void ARDUINO_ISR_ATTR astopBtnCallback() {
     astopped = true;
 }
+
+// ── Forward Declarations ──────────────────────────────────────────────────────
+uint32_t sendHeartbeat(bool estopActivated, bool astopActivated);
+void receiveReply(uint32_t sentAtMs);
+void updateConnectionState();
 
 // ── Setup ─────────────────────────────────────────────────────────────────────
 void setup() {
@@ -69,74 +85,101 @@ void setup() {
     attachInterrupt(digitalPinToInterrupt(ESTOP_PIN), estopBtnCallback, FALLING);
     attachInterrupt(digitalPinToInterrupt(ASTOP_PIN), astopBtnCallback, FALLING);
 
-
-    connectWifi();
-    connectFms();
+    WiFi.mode(WIFI_STA);
+    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+    connState = CONN_STATE_WIFI_CONNECTING;
+    lastStateActionMs = millis();
+    Serial.print("[ESTOP] Initiated WiFi connection…");
 }
 
 // ── Main loop ─────────────────────────────────────────────────────────────────
 void loop() {
     static uint32_t lastHeartbeatMs = 0;
-
-    // ── Reconnect if needed ──────────────────────────────────────────────────
-    if (WiFi.status() != WL_CONNECTED) {
-        Serial.println("[ESTOP] WiFi lost – reconnecting…");
-        connectWifi();
-    }
-    if (!client.connected()) {
-        Serial.println("[ESTOP] TCP lost – reconnecting…");
-        connectFms();
-    }
-
-    // ── Poll buttons (debounced) ─────────────────────────────────────────────
-    // readButton(ESTOP_PIN, estopBtn);
-    // readButton(ASTOP_PIN, astopBtn);
-
-    // ── Heartbeat ────────────────────────────────────────────────────────────
     uint32_t now = millis();
-    
-    if (now - lastHeartbeatMs >= HEARTBEAT_INTERVAL_MS) {
-        lastHeartbeatMs = now;
-        uint32_t sentAtMs = sendHeartbeat(estopped, astopped);
-        if (estopped) {
-            Serial.println("Attempting to send E-Stop!");
+
+    updateConnectionState();
+
+    if (connState == CONN_STATE_CONNECTED) {
+        if (now - lastHeartbeatMs >= HEARTBEAT_INTERVAL_MS) {
+            lastHeartbeatMs = now;
+            uint32_t sentAtMs = sendHeartbeat(estopped, astopped);
+            if (estopped) {
+                Serial.println("[ESTOP] Attempting to send E-Stop!");
+            }
+            if (astopped) {
+                Serial.println("[ESTOP] Attempting to send A-Stop!");
+            }
+            receiveReply(sentAtMs);
         }
-        if (astopped) {
-            Serial.println("Attempting to send A-Stop!");
-        }
-        receiveReply(sentAtMs);
     }
+
+    delay(1);
 }
 
 // =============================================================================
-//  WiFi helpers
+//  Non-blocking Connection State Machine
 // =============================================================================
-void connectWifi() {
-    WiFi.mode(WIFI_STA);
-    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-    Serial.print("[ESTOP] Connecting to WiFi");
-    while (WiFi.status() != WL_CONNECTED) {
-        delay(500);
-        Serial.print(".");
-    }
-    Serial.printf("\n[ESTOP] WiFi connected – IP: %s\n",
-                  WiFi.localIP().toString().c_str());
-}
+void updateConnectionState() {
+    uint32_t now = millis();
 
-// =============================================================================
-//  FMS TCP helpers
-// =============================================================================
-void connectFms() {
-    client.stop();
-    Serial.printf("[ESTOP] Connecting to FMS %s:%d\n", FMS_HOST, FMS_PORT);
-    while (!client.connect(FMS_HOST, FMS_PORT)) {
-        Serial.println("[ESTOP] FMS connection failed - retrying in 1 s.");
-        delay(1000);
+    switch (connState) {
+        case CONN_STATE_WIFI_DISCONNECTED:
+            Serial.println("[ESTOP] Reconnecting to WiFi…");
+            WiFi.mode(WIFI_STA);
+            WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+            connState = CONN_STATE_WIFI_CONNECTING;
+            lastStateActionMs = now;
+            break;
+
+        case CONN_STATE_WIFI_CONNECTING:
+            if (WiFi.status() == WL_CONNECTED) {
+                Serial.printf("\n[ESTOP] WiFi connected – IP: %s\n", WiFi.localIP().toString().c_str());
+                connState = CONN_STATE_TCP_CONNECTING;
+                lastStateActionMs = 0; // trigger immediate TCP connect
+            } else if (now - lastStateActionMs >= WIFI_RECONNECT_INTERVAL_MS) {
+                Serial.println("\n[ESTOP] WiFi connection timeout – retrying…");
+                WiFi.disconnect();
+                connState = CONN_STATE_WIFI_DISCONNECTED;
+            }
+            break;
+
+        case CONN_STATE_TCP_CONNECTING:
+            if (WiFi.status() != WL_CONNECTED) {
+                Serial.println("[ESTOP] WiFi lost while connecting TCP.");
+                client.stop();
+                connState = CONN_STATE_WIFI_DISCONNECTED;
+                break;
+            }
+
+            if (now - lastStateActionMs >= TCP_RECONNECT_INTERVAL_MS) {
+                lastStateActionMs = now;
+                Serial.printf("[ESTOP] Connecting to FMS %s:%d…\n", FMS_HOST, FMS_PORT);
+                client.stop();
+                if (client.connect(FMS_HOST, FMS_PORT)) {
+                    client.setNoDelay(true);
+                    lastReplyTimeMs = 0;
+                    hasReceivedReplySinceConnect = false;
+                    connState = CONN_STATE_CONNECTED;
+                    Serial.println("[ESTOP] FMS connected.");
+                } else {
+                    Serial.println("[ESTOP] FMS connection failed; will retry.");
+                }
+            }
+            break;
+
+        case CONN_STATE_CONNECTED:
+            if (WiFi.status() != WL_CONNECTED) {
+                Serial.println("[ESTOP] WiFi lost – resetting socket.");
+                client.stop();
+                connState = CONN_STATE_WIFI_DISCONNECTED;
+            } else if (!client.connected()) {
+                Serial.println("[ESTOP] TCP lost – reconnecting.");
+                client.stop();
+                connState = CONN_STATE_TCP_CONNECTING;
+                lastStateActionMs = now;
+            }
+            break;
     }
-    client.setNoDelay(true);
-    lastReplyTimeMs = 0;
-    hasReceivedReplySinceConnect = false;
-    Serial.println("[ESTOP] FMS connected.");
 }
 
 // ── Build and send an e-stop heartbeat ───────────────────────────────────────
@@ -158,7 +201,6 @@ uint32_t sendHeartbeat(bool estopActivated, bool astopActivated) {
 }
 
 // ── Read and parse the server reply ──────────────────────────────────────────
-// E-stop reply only has: accepted (bool) — and error (string) on failure.
 void receiveReply(uint32_t sentAtMs) {
     uint32_t replyTimeoutMs = hasReceivedReplySinceConnect
         ? REPLY_TIMEOUT_MS
@@ -211,10 +253,10 @@ void receiveReply(uint32_t sentAtMs) {
     hasReceivedReplySinceConnect = true;
 
     if (estopped) {
-        Serial.println("E-Stop accepted by server.");
+        Serial.println("[ESTOP] E-Stop accepted by server.");
     }
     if (astopped) {
-        Serial.println("A-Stop accepted by server.");
+        Serial.println("[ESTOP] A-Stop accepted by server.");
     }
     estopped = false;
     astopped = false;
