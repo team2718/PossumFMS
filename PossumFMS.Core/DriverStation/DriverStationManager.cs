@@ -216,13 +216,13 @@ public sealed class DriverStationManager : BackgroundService
         if (duplicateTeams.Length > 0)
             throw new InvalidOperationException($"Duplicate team assignments are not allowed: {string.Join(", ", duplicateTeams)}.");
 
-        // if wpaKey is empty, set it to "possum2718" as a default until we get a radio programming setup
+        // if wpaKey is empty, set it to the team number twice (e.g. "27182718" for 2718) as a default until we get a radio programming setup
         static string NormalizeWpaKey(int teamNumber, string wpaKey)
         {
             if (teamNumber == 0)
                 return string.Empty;
 
-            return string.IsNullOrEmpty(wpaKey) ? "possum2718" : wpaKey;
+            return string.IsNullOrEmpty(wpaKey) ? $"{teamNumber}{teamNumber}" : wpaKey;
         }
 
         var changed = false;
