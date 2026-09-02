@@ -98,7 +98,7 @@
 		<div class="flex flex-wrap items-center justify-center gap-4">
 			<!-- Normal Match Lifecycle Group -->
 			<div
-				class="flex flex-wrap items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white/60 p-1.5 shadow-xs dark:border-slate-700/80 dark:bg-slate-900/40"
+				class="flex w-full flex-wrap items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white/60 p-1.5 shadow-xs sm:w-auto dark:border-slate-700/80 dark:bg-slate-900/40"
 			>
 				<button
 					type="button"
@@ -109,7 +109,7 @@
 					disabled={phase !== 'Idle' ||
 						!!matchState?.arenaEstop ||
 						!!matchState?.freePracticeEnabled}
-					class="h-13 min-w-38 cursor-pointer rounded px-4 text-xs font-black tracking-wide uppercase shadow-xs transition disabled:cursor-not-allowed disabled:opacity-40 {phase ===
+					class="h-13 min-w-[130px] flex-1 cursor-pointer rounded px-4 text-xs font-black tracking-wide uppercase shadow-xs transition disabled:cursor-not-allowed disabled:opacity-40 sm:min-w-38 sm:flex-initial {phase ===
 						'Idle' && !matchState?.freePracticeEnabled
 						? 'bg-amber-400 text-slate-900 hover:bg-amber-300'
 						: 'bg-amber-800 text-white'}"
@@ -120,7 +120,7 @@
 					type="button"
 					onclick={() => void startMatch()}
 					disabled={phase !== 'PreMatch' || !blueReady || !redReady || !!matchState?.arenaEstop}
-					class="h-13 min-w-38 cursor-pointer rounded px-4 text-xs font-black tracking-wide uppercase shadow-xs transition disabled:cursor-not-allowed {phase ===
+					class="h-13 min-w-[130px] flex-1 cursor-pointer rounded px-4 text-xs font-black tracking-wide uppercase shadow-xs transition disabled:cursor-not-allowed sm:min-w-38 sm:flex-initial {phase ===
 						'PreMatch' &&
 					blueReady &&
 					redReady &&
@@ -134,7 +134,7 @@
 					type="button"
 					onclick={commitMatchResults}
 					disabled={!canCommit}
-					class="h-13 min-w-38 cursor-pointer rounded px-4 text-xs font-black tracking-wide uppercase shadow-xs transition disabled:cursor-not-allowed disabled:opacity-40 {canCommit
+					class="h-13 min-w-[130px] flex-1 cursor-pointer rounded px-4 text-xs font-black tracking-wide uppercase shadow-xs transition disabled:cursor-not-allowed disabled:opacity-40 sm:min-w-38 sm:flex-initial {canCommit
 						? 'bg-indigo-600 text-white hover:bg-indigo-500'
 						: 'bg-indigo-950 text-slate-400'}"
 				>
@@ -145,7 +145,7 @@
 					onclick={() => fms.clearMatch()}
 					disabled={(phase !== 'PostMatch' && phase !== 'PreMatch' && phase !== 'Idle') ||
 						!!matchState?.arenaEstop}
-					class="h-13 min-w-32 cursor-pointer rounded bg-slate-500 px-4 text-xs font-black tracking-wide text-white uppercase shadow-xs transition hover:bg-slate-400 disabled:cursor-not-allowed disabled:opacity-40"
+					class="h-13 min-w-[100px] flex-1 cursor-pointer rounded bg-slate-500 px-4 text-xs font-black tracking-wide text-white uppercase shadow-xs transition hover:bg-slate-400 disabled:cursor-not-allowed disabled:opacity-40 sm:min-w-32 sm:flex-initial"
 				>
 					Clear
 				</button>
@@ -156,13 +156,13 @@
 
 			<!-- Emergency / Abort Safety Group -->
 			<div
-				class="flex flex-wrap items-center justify-center gap-2 rounded-lg border border-rose-200 bg-rose-50/40 p-1.5 shadow-xs dark:border-rose-900/40 dark:bg-rose-950/20"
+				class="flex w-full flex-wrap items-center justify-center gap-2 rounded-lg border border-rose-200 bg-rose-50/40 p-1.5 shadow-xs sm:w-auto dark:border-rose-900/40 dark:bg-rose-950/20"
 			>
 				<button
 					type="button"
 					onclick={() => fms.abortMatch()}
 					disabled={phase !== 'Auto' && phase !== 'AutoToTeleopTransition' && phase !== 'Teleop'}
-					class="h-13 min-w-38 cursor-pointer rounded px-4 text-xs font-black tracking-wide text-white uppercase shadow-xs transition disabled:cursor-not-allowed disabled:opacity-40 {phase ===
+					class="h-13 min-w-[130px] flex-1 cursor-pointer rounded px-4 text-xs font-black tracking-wide text-white uppercase shadow-xs transition disabled:cursor-not-allowed disabled:opacity-40 sm:min-w-38 sm:flex-initial {phase ===
 						'Auto' ||
 					phase === 'AutoToTeleopTransition' ||
 					phase === 'Teleop'
@@ -176,7 +176,7 @@
 					<button
 						type="button"
 						onclick={() => void resetArenaEstop()}
-						class="h-13 min-w-38 cursor-pointer rounded bg-[repeating-linear-gradient(-45deg,#e7ca4f_0px,#e7ca4f_8px,#9a9a9a_8px,#9a9a9a_16px)] px-4 text-xs font-black tracking-wide text-black uppercase shadow-xs transition hover:opacity-90"
+						class="h-13 min-w-[130px] flex-1 cursor-pointer rounded bg-[repeating-linear-gradient(-45deg,#e7ca4f_0px,#e7ca4f_8px,#9a9a9a_8px,#9a9a9a_16px)] px-4 text-xs font-black tracking-wide text-black uppercase shadow-xs transition hover:opacity-90 sm:min-w-38 sm:flex-initial"
 					>
 						Reset Arena E-Stop
 					</button>
@@ -184,7 +184,7 @@
 					<button
 						type="button"
 						onclick={() => fms.triggerArenaEstop()}
-						class="h-13 min-w-38 cursor-pointer rounded bg-rose-700 px-4 text-xs font-black tracking-wide text-white uppercase shadow-xs transition hover:bg-rose-600 active:scale-95"
+						class="h-13 min-w-[130px] flex-1 cursor-pointer rounded bg-rose-700 px-4 text-xs font-black tracking-wide text-white uppercase shadow-xs transition hover:bg-rose-600 active:scale-95 sm:min-w-38 sm:flex-initial"
 					>
 						Arena E-STOP
 					</button>

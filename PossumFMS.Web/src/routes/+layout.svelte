@@ -10,10 +10,13 @@
 		const isAudience = page.url.pathname.startsWith('/audience');
 		if (isAudience) {
 			document.documentElement.classList.remove('dark');
+			document.documentElement.style.colorScheme = 'light';
 		} else if (theme.isDark) {
 			document.documentElement.classList.add('dark');
+			document.documentElement.style.colorScheme = 'dark';
 		} else {
 			document.documentElement.classList.remove('dark');
+			document.documentElement.style.colorScheme = 'light';
 		}
 	});
 </script>

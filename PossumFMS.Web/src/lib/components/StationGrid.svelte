@@ -259,7 +259,7 @@
 
 {#snippet readinessHeaderRow()}
 	<div
-		class="hidden items-center gap-1 border-b border-slate-200/80 px-1.5 py-1 text-center text-[10px] font-bold text-slate-500 uppercase sm:grid sm:grid-cols-[68px_66px_minmax(128px,1fr)_48px_44px_44px_88px_80px] dark:border-slate-700/80 dark:text-slate-400"
+		class="grid grid-cols-[68px_66px_minmax(128px,1fr)_48px_44px_44px_88px_80px] items-center gap-1 border-b border-slate-200/80 px-1.5 py-1 text-center text-[10px] font-bold text-slate-500 uppercase dark:border-slate-700/80 dark:text-slate-400"
 	>
 		<div>E-Stop HW</div>
 		<div>Station</div>
@@ -272,9 +272,11 @@
 	</div>
 {/snippet}
 
-{#snippet readinessStatusCell(online: boolean)}
+{#snippet readinessStatusCell(online: boolean, compact = false)}
 	<div
-		class="mx-auto flex h-7 w-10 items-center justify-center rounded font-bold text-white shadow-xs {online
+		class="mx-auto flex {compact
+			? 'h-5 w-6 text-[10px]'
+			: 'h-7 w-10 text-xs'} items-center justify-center rounded font-bold text-white shadow-xs {online
 			? 'bg-emerald-600'
 			: 'bg-rose-700'}"
 	>
@@ -282,7 +284,13 @@
 	</div>
 {/snippet}
 
-{#snippet robotEnabledCell(estop: boolean, astop: boolean, robotLinked: boolean, bypassed: boolean)}
+{#snippet robotEnabledCell(
+	estop: boolean,
+	astop: boolean,
+	robotLinked: boolean,
+	bypassed: boolean,
+	compact = false
+)}
 	{@const state = estop
 		? { label: 'E-Stopped', classes: 'bg-rose-700 text-white shadow-xs' }
 		: astop
@@ -293,22 +301,98 @@
 					? { label: 'No Robot', classes: 'bg-slate-500 text-white shadow-xs' }
 					: { label: 'Enabled', classes: 'bg-emerald-600 text-white shadow-xs' }}
 	<div
-		class="mx-auto flex h-7 w-20 items-center justify-center rounded px-1 text-[10px] font-bold whitespace-nowrap {state.classes}"
+		class="mx-auto flex {compact
+			? 'h-5 px-1.5 text-[9px]'
+			: 'h-7 w-20 px-1 text-[10px]'} items-center justify-center rounded font-bold whitespace-nowrap {state.classes}"
 	>
 		{state.label}
 	</div>
 {/snippet}
 
-{#snippet stopButton(type: 'E' | 'A', active: boolean, stationIndex: number)}
+{#snippet stopButton(type: 'E' | 'A', active: boolean, stationIndex: number, compact = false)}
 	<button
 		type="button"
 		onclick={() => (type === 'E' ? fms.estopStation(stationIndex) : fms.astopStation(stationIndex))}
-		class="mx-auto h-7 w-14 cursor-pointer rounded border border-rose-900 px-1 text-[10px] font-black tracking-wide text-white shadow-xs transition active:translate-y-px {active
+		class="mx-auto {compact
+			? 'h-6 px-2 text-[9px]'
+			: 'h-7 w-14 px-1 text-[10px]'} cursor-pointer rounded border border-rose-900 font-black tracking-wide text-white shadow-xs transition active:translate-y-px {active
 			? 'bg-rose-950'
 			: 'bg-rose-700 hover:bg-rose-600'}"
 	>
 		{type}-Stop
 	</button>
+{/snippet}
+
+{#snippet stationMobileCard(
+	s: Station,
+	stationNumber: number,
+	alliance: 'blue' | 'red',
+	idx: number
+)}
+	<div
+		class="mt-1.5 rounded-lg border p-2.5 shadow-xs transition-colors {alliance === 'blue'
+			? 'alliance-blue-border-soft bg-white/90 dark:bg-slate-900/80'
+			: 'alliance-red-border-soft bg-white/90 dark:bg-slate-900/80'}"
+	>
+		<!-- Top row: Station Title, Team input, E-stop -->
+		<div
+			class="flex items-center justify-between gap-2 border-b border-slate-200/80 pb-2 dark:border-slate-800/80"
+		>
+			<div class="font-bold {alliance === 'blue' ? 'alliance-blue-text' : 'alliance-red-text'}">
+				Station {stationNumber}
+			</div>
+			<div class="flex items-center gap-1.5">
+				<label
+					for={`mobile-team-${idx}`}
+					class="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Team:</label
+				>
+				<input
+					id={`mobile-team-${idx}`}
+					type="text"
+					inputmode="numeric"
+					pattern="[0-9]*"
+					placeholder="Team #"
+					bind:value={inputs[idx].team}
+					disabled={phase !== 'Idle'}
+					class="h-7 w-20 rounded border border-slate-300 bg-white px-2 text-center text-xs font-bold text-slate-900 placeholder-slate-400 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:opacity-60 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:disabled:bg-slate-900/60"
+				/>
+			</div>
+			<div>
+				{@render stopButton('E', s.estop, idx, true)}
+			</div>
+		</div>
+
+		<!-- Bottom row: Indicators and Bypass -->
+		<div class="flex flex-wrap items-center justify-between gap-2 pt-2 text-[10px]">
+			<div class="flex items-center gap-1">
+				<span class="font-bold text-slate-500 dark:text-slate-400">HW</span>
+				{@render readinessStatusCell(hasActiveEstopHardware(idx), true)}
+			</div>
+			<div class="flex items-center gap-1">
+				<span class="font-bold text-slate-500 dark:text-slate-400">DS</span>
+				{@render readinessStatusCell(s.dsLinked, true)}
+			</div>
+			<div class="flex items-center gap-1">
+				<span class="font-bold text-slate-500 dark:text-slate-400">Robot</span>
+				{@render readinessStatusCell(s.robotLinked, true)}
+			</div>
+			<div>
+				{@render robotEnabledCell(s.estop, s.astop, s.robotLinked, s.bypassed, true)}
+			</div>
+			<label
+				class="flex cursor-pointer items-center gap-1 font-semibold text-slate-600 dark:text-slate-300"
+			>
+				<input
+					type="checkbox"
+					checked={s.bypassed}
+					disabled={phase !== 'Idle'}
+					onchange={() => fms.bypassStation(idx, !s.bypassed)}
+					class="h-4 w-4 rounded border-slate-300 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-600"
+				/>
+				<span>Bypass</span>
+			</label>
+		</div>
+	</div>
 {/snippet}
 
 <div
@@ -318,7 +402,7 @@
 	<div
 		class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 text-xs dark:border-slate-700 dark:bg-slate-900/60"
 	>
-		<div class="flex items-center gap-2">
+		<div class="flex flex-wrap items-center gap-2">
 			<span class="font-bold tracking-wider text-slate-700 uppercase dark:text-slate-300">
 				Field Stations & Teams
 			</span>
@@ -358,7 +442,7 @@
 				</span>
 			{/if}
 		</div>
-		<div class="flex items-center gap-2">
+		<div class="flex flex-wrap items-center gap-2">
 			{#if onOpenWpaModal}
 				<button
 					type="button"
@@ -391,7 +475,7 @@
 	<div class="grid grid-cols-1 xl:grid-cols-[1fr_210px_1fr]">
 		<!-- Blue Alliance -->
 		<div
-			class="alliance-blue-bg-soft border-b border-slate-300 xl:border-r xl:border-b-0 dark:border-slate-700"
+			class="alliance-blue-bg-soft min-w-0 border-b border-slate-300 xl:border-r xl:border-b-0 dark:border-slate-700"
 		>
 			<div class="alliance-blue-border-soft flex items-center justify-between border-b px-3 py-2">
 				<span class="alliance-blue-text text-sm font-bold tracking-wide">BLUE ALLIANCE</span>
@@ -403,45 +487,58 @@
 					{blueReady ? readinessPositiveLabel : readinessNegativeLabel}
 				</span>
 			</div>
-			<div class="overflow-x-auto p-2 text-xs">
-				{@render readinessHeaderRow()}
-				{#each blueStations as s, i (s.index)}
-					{@const idx = blueInputIndices[i]}
-					<div
-						class="alliance-blue-border-soft mt-1.5 grid grid-cols-[68px_66px_minmax(128px,1fr)_48px_44px_44px_88px_80px] items-center gap-1 rounded border bg-white/80 px-1.5 py-1.5 shadow-xs dark:bg-slate-900/70"
-					>
-						{@render readinessStatusCell(hasActiveEstopHardware(idx))}
-						<div class="alliance-blue-text text-center font-bold">Station {i + 1}</div>
-						<div class="flex items-center gap-1">
-							<input
-								type="text"
-								inputmode="numeric"
-								pattern="[0-9]*"
-								placeholder="Team"
-								bind:value={inputs[idx].team}
-								disabled={phase !== 'Idle'}
-								class="h-7 w-full min-w-[8rem] rounded border border-slate-300 bg-white px-2 text-xs text-slate-900 placeholder-slate-400 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:opacity-60 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:disabled:bg-slate-900/60"
-							/>
-						</div>
-						<input
-							type="checkbox"
-							checked={s.bypassed}
-							disabled={phase !== 'Idle'}
-							onchange={() => fms.bypassStation(idx, !s.bypassed)}
-							class="mx-auto h-4 w-4 cursor-pointer rounded border-slate-300 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-600"
-						/>
-						{@render readinessStatusCell(s.dsLinked)}
-						{@render readinessStatusCell(s.robotLinked)}
-						{@render robotEnabledCell(s.estop, s.astop, s.robotLinked, s.bypassed)}
-						{@render stopButton('E', s.estop, idx)}
+			<div class="p-2 text-xs">
+				<!-- Desktop / Tablet Table View (sm and up) -->
+				<div class="hidden overflow-x-auto sm:block">
+					<div class="min-w-[580px]">
+						{@render readinessHeaderRow()}
+						{#each blueStations as s, i (s.index)}
+							{@const idx = blueInputIndices[i]}
+							<div
+								class="alliance-blue-border-soft mt-1.5 grid grid-cols-[68px_66px_minmax(128px,1fr)_48px_44px_44px_88px_80px] items-center gap-1 rounded border bg-white/80 px-1.5 py-1.5 shadow-xs dark:bg-slate-900/70"
+							>
+								{@render readinessStatusCell(hasActiveEstopHardware(idx))}
+								<div class="alliance-blue-text text-center font-bold">Station {i + 1}</div>
+								<div class="flex items-center gap-1">
+									<input
+										type="text"
+										inputmode="numeric"
+										pattern="[0-9]*"
+										placeholder="Team"
+										bind:value={inputs[idx].team}
+										disabled={phase !== 'Idle'}
+										class="h-7 w-full min-w-[8rem] rounded border border-slate-300 bg-white px-2 text-xs text-slate-900 placeholder-slate-400 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:opacity-60 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:disabled:bg-slate-900/60"
+									/>
+								</div>
+								<input
+									type="checkbox"
+									checked={s.bypassed}
+									disabled={phase !== 'Idle'}
+									onchange={() => fms.bypassStation(idx, !s.bypassed)}
+									class="mx-auto h-4 w-4 cursor-pointer rounded border-slate-300 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-600"
+								/>
+								{@render readinessStatusCell(s.dsLinked)}
+								{@render readinessStatusCell(s.robotLinked)}
+								{@render robotEnabledCell(s.estop, s.astop, s.robotLinked, s.bypassed)}
+								{@render stopButton('E', s.estop, idx)}
+							</div>
+						{/each}
 					</div>
-				{/each}
+				</div>
+
+				<!-- Mobile Card View (< sm) -->
+				<div class="flex flex-col gap-1.5 sm:hidden">
+					{#each blueStations as s, i (s.index)}
+						{@const idx = blueInputIndices[i]}
+						{@render stationMobileCard(s, i + 1, 'blue', idx)}
+					{/each}
+				</div>
 			</div>
 		</div>
 
 		<!-- Center Column: Match Status & Diagnostics -->
 		<div
-			class="order-first flex flex-col items-center justify-center gap-2 border-b border-slate-300 bg-slate-50 px-3 py-4 text-center xl:order-none xl:border-b-0 dark:border-slate-700 dark:bg-slate-900/60"
+			class="order-first flex min-w-0 flex-col items-center justify-center gap-2 border-b border-slate-300 bg-slate-50 px-3 py-4 text-center xl:order-none xl:border-b-0 dark:border-slate-700 dark:bg-slate-900/60"
 		>
 			<div
 				class="text-[11px] font-bold tracking-widest text-slate-500 uppercase dark:text-slate-400"
@@ -556,7 +653,7 @@
 		</div>
 
 		<!-- Red Alliance -->
-		<div class="alliance-red-bg-soft">
+		<div class="alliance-red-bg-soft min-w-0">
 			<div class="alliance-red-border-soft flex items-center justify-between border-b px-3 py-2">
 				<span
 					class="rounded px-2 py-0.5 text-xs font-bold text-white shadow-xs {redReady
@@ -567,39 +664,52 @@
 				</span>
 				<span class="alliance-red-text text-sm font-bold tracking-wide">RED ALLIANCE</span>
 			</div>
-			<div class="overflow-x-auto p-2 text-xs">
-				{@render readinessHeaderRow()}
-				{#each redStations as s, i (s.index)}
-					{@const idx = redInputIndices[i]}
-					<div
-						class="alliance-red-border-soft mt-1.5 grid grid-cols-[68px_66px_minmax(128px,1fr)_48px_44px_44px_88px_80px] items-center gap-1 rounded border bg-white/80 px-1.5 py-1.5 shadow-xs dark:bg-slate-900/70"
-					>
-						{@render readinessStatusCell(hasActiveEstopHardware(idx))}
-						<div class="alliance-red-text text-center font-bold">Station {i + 1}</div>
-						<div class="flex items-center gap-1">
-							<input
-								type="text"
-								inputmode="numeric"
-								pattern="[0-9]*"
-								placeholder="Team"
-								bind:value={inputs[idx].team}
-								disabled={phase !== 'Idle'}
-								class="h-7 w-full min-w-[8rem] rounded border border-slate-300 bg-white px-2 text-xs text-slate-900 placeholder-slate-400 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:opacity-60 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:disabled:bg-slate-900/60"
-							/>
-						</div>
-						<input
-							type="checkbox"
-							checked={s.bypassed}
-							disabled={phase !== 'Idle'}
-							onchange={() => fms.bypassStation(idx, !s.bypassed)}
-							class="mx-auto h-4 w-4 cursor-pointer rounded border-slate-300 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-600"
-						/>
-						{@render readinessStatusCell(s.dsLinked)}
-						{@render readinessStatusCell(s.robotLinked)}
-						{@render robotEnabledCell(s.estop, s.astop, s.robotLinked, s.bypassed)}
-						{@render stopButton('E', s.estop, idx)}
+			<div class="p-2 text-xs">
+				<!-- Desktop / Tablet Table View (sm and up) -->
+				<div class="hidden overflow-x-auto sm:block">
+					<div class="min-w-[580px]">
+						{@render readinessHeaderRow()}
+						{#each redStations as s, i (s.index)}
+							{@const idx = redInputIndices[i]}
+							<div
+								class="alliance-red-border-soft mt-1.5 grid grid-cols-[68px_66px_minmax(128px,1fr)_48px_44px_44px_88px_80px] items-center gap-1 rounded border bg-white/80 px-1.5 py-1.5 shadow-xs dark:bg-slate-900/70"
+							>
+								{@render readinessStatusCell(hasActiveEstopHardware(idx))}
+								<div class="alliance-red-text text-center font-bold">Station {i + 1}</div>
+								<div class="flex items-center gap-1">
+									<input
+										type="text"
+										inputmode="numeric"
+										pattern="[0-9]*"
+										placeholder="Team"
+										bind:value={inputs[idx].team}
+										disabled={phase !== 'Idle'}
+										class="h-7 w-full min-w-[8rem] rounded border border-slate-300 bg-white px-2 text-xs text-slate-900 placeholder-slate-400 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:opacity-60 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:disabled:bg-slate-900/60"
+									/>
+								</div>
+								<input
+									type="checkbox"
+									checked={s.bypassed}
+									disabled={phase !== 'Idle'}
+									onchange={() => fms.bypassStation(idx, !s.bypassed)}
+									class="mx-auto h-4 w-4 cursor-pointer rounded border-slate-300 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-600"
+								/>
+								{@render readinessStatusCell(s.dsLinked)}
+								{@render readinessStatusCell(s.robotLinked)}
+								{@render robotEnabledCell(s.estop, s.astop, s.robotLinked, s.bypassed)}
+								{@render stopButton('E', s.estop, idx)}
+							</div>
+						{/each}
 					</div>
-				{/each}
+				</div>
+
+				<!-- Mobile Card View (< sm) -->
+				<div class="flex flex-col gap-1.5 sm:hidden">
+					{#each redStations as s, i (s.index)}
+						{@const idx = redInputIndices[i]}
+						{@render stationMobileCard(s, i + 1, 'red', idx)}
+					{/each}
+				</div>
 			</div>
 		</div>
 	</div>
