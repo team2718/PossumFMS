@@ -22,11 +22,11 @@
 		>
 			<div class="flex items-start gap-4">
 				<div
-					class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-rose-100 text-rose-600 dark:bg-rose-950 dark:text-rose-400"
+					class="flex size-12 shrink-0 items-center justify-center rounded-full bg-rose-100 text-rose-600 dark:bg-rose-950 dark:text-rose-400"
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
-						class="h-6 w-6"
+						class="size-6"
 						fill="none"
 						viewBox="0 0 24 24"
 						stroke="currentColor"

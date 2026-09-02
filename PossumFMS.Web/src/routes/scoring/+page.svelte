@@ -80,7 +80,7 @@
 					type="checkbox"
 					checked={matchState?.stationClimbs?.[idx]?.autoClimbed ?? false}
 					onchange={(e) => setAutoTowerClimb(idx, (e.currentTarget as HTMLInputElement).checked)}
-					class="h-4 w-4 rounded border-slate-300 dark:border-slate-600"
+					class="size-4 rounded border-slate-300 dark:border-slate-600"
 				/>
 				<span class="text-xs font-semibold">{stationCode(idx)}</span>
 			</label>
@@ -104,7 +104,7 @@
 							idx,
 							(e.currentTarget as HTMLSelectElement).value as TowerEndgameLevel
 						)}
-					class="w-full rounded border border-slate-300 bg-white px-1 py-1 text-xs text-slate-800 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+					class="w-full rounded border border-slate-300 bg-white p-1 text-xs text-slate-800 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
 				>
 					<option value="None">None</option>
 					<option value="L1">L1 (10)</option>
@@ -248,7 +248,7 @@
 <div class="app-neutral-bg min-h-screen text-slate-900 transition-colors dark:text-slate-100">
 	<Navbar />
 
-	<main class="mx-auto flex max-w-[1700px] flex-col gap-3 px-3 py-3">
+	<main class="mx-auto flex max-w-425 flex-col gap-3 p-3">
 		<!-- Phase banner -->
 		<div
 			class="flex items-center gap-3 rounded border border-slate-200 bg-white px-4 py-2 shadow-sm dark:border-slate-700 dark:bg-slate-800"

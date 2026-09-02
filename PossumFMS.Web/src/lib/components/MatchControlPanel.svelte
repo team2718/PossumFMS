@@ -145,7 +145,7 @@
 					onclick={() => fms.clearMatch()}
 					disabled={(phase !== 'PostMatch' && phase !== 'PreMatch' && phase !== 'Idle') ||
 						!!matchState?.arenaEstop}
-					class="h-13 min-w-[100px] flex-1 cursor-pointer rounded bg-slate-500 px-4 text-xs font-black tracking-wide text-white uppercase shadow-xs transition hover:bg-slate-400 disabled:cursor-not-allowed disabled:opacity-40 sm:min-w-32 sm:flex-initial"
+					class="h-13 min-w-25 flex-1 cursor-pointer rounded bg-slate-500 px-4 text-xs font-black tracking-wide text-white uppercase shadow-xs transition hover:bg-slate-400 disabled:cursor-not-allowed disabled:opacity-40 sm:min-w-32 sm:flex-initial"
 				>
 					Clear
 				</button>

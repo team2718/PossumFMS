@@ -77,7 +77,7 @@
 					type="checkbox"
 					checked={matchState?.stationClimbs?.[idx]?.autoClimbed ?? false}
 					onchange={(e) => setAutoTowerClimb(idx, (e.currentTarget as HTMLInputElement).checked)}
-					class="h-4 w-4 rounded border-slate-300 dark:border-slate-600"
+					class="size-4 rounded border-slate-300 dark:border-slate-600"
 				/>
 				<span class="text-xs font-semibold">{stationCode(idx)}</span>
 			</label>
@@ -101,7 +101,7 @@
 							idx,
 							(e.currentTarget as HTMLSelectElement).value as TowerEndgameLevel
 						)}
-					class="w-full rounded border border-slate-300 bg-white px-1 py-1 text-xs text-slate-800 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+					class="w-full rounded border border-slate-300 bg-white p-1 text-xs text-slate-800 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
 				>
 					<option value="None">None</option>
 					<option value="L1">L1 (10)</option>

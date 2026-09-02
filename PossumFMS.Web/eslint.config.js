@@ -6,6 +6,7 @@ import svelte from 'eslint-plugin-svelte';
 import { defineConfig } from 'eslint/config';
 import globals from 'globals';
 import ts from 'typescript-eslint';
+import tailwindcss from 'eslint-plugin-tailwindcss';
 import svelteConfig from './svelte.config.js';
 
 const gitignorePath = path.resolve(import.meta.dirname, '.gitignore');
@@ -15,9 +16,15 @@ export default defineConfig(
 	js.configs.recommended,
 	ts.configs.recommended,
 	svelte.configs.recommended,
+	tailwindcss.configs.recommended,
 	prettier,
 	svelte.configs.prettier,
 	{
+		settings: {
+			tailwindcss: {
+				cssConfigPath: 'src/routes/layout.css'
+			}
+		},
 		languageOptions: { globals: { ...globals.browser, ...globals.node } },
 		rules: {
 			// typescript-eslint strongly recommend that you do not use the no-undef lint rule on TypeScript projects.
@@ -29,6 +36,12 @@ export default defineConfig(
 			'@typescript-eslint/no-unused-vars': [
 				'warn',
 				{ argsIgnorePattern: '^_', varsIgnorePattern: '^_' }
+			],
+			'tailwindcss/no-custom-classname': [
+				'warn',
+				{
+					whitelist: ['app-.*', 'brand-.*', 'alliance-.*', 'text-white-glow']
+				}
 			]
 		}
 	},

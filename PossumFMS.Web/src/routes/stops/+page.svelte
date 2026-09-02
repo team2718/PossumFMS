@@ -102,7 +102,7 @@
 <div class="app-neutral-bg min-h-screen text-slate-900 transition-colors dark:text-slate-100">
 	<Navbar />
 
-	<main class="mx-auto flex max-w-[900px] flex-col gap-4 px-3 py-4">
+	<main class="mx-auto flex max-w-225 flex-col gap-4 px-3 py-4">
 		<!-- Phase indicator -->
 		<div
 			class="flex items-center gap-3 rounded border border-slate-200 bg-white px-4 py-2 shadow-sm dark:border-slate-700 dark:bg-slate-800"
@@ -158,13 +158,13 @@
 				<!-- Practice Mode: DISABLE spans the first two columns -->
 				<button
 					onclick={executePracticeDisable}
-					class="col-span-1 flex min-h-[12rem] flex-col items-center justify-center gap-3 rounded-xl border-2 border-amber-700 bg-amber-500 px-4 py-6 text-white shadow-lg transition hover:bg-amber-400 active:translate-y-px active:shadow-md sm:col-span-2"
+					class="col-span-1 flex min-h-48 flex-col items-center justify-center gap-3 rounded-xl border-2 border-amber-700 bg-amber-500 px-4 py-6 text-white shadow-lg transition hover:bg-amber-400 active:translate-y-px active:shadow-md sm:col-span-2"
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
 						viewBox="0 0 24 24"
 						fill="currentColor"
-						class="h-12 w-12"
+						class="size-12"
 					>
 						<path
 							fill-rule="evenodd"
@@ -182,13 +182,13 @@
 				<button
 					onclick={() => fms.abortMatch()}
 					disabled={!isMatchInProgress}
-					class="flex min-h-[12rem] flex-col items-center justify-center gap-3 rounded-xl border-2 border-orange-700 bg-orange-600 px-4 py-6 text-white shadow-lg transition hover:bg-orange-500 active:translate-y-px active:shadow-md disabled:cursor-not-allowed disabled:opacity-40"
+					class="flex min-h-48 flex-col items-center justify-center gap-3 rounded-xl border-2 border-orange-700 bg-orange-600 px-4 py-6 text-white shadow-lg transition hover:bg-orange-500 active:translate-y-px active:shadow-md disabled:cursor-not-allowed disabled:opacity-40"
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
 						viewBox="0 0 24 24"
 						fill="currentColor"
-						class="h-12 w-12"
+						class="size-12"
 					>
 						<path
 							fill-rule="evenodd"
@@ -205,13 +205,13 @@
 				<!-- A-Stop -->
 				<button
 					onclick={executeAstop}
-					class="flex min-h-[12rem] flex-col items-center justify-center gap-3 rounded-xl border-2 border-amber-700 bg-amber-500 px-4 py-6 text-white shadow-lg transition hover:bg-amber-400 active:translate-y-px active:shadow-md"
+					class="flex min-h-48 flex-col items-center justify-center gap-3 rounded-xl border-2 border-amber-700 bg-amber-500 px-4 py-6 text-white shadow-lg transition hover:bg-amber-400 active:translate-y-px active:shadow-md"
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
 						viewBox="0 0 24 24"
 						fill="currentColor"
-						class="h-12 w-12"
+						class="size-12"
 					>
 						<path
 							fill-rule="evenodd"
@@ -229,13 +229,13 @@
 			<!-- E-Stop -->
 			<button
 				onclick={executeEstop}
-				class="flex min-h-[12rem] flex-col items-center justify-center gap-3 rounded-xl border-2 border-rose-900 bg-rose-700 px-4 py-6 text-white shadow-lg transition hover:bg-rose-600 active:translate-y-px active:shadow-md"
+				class="flex min-h-48 flex-col items-center justify-center gap-3 rounded-xl border-2 border-rose-900 bg-rose-700 px-4 py-6 text-white shadow-lg transition hover:bg-rose-600 active:translate-y-px active:shadow-md"
 			>
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
 					viewBox="0 0 24 24"
 					fill="currentColor"
-					class="h-12 w-12"
+					class="size-12"
 				>
 					<path
 						fill-rule="evenodd"

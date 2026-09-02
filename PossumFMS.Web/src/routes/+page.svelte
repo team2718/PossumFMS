@@ -210,7 +210,7 @@
 >
 	<Navbar />
 
-	<main class="mx-auto flex max-w-[1700px] flex-col gap-3 px-3 pt-3 pb-16">
+	<main class="mx-auto flex max-w-425 flex-col gap-3 px-3 pt-3 pb-16">
 		<!-- Station Grid and Readiness Matrix -->
 		<StationGrid
 			bind:inputs
@@ -329,7 +329,7 @@
 						>
 							<svg
 								xmlns="http://www.w3.org/2000/svg"
-								class="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400"
+								class="size-4 shrink-0 text-amber-600 dark:text-amber-400"
 								fill="none"
 								viewBox="0 0 24 24"
 								stroke="currentColor"
@@ -365,7 +365,7 @@
 					<div class="flex flex-wrap gap-3">
 						<!-- Free Practice -->
 						<div
-							class="w-full flex-1 rounded border px-4 py-3 transition-all sm:w-auto sm:min-w-[300px] {phase !==
+							class="w-full flex-1 rounded border px-4 py-3 transition-all sm:w-auto sm:min-w-75 {phase !==
 							'Idle'
 								? 'border-dashed border-slate-300 bg-slate-100/60 opacity-60 dark:border-slate-700 dark:bg-slate-900/40'
 								: 'border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900/60'}"
@@ -397,7 +397,7 @@
 										disabled={!matchState || phase !== 'Idle' || isTogglingFreePractice}
 										onchange={(event) =>
 											setFreePracticeEnabled((event.currentTarget as HTMLInputElement).checked)}
-										class="h-4 w-4 cursor-pointer disabled:cursor-not-allowed"
+										class="size-4 cursor-pointer disabled:cursor-not-allowed"
 									/>
 									<span>{matchState?.freePracticeEnabled ? 'Enabled' : 'Disabled'}</span>
 								</label>
@@ -411,7 +411,7 @@
 
 						<!-- Field Hardware E-Stop Safety Check -->
 						<div
-							class="w-full flex-1 rounded border px-4 py-3 transition-all sm:w-auto sm:min-w-[300px] {phase !==
+							class="w-full flex-1 rounded border px-4 py-3 transition-all sm:w-auto sm:min-w-75 {phase !==
 							'Idle'
 								? 'border-dashed border-slate-300 bg-slate-100/60 opacity-60 dark:border-slate-700 dark:bg-slate-900/40'
 								: 'border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900/60'}"
@@ -450,7 +450,7 @@
 										disabled={!matchState || phase !== 'Idle' || isTogglingEstopCheck}
 										onchange={(event) =>
 											handleToggleEstopCheck((event.currentTarget as HTMLInputElement).checked)}
-										class="h-4 w-4 cursor-pointer disabled:cursor-not-allowed"
+										class="size-4 cursor-pointer disabled:cursor-not-allowed"
 									/>
 									<span
 										>{(matchState?.requireFieldEstopForMatchStart ?? true)
@@ -475,7 +475,7 @@
 
 						<!-- Match Durations -->
 						<div
-							class="w-full flex-1 rounded border px-4 py-3 transition-all sm:w-auto sm:min-w-[340px] {phase !==
+							class="w-full flex-1 rounded border px-4 py-3 transition-all sm:w-auto sm:min-w-85 {phase !==
 							'Idle'
 								? 'border-dashed border-slate-300 bg-slate-100/60 opacity-60 dark:border-slate-700 dark:bg-slate-900/40'
 								: 'border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900/60'}"
@@ -546,7 +546,7 @@
 
 						<!-- Alliance Display Order -->
 						<div
-							class="w-full flex-1 rounded border border-slate-200 bg-slate-50 px-4 py-3 sm:w-auto sm:min-w-[300px] dark:border-slate-700 dark:bg-slate-900/60"
+							class="w-full flex-1 rounded border border-slate-200 bg-slate-50 px-4 py-3 sm:w-auto sm:min-w-75 dark:border-slate-700 dark:bg-slate-900/60"
 						>
 							<div class="text-sm font-bold text-slate-900 dark:text-slate-100">
 								Alliance Display Order
@@ -564,7 +564,7 @@
 										value="redLeft"
 										checked={allianceOrderSetting === 'redLeft'}
 										onchange={() => fms.setAllianceOrder('redLeft')}
-										class="h-4 w-4 cursor-pointer"
+										class="size-4 cursor-pointer"
 									/>
 									<span>Red Left, Blue Right</span>
 								</label>
@@ -577,7 +577,7 @@
 										value="blueLeft"
 										checked={allianceOrderSetting === 'blueLeft'}
 										onchange={() => fms.setAllianceOrder('blueLeft')}
-										class="h-4 w-4 cursor-pointer"
+										class="size-4 cursor-pointer"
 									/>
 									<span>Blue Left, Red Right</span>
 								</label>
@@ -657,9 +657,9 @@
 
 	<!-- Footer -->
 	<footer
-		class="app-neutral-bg fixed right-0 bottom-0 left-0 z-40 border-t border-slate-300 px-3 py-1 text-xs text-slate-600 transition-colors dark:border-slate-700 dark:text-slate-400"
+		class="app-neutral-bg fixed inset-x-0 bottom-0 z-40 border-t border-slate-300 px-3 py-1 text-xs text-slate-600 transition-colors dark:border-slate-700 dark:text-slate-400"
 	>
-		<div class="relative mx-auto flex max-w-[1700px] items-center justify-between">
+		<div class="relative mx-auto flex max-w-425 items-center justify-between">
 			<span class="truncate pr-2">
 				<span class="hidden sm:inline">
 					{matchState

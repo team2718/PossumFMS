@@ -78,7 +78,7 @@
 	<button
 		onclick={() => addViolation(station.index)}
 		disabled={!canEditViolations}
-		class="flex min-h-40 w-full flex-col items-start justify-between rounded-2xl border-2 bg-white px-5 py-5 text-left shadow-md transition active:translate-y-px active:shadow-sm disabled:cursor-not-allowed disabled:opacity-40 dark:bg-slate-800 {station.alliance ===
+		class="flex min-h-40 w-full flex-col items-start justify-between rounded-2xl border-2 bg-white p-5 text-left shadow-md transition active:translate-y-px active:shadow-sm disabled:cursor-not-allowed disabled:opacity-40 dark:bg-slate-800 {station.alliance ===
 		'Red'
 			? 'alliance-red-border-soft hover:opacity-90'
 			: 'alliance-blue-border-soft hover:opacity-90'}"
@@ -134,7 +134,7 @@
 			</div>
 			<select
 				bind:value={selectedPenaltyIndex}
-				class="w-full rounded-xl border-2 border-slate-300 bg-white px-4 py-4 text-2xl font-black text-slate-900 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+				class="w-full rounded-xl border-2 border-slate-300 bg-white p-4 text-2xl font-black text-slate-900 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
 			>
 				{#each penalties as penalty, index}
 					<option value={index}>{penalty.name}</option>

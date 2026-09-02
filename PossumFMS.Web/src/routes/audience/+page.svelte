@@ -252,7 +252,7 @@
 			: 'left-full pl-3'} flex items-center {active ? '' : 'invisible'}"
 	>
 		<div
-			class="flex h-16 w-16 items-center justify-center bg-[#fbf700] text-5xl leading-none font-black text-black"
+			class="flex size-16 items-center justify-center bg-[#fbf700] text-5xl leading-none font-black text-black"
 		>
 			{side === 'left' ? '🡨' : '🡪'}
 		</div>
@@ -273,12 +273,12 @@
 				: 'alliance-blue-bg-darker'
 			: isMiddle
 				? 'alliance-red-bg-dark'
-				: 'alliance-red-bg-darker'} px-2 py-2 text-sm font-semibold md:text-4xl"
+				: 'alliance-red-bg-darker'} p-2 text-sm font-semibold md:text-4xl"
 	>
 		<img
 			src={avatar ? `data:image/png;base64,${avatar}` : '/first-default-avatar.png'}
 			alt=""
-			class="h-8 w-8 shrink-0 object-contain md:h-10 md:w-10"
+			class="size-8 shrink-0 object-contain md:size-10"
 		/>
 		<span>{team > 0 ? team : '----'}</span>
 	</div>
@@ -312,7 +312,7 @@
 		<img
 			src={avatar ? `data:image/png;base64,${avatar}` : '/first-default-avatar.png'}
 			alt=""
-			class="h-12 w-12 shrink-0 object-contain md:h-14 md:w-14"
+			class="size-12 shrink-0 object-contain md:size-14"
 		/>
 		<div class="min-w-0 flex-1">
 			<div class="text-5xl leading-tight font-black md:text-5xl">
@@ -328,14 +328,14 @@
 {#snippet rpIcons(rp: MatchResultRankingPoints, alliance: 'red' | 'blue')}
 	{@const earnedBg = alliance === 'red' ? 'alliance-red-bg' : 'alliance-blue-bg'}
 	{@const unearnedBg = alliance === 'red' ? 'alliance-red-bg-darker' : 'alliance-blue-bg-darker'}
-	<div class="mt-auto border-t border-black/20 px-3 py-3">
+	<div class="mt-auto border-t border-black/20 p-3">
 		<div class="mb-2 text-[10px] font-black tracking-widest uppercase opacity-50">
 			Ranking Points
 		</div>
 		<div class="flex flex-wrap items-center gap-2">
 			{#each [{ icon: '/single_fuel.png', earned: rp.energized, label: 'Energized' }, { icon: '/multiple_fuel.png', earned: rp.supercharged, label: 'Supercharged' }, { icon: '/tower.png', earned: rp.traversal, label: 'Traversal' }] as item}
 				<div
-					class="flex h-13 w-13 items-center justify-center rounded shadow-md shadow-black/60 {item.earned
+					class="flex size-13 items-center justify-center rounded shadow-md shadow-black/60 {item.earned
 						? earnedBg
 						: unearnedBg}"
 					title={item.label}
@@ -343,13 +343,13 @@
 					<img
 						src={item.icon}
 						alt={item.label}
-						class="h-9 w-9 object-contain {item.earned ? 'opacity-100' : 'opacity-30'}"
+						class="size-9 object-contain {item.earned ? 'opacity-100' : 'opacity-30'}"
 					/>
 				</div>
 			{/each}
 			{#each Array.from({ length: 3 }, (_, idx) => idx) as idx}
 				<div
-					class="flex h-13 w-13 items-center justify-center rounded shadow-md shadow-black/60 {idx <
+					class="flex size-13 items-center justify-center rounded shadow-md shadow-black/60 {idx <
 					rp.winTie
 						? earnedBg
 						: unearnedBg}"
@@ -358,7 +358,7 @@
 					<img
 						src="/trophy.png"
 						alt="Win"
-						class="h-9 w-9 object-contain {idx < rp.winTie ? 'opacity-100' : 'opacity-30'}"
+						class="size-9 object-contain {idx < rp.winTie ? 'opacity-100' : 'opacity-30'}"
 					/>
 				</div>
 			{/each}
@@ -409,7 +409,7 @@
 						<div
 							class="flex items-center justify-center gap-2 bg-yellow-400 px-3 py-4 text-4xl font-black tracking-wide text-black uppercase md:text-4xl"
 						>
-							<img src="/trophy.png" alt="" class="h-8 w-8 object-contain invert" />
+							<img src="/trophy.png" alt="" class="size-8 object-contain invert" />
 							<span>Winner</span>
 						</div>
 					{:else if winner === 'tie'}
@@ -512,7 +512,7 @@
 						<div
 							class="flex items-center justify-center gap-2 bg-yellow-400 px-3 py-4 text-4xl font-black tracking-wide text-black uppercase md:text-4xl"
 						>
-							<img src="/trophy.png" alt="" class="h-8 w-8 object-contain invert" />
+							<img src="/trophy.png" alt="" class="size-8 object-contain invert" />
 							<span>Winner</span>
 						</div>
 					{:else if winner === 'tie'}

@@ -46,12 +46,12 @@
 					onclick={() => theme.toggle()}
 					title={theme.isDark ? 'Switch to light mode' : 'Switch to dark mode'}
 					aria-label="Toggle theme"
-					class="flex h-7 w-7 cursor-pointer items-center justify-center rounded border border-slate-300 bg-white text-slate-700 shadow-xs transition hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+					class="flex size-7 cursor-pointer items-center justify-center rounded border border-slate-300 bg-white text-slate-700 shadow-xs transition hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
 				>
 					{#if theme.isDark}
 						<!-- Sun icon -->
 						<svg
-							class="h-4 w-4 text-amber-400"
+							class="size-4 text-amber-400"
 							fill="none"
 							viewBox="0 0 24 24"
 							stroke="currentColor"
@@ -66,7 +66,7 @@
 					{:else}
 						<!-- Moon icon -->
 						<svg
-							class="h-4 w-4 text-slate-600"
+							class="size-4 text-slate-600"
 							fill="none"
 							viewBox="0 0 24 24"
 							stroke="currentColor"
@@ -82,7 +82,7 @@
 				</button>
 
 				<span class="inline-flex items-center gap-1">
-					<span class="h-2.5 w-2.5 rounded-full {fms.connected ? 'bg-emerald-500' : 'bg-rose-500'}"
+					<span class="size-2.5 rounded-full {fms.connected ? 'bg-emerald-500' : 'bg-rose-500'}"
 					></span>{fms.connected ? 'Connected' : 'Connecting'}
 				</span>
 				<span class="font-medium"

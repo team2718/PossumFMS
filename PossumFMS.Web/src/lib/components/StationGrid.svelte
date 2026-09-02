@@ -387,7 +387,7 @@
 					checked={s.bypassed}
 					disabled={phase !== 'Idle'}
 					onchange={() => fms.bypassStation(idx, !s.bypassed)}
-					class="h-4 w-4 rounded border-slate-300 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-600"
+					class="size-4 rounded border-slate-300 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-600"
 				/>
 				<span>Bypass</span>
 			</label>
@@ -412,7 +412,7 @@
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
-						class="h-3 w-3"
+						class="size-3"
 						fill="none"
 						viewBox="0 0 24 24"
 						stroke="currentColor"
@@ -490,12 +490,12 @@
 			<div class="p-2 text-xs">
 				<!-- Desktop / Tablet Table View (sm and up) -->
 				<div class="hidden overflow-x-auto sm:block">
-					<div class="min-w-[580px]">
+					<div class="min-w-145">
 						{@render readinessHeaderRow()}
 						{#each blueStations as s, i (s.index)}
 							{@const idx = blueInputIndices[i]}
 							<div
-								class="alliance-blue-border-soft mt-1.5 grid grid-cols-[68px_66px_minmax(128px,1fr)_48px_44px_44px_88px_80px] items-center gap-1 rounded border bg-white/80 px-1.5 py-1.5 shadow-xs dark:bg-slate-900/70"
+								class="alliance-blue-border-soft mt-1.5 grid grid-cols-[68px_66px_minmax(128px,1fr)_48px_44px_44px_88px_80px] items-center gap-1 rounded border bg-white/80 p-1.5 shadow-xs dark:bg-slate-900/70"
 							>
 								{@render readinessStatusCell(hasActiveEstopHardware(idx))}
 								<div class="alliance-blue-text text-center font-bold">Station {i + 1}</div>
@@ -507,7 +507,7 @@
 										placeholder="Team"
 										bind:value={inputs[idx].team}
 										disabled={phase !== 'Idle'}
-										class="h-7 w-full min-w-[8rem] rounded border border-slate-300 bg-white px-2 text-xs text-slate-900 placeholder-slate-400 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:opacity-60 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:disabled:bg-slate-900/60"
+										class="h-7 w-full min-w-32 rounded border border-slate-300 bg-white px-2 text-xs text-slate-900 placeholder-slate-400 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:opacity-60 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:disabled:bg-slate-900/60"
 									/>
 								</div>
 								<input
@@ -515,7 +515,7 @@
 									checked={s.bypassed}
 									disabled={phase !== 'Idle'}
 									onchange={() => fms.bypassStation(idx, !s.bypassed)}
-									class="mx-auto h-4 w-4 cursor-pointer rounded border-slate-300 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-600"
+									class="mx-auto size-4 cursor-pointer rounded border-slate-300 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-600"
 								/>
 								{@render readinessStatusCell(s.dsLinked)}
 								{@render readinessStatusCell(s.robotLinked)}
@@ -538,7 +538,7 @@
 
 		<!-- Center Column: Match Status & Diagnostics -->
 		<div
-			class="order-first flex min-w-0 flex-col items-center justify-center gap-2 border-b border-slate-300 bg-slate-50 px-3 py-4 text-center xl:order-none xl:border-b-0 dark:border-slate-700 dark:bg-slate-900/60"
+			class="order-first flex min-w-0 flex-col items-center justify-center gap-2 border-b border-slate-300 bg-slate-50 px-3 py-4 text-center xl:order-0 xl:border-b-0 dark:border-slate-700 dark:bg-slate-900/60"
 		>
 			<div
 				class="text-[11px] font-bold tracking-widest text-slate-500 uppercase dark:text-slate-400"
@@ -554,7 +554,7 @@
 				class="inline-flex items-center gap-1.5 rounded-full border border-slate-300 bg-white px-3 py-0.5 shadow-xs dark:border-slate-600 dark:bg-slate-800"
 			>
 				<span
-					class="h-2 w-2 rounded-full {isMatchStartingOrRunning
+					class="size-2 rounded-full {isMatchStartingOrRunning
 						? 'animate-pulse bg-emerald-500'
 						: 'bg-slate-400'}"
 				></span>
@@ -667,12 +667,12 @@
 			<div class="p-2 text-xs">
 				<!-- Desktop / Tablet Table View (sm and up) -->
 				<div class="hidden overflow-x-auto sm:block">
-					<div class="min-w-[580px]">
+					<div class="min-w-145">
 						{@render readinessHeaderRow()}
 						{#each redStations as s, i (s.index)}
 							{@const idx = redInputIndices[i]}
 							<div
-								class="alliance-red-border-soft mt-1.5 grid grid-cols-[68px_66px_minmax(128px,1fr)_48px_44px_44px_88px_80px] items-center gap-1 rounded border bg-white/80 px-1.5 py-1.5 shadow-xs dark:bg-slate-900/70"
+								class="alliance-red-border-soft mt-1.5 grid grid-cols-[68px_66px_minmax(128px,1fr)_48px_44px_44px_88px_80px] items-center gap-1 rounded border bg-white/80 p-1.5 shadow-xs dark:bg-slate-900/70"
 							>
 								{@render readinessStatusCell(hasActiveEstopHardware(idx))}
 								<div class="alliance-red-text text-center font-bold">Station {i + 1}</div>
@@ -684,7 +684,7 @@
 										placeholder="Team"
 										bind:value={inputs[idx].team}
 										disabled={phase !== 'Idle'}
-										class="h-7 w-full min-w-[8rem] rounded border border-slate-300 bg-white px-2 text-xs text-slate-900 placeholder-slate-400 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:opacity-60 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:disabled:bg-slate-900/60"
+										class="h-7 w-full min-w-32 rounded border border-slate-300 bg-white px-2 text-xs text-slate-900 placeholder-slate-400 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:opacity-60 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:disabled:bg-slate-900/60"
 									/>
 								</div>
 								<input
@@ -692,7 +692,7 @@
 									checked={s.bypassed}
 									disabled={phase !== 'Idle'}
 									onchange={() => fms.bypassStation(idx, !s.bypassed)}
-									class="mx-auto h-4 w-4 cursor-pointer rounded border-slate-300 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-600"
+									class="mx-auto size-4 cursor-pointer rounded border-slate-300 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-600"
 								/>
 								{@render readinessStatusCell(s.dsLinked)}
 								{@render readinessStatusCell(s.robotLinked)}
