@@ -26,8 +26,20 @@ public sealed class DriverStationConnection
     // ── Network ────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Endpoint used to send UDP control packets (DS_IP:1121).
-    /// Set from the TCP connection's remote IP; null until DS connects via TCP.
+    /// True when the connected Driver Station is using the 2027 protocol format
+    /// rather than the legacy NI protocol format.
+    /// </summary>
+    public bool IsNewDs { get; internal set; }
+
+    /// <summary>
+    /// UDP port on the Driver Station that receives FMS control packets.
+    /// Default is 1121 (NI DS). For 2027 DS, this port is dynamically specified during the handshake.
+    /// </summary>
+    public int UdpSendPort { get; internal set; } = 1121;
+
+    /// <summary>
+    /// Endpoint used to send UDP control packets (DS_IP:UdpSendPort).
+    /// Set from the TCP connection's remote IP and negotiated UDP port; null until DS connects via TCP.
     /// </summary>
     internal IPEndPoint? UdpEndpoint { get; set; }
     internal IPEndPoint? ValidatedEndpoint { get; set; }

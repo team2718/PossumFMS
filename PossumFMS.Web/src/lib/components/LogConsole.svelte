@@ -22,17 +22,23 @@
 	});
 
 	const filteredLogs = $derived<RecentLogEntry[]>(
-		fms.logEntries.filter((entry) => {
-			if (!selectedSeverities[entry.level]) return false;
-			if (!logSearch.trim()) return true;
+		fms.logEntries
+			.filter((entry) => {
+				if (!selectedSeverities[entry.level]) return false;
+				if (!logSearch.trim()) return true;
 
-			const term = logSearch.toLowerCase();
-			return (
-				entry.message.toLowerCase().includes(term) ||
-				entry.category.toLowerCase().includes(term) ||
-				entry.level.toLowerCase().includes(term)
-			);
-		})
+				const term = logSearch.toLowerCase();
+				return (
+					entry.message.toLowerCase().includes(term) ||
+					entry.category.toLowerCase().includes(term) ||
+					entry.level.toLowerCase().includes(term)
+				);
+			})
+			.sort(
+				(left, right) =>
+					right.id - left.id ||
+					new Date(right.timestampUtc).getTime() - new Date(left.timestampUtc).getTime()
+			)
 	);
 
 	function toggleAllSeverities(enable: boolean) {

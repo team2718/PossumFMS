@@ -20,7 +20,7 @@ public sealed class ControlPacketTests
         var arena = new PossumFMS.Core.Arena.Arena();
         var mgr   = new DriverStationManager(arena, NullLogger<DriverStationManager>.Instance);
         var s     = station ?? AllianceStations.Red1;
-        var buf   = new byte[22];
+        var buf   = new byte[64];
         var ds    = mgr.Stations[s];
         return (mgr, arena, buf, ds);
     }
@@ -434,5 +434,66 @@ public sealed class ControlPacketTests
         // Buf[2] and buf[4] should always be zero regardless
         Assert.Equal(0, buf[2]);
         Assert.Equal(0, buf[4]);
+    }
+
+    // ── 2027 DS Game Data (Tag 32) ────────────────────────────────────────────
+
+    [Fact]
+    public void EncodeControlPacket_WhenNewDs_AndGameDataSet_AppendsTag32()
+    {
+        var (mgr, arena, buf, ds) = Setup();
+        ds.IsNewDs = true;
+        arena.SetGameData("LRL");
+
+        int len = mgr.EncodeControlPacket(buf, ds);
+
+        // 22 base bytes + 2 tag header bytes + 3 data bytes = 27
+        Assert.Equal(27, len);
+        Assert.Equal(4, buf[22]);     // Tag payload length: 3 chars + 1 tag byte = 4
+        Assert.Equal(0x20, buf[23]);  // Tag 32
+        Assert.Equal((byte)'L', buf[24]);
+        Assert.Equal((byte)'R', buf[25]);
+        Assert.Equal((byte)'L', buf[26]);
+    }
+
+    [Fact]
+    public void EncodeControlPacket_WhenNewDs_AndGameDataExceeds8Bytes_TruncatesTo8Bytes()
+    {
+        var (mgr, arena, buf, ds) = Setup();
+        ds.IsNewDs = true;
+        arena.SetGameData("1234567890EXTRA");
+
+        int len = mgr.EncodeControlPacket(buf, ds);
+
+        // 22 base bytes + 2 tag header bytes + 8 data bytes = 32
+        Assert.Equal(32, len);
+        Assert.Equal(9, buf[22]);     // Tag payload length: 8 chars + 1 tag byte = 9
+        Assert.Equal(0x20, buf[23]);  // Tag 32
+        Assert.Equal(System.Text.Encoding.ASCII.GetBytes("12345678"), buf[24..32]);
+    }
+
+    [Fact]
+    public void EncodeControlPacket_WhenLegacyDs_AndGameDataSet_DoesNotAppendTag32()
+    {
+        var (mgr, arena, buf, ds) = Setup();
+        ds.IsNewDs = false;
+        arena.SetGameData("LRL");
+
+        int len = mgr.EncodeControlPacket(buf, ds);
+
+        Assert.Equal(22, len);
+        Assert.Equal(0, buf[22]); // Buffer beyond 22 remains untouched/cleared
+    }
+
+    [Fact]
+    public void EncodeControlPacket_WhenNewDs_AndGameDataEmpty_Returns22Bytes()
+    {
+        var (mgr, arena, buf, ds) = Setup();
+        ds.IsNewDs = true;
+        arena.SetGameData(string.Empty);
+
+        int len = mgr.EncodeControlPacket(buf, ds);
+
+        Assert.Equal(22, len);
     }
 }

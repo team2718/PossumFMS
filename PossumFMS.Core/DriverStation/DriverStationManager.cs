@@ -27,11 +27,27 @@ public sealed class DriverStationManager : BackgroundService
     private static readonly TimeSpan UdpLinkTimeout = TimeSpan.FromSeconds(1);
     private static readonly TimeSpan TcpReadTimeout = TimeSpan.FromSeconds(5);
 
-    // ── Ports ──────────────────────────────────────────────────────────────────
+    // ── Ports & Protocol Tags ──────────────────────────────────────────────────
 
     private const int DsUdpReceivePort = 1121;
     private const int FmsTcpListenPort = 1750;
     private const string DriverStationEventCode = "POSM";
+
+    // Protocol Tags:
+    // Legacy NI Driver Station:
+    //   Tag 24 (0x18) - Initial handshake: [0x00, 0x03, 0x18, teamHi, teamLo]
+    //   Tag 25 (0x19) - Station assignment: [0x00, 0x03, 0x19, stationIndex, stationStatus]
+    //   Tag 28 (0x1C) - Game data (TCP): [0x00, len+2, 0x1C, len, ...data...]
+    // 2027 FIRST Driver Station:
+    //   Tag 30 (0x1E) - Initial handshake: [lenHi, lenLo, 0x1E, udpPortHi, udpPortLo, flags, teamLen, ...teamAscii...]
+    //   Tag 31 (0x1F) - Station assignment: [0x00, 0x06, 0x1F, stationIndex, stationStatus, flags, teamHi, teamLo]
+    //   Tag 32 (0x20) - Game data (UDP control packet tag): [len+1, 0x20, ...data (max 8 bytes)...]
+    private const byte LegacyDsHandshakeTag = 0x18;
+    private const byte LegacyDsStationAssignmentTag = 0x19;
+    private const byte LegacyDsGameDataTag = 0x1C;
+    private const byte NewDsHandshakeTag = 0x1E;
+    private const byte NewDsStationAssignmentTag = 0x1F;
+    private const byte NewDsGameDataTag = 0x20;
 
     // ── State ──────────────────────────────────────────────────────────────────
 
@@ -558,7 +574,7 @@ public sealed class DriverStationManager : BackgroundService
 
     // ── UDP send ───────────────────────────────────────────────────────────────
 
-    private readonly byte[] _txBuf = new byte[22];
+    private readonly byte[] _txBuf = new byte[64];
 
     private void SendControlPackets()
     {
@@ -571,38 +587,42 @@ public sealed class DriverStationManager : BackgroundService
         {
             if (ds.UdpEndpoint is null) continue;
 
-            EncodeControlPacket(_txBuf, ds);
+            int packetLen = EncodeControlPacket(_txBuf, ds);
 
-            transport.Send(_txBuf, ds.UdpEndpoint);
+            transport.Send(_txBuf.AsSpan(0, packetLen), ds.UdpEndpoint);
 
             ds.TxSequence++;
         }
     }
 
-    internal void EncodeControlPacket(byte[] buf, DriverStationConnection ds)
+    internal int EncodeControlPacket(byte[] buf, DriverStationConnection ds)
     {
-        // FMS → DS UDP packet currently emitted by PossumFMS:
-        //   [0-1]  Sequence number (big-endian, incremented each packet)
-        //   [2]    Protocol version (0)
-        //   [3]    Control byte:
-        //            0x02 = Autonomous mode
-        //            0x04 = Enabled
-        //            0x40 = AStop (autonomous stop)
-        //            0x80 = EStop
-        //   [4]    Request byte (currently 0)
-        //   [5]    Alliance station index: 0=R1, 1=R2, 2=R3, 3=B1, 4=B2, 5=B3
-        //   [6]    Tournament level: 0=match test, 1=practice, 2=qualification, 3=playoff
-        //   [7-8]  Match number (big-endian)
-        //   [9]    Play/replay number
+        // FMS → DS UDP packet layout:
+        // Base (bytes 0-21, common to Legacy NI DS and 2027 DS):
+        //   [0-1]   Sequence number (big-endian, incremented each packet)
+        //   [2]     Protocol version (0)
+        //   [3]     Control byte:
+        //             0x02 = Autonomous mode
+        //             0x04 = Enabled
+        //             0x40 = AStop (autonomous stop)
+        //             0x80 = EStop
+        //   [4]     Request byte (currently 0)
+        //   [5]     Alliance station index: 0=R1, 1=R2, 2=R3, 3=B1, 4=B2, 5=B3
+        //   [6]     Tournament level: 0=match test, 1=practice, 2=qualification, 3=playoff
+        //   [7-8]   Match number (big-endian)
+        //   [9]     Play/replay number
         //   [10-13] Microseconds within current second (big-endian)
         //   [14-19] Date/time fields
-        //   [14]   Seconds
-        //   [15]   Minutes
-        //   [16]   Hours
-        //   [17]   Day
-        //   [18]   Month
-        //   [19]   Year - 1900
+        //   [14]    Seconds
+        //   [15]    Minutes
+        //   [16]    Hours
+        //   [17]    Day
+        //   [18]    Month
+        //   [19]    Year - 1900
         //   [20-21] Seconds remaining in current phase (big-endian)
+        // 2027 DS Extensions (bytes 22+):
+        //   Tag 32 (0x20) - Game Data: [tag_len, 0x20, ...data (max 8 bytes)...]
+        //   where tag_len = data_len + 1 (includes tag byte itself)
 
         Array.Clear(buf);
 
@@ -643,12 +663,113 @@ public sealed class DriverStationManager : BackgroundService
         int secsRemaining = (int)_arena.TimeRemaining.TotalSeconds;
         buf[20] = (byte)(secsRemaining >> 8);
         buf[21] = (byte)(secsRemaining & 0xFF);
+
+        int packetLength = 22;
+
+        // In 2027 DS protocol, game data is delivered inside the UDP control packet as Tag 32 (max 8 bytes)
+        if (ds.IsNewDs && !string.IsNullOrEmpty(_arena.GameData))
+        {
+            byte[] gameDataBytes = Encoding.UTF8.GetBytes(_arena.GameData);
+            int gameDataLen = Math.Min(gameDataBytes.Length, 8);
+            if (gameDataLen > 0)
+            {
+                buf[22] = (byte)(gameDataLen + 1); // length of tag payload including tag byte
+                buf[23] = NewDsGameDataTag;        // Tag 32 (0x20)
+                gameDataBytes.AsSpan(0, gameDataLen).CopyTo(buf.AsSpan(24));
+                packetLength += 2 + gameDataLen;
+            }
+        }
+
+        return packetLength;
     }
 
-    internal static byte[] CreateStationInfoPacket(AllianceStation station, byte stationStatus)
+    internal static byte[] CreateStationInfoPacket(
+        AllianceStation station,
+        byte stationStatus,
+        int teamNumber = 0,
+        bool isNewDs = false,
+        byte flags = 0)
     {
         byte stationIndex = (byte)((station.Color == AllianceColor.Red ? 0 : 3) + (int)station.Position - 1);
-        return CreateTcpPacket(0x19, [stationIndex, stationStatus]);
+        if (!isNewDs)
+        {
+            return CreateTcpPacket(LegacyDsStationAssignmentTag, [stationIndex, stationStatus]);
+        }
+
+        return CreateTcpPacket(NewDsStationAssignmentTag, [
+            stationIndex,
+            stationStatus,
+            flags,
+            (byte)(teamNumber >> 8),
+            (byte)(teamNumber & 0xFF)
+        ]);
+    }
+
+    internal static byte[] CreateRejectionPacket(byte status, bool isNewDs)
+    {
+        if (!isNewDs)
+        {
+            return CreateTcpPacket(LegacyDsStationAssignmentTag, [0x00, status]);
+        }
+
+        return CreateTcpPacket(NewDsStationAssignmentTag, [
+            0x00,   // stationIndex = 0
+            status, // rejection status: 2 = not in match, 3 = invalid/malformed
+            0x00,   // flags = 0
+            0x00,   // teamHi = 0
+            0x00    // teamLo = 0
+        ]);
+    }
+
+    internal static bool TryParseInitialHandshake(
+        ReadOnlySpan<byte> payload,
+        out bool isNewDs,
+        out int teamNumber,
+        out int udpSendPort,
+        out byte flags)
+    {
+        isNewDs = false;
+        teamNumber = 0;
+        udpSendPort = DsUdpReceivePort;
+        flags = 0;
+
+        if (payload.Length < 3)
+            return false;
+
+        byte tag = payload[0];
+
+        if (tag == LegacyDsHandshakeTag)
+        {
+            if (payload.Length != 3)
+                return false;
+
+            isNewDs = false;
+            udpSendPort = DsUdpReceivePort;
+            teamNumber = (payload[1] << 8) | payload[2];
+            return teamNumber > 0 && teamNumber <= 65535;
+        }
+
+        if (tag == NewDsHandshakeTag)
+        {
+            if (payload.Length < 5)
+                return false;
+
+            isNewDs = true;
+            udpSendPort = (payload[1] << 8) | payload[2];
+            flags = payload[3];
+            int teamNumLen = payload[4];
+
+            if (payload.Length < 5 + teamNumLen || teamNumLen == 0)
+                return false;
+
+            string teamStr = Encoding.ASCII.GetString(payload.Slice(5, teamNumLen));
+            if (!int.TryParse(teamStr, out teamNumber) || teamNumber <= 0 || teamNumber > 65535)
+                return false;
+
+            return true;
+        }
+
+        return false;
     }
 
     internal static byte[] CreateEventCodePacket()
@@ -729,30 +850,54 @@ public sealed class DriverStationManager : BackgroundService
         try
         {
             // ── Handshake: read initial DS→FMS identification packet ───────────
-            // Format: [sizeHi, sizeLo, 0x18, teamHi, teamLo]
-            //   size = 3 (includes tag ID), type = 0x18 (team number)
-            var initBuf = new byte[5];
-            if (!await ReadExactAsync(stream, initBuf, ct)) return;
+            // A 2-byte big-endian length prefix precedes every tagged TCP packet.
+            var lenBuf = new byte[2];
+            if (!await ReadExactAsync(stream, lenBuf, ct)) return;
 
-            if (initBuf[0] != 0x00 || initBuf[1] != 0x03 || initBuf[2] != 0x18)
+            int packetLen = (lenBuf[0] << 8) | lenBuf[1];
+            if (packetLen < 3 || packetLen > 1024)
             {
-                _logger.LogWarning("Invalid handshake from {IP} — dropping.", remoteIp);
+                _logger.LogWarning("Invalid initial handshake length {Length} from {IP} — dropping.", packetLen, remoteIp);
                 return;
             }
 
-            int teamNumber = (initBuf[3] << 8) | initBuf[4];
+            var payload = new byte[packetLen];
+            if (!await ReadExactAsync(stream, payload, ct)) return;
 
-            if (teamNumber <= 0)
+            if (!TryParseInitialHandshake(payload, out bool isNewDs, out int teamNumber, out int udpSendPort, out byte flags))
             {
-                _logger.LogWarning("Driver Station at {IP} reported invalid team number {Team}; dropping connection.", remoteIp, teamNumber);
-                await Task.Delay(1000, ct);
+                byte tag = payload[0];
+                if (tag == NewDsHandshakeTag)
+                {
+                    _logger.LogWarning("[2027 DS] Malformed initial handshake from {IP}; sending rejection (status 3) and dropping.", remoteIp);
+                    await stream.WriteAsync(CreateRejectionPacket(0x03, isNewDs: true), ct);
+                    await Task.Delay(1000, ct);
+                }
+                else
+                {
+                    _logger.LogWarning("Invalid initial handshake (tag 0x{Tag:X2}, length {Length}) from {IP} — dropping.", tag, packetLen, remoteIp);
+                }
                 return;
+            }
+
+            if (isNewDs)
+            {
+                _logger.LogInformation("[2027 DS] Received connection from {IP} for Team {Team} (UDP send port: {Port}, flags: 0x{Flags:X2}).",
+                    remoteIp, teamNumber, udpSendPort, flags);
+            }
+            else
+            {
+                _logger.LogInformation("[NI DS] Received legacy connection from {IP} for Team {Team}.",
+                    remoteIp, teamNumber);
             }
 
             ds = FindStationByTeamNumber(teamNumber);
             if (ds is null)
             {
-                _logger.LogWarning("Team {Team} not in current match — closing in 1 s.", teamNumber);
+                string dsType = isNewDs ? "2027 DS" : "NI DS";
+                _logger.LogWarning("[{DsType}] Team {Team} ({IP}) is not scheduled in current match — sending rejection (status 2) and closing in 1 s.",
+                    dsType, teamNumber, remoteIp);
+                await stream.WriteAsync(CreateRejectionPacket(0x02, isNewDs), ct);
                 await Task.Delay(1000, ct);
                 return;
             }
@@ -770,20 +915,20 @@ public sealed class DriverStationManager : BackgroundService
                 {
                     ds.WrongStation = wrongDs.Station.ToString();
                     stationStatus   = 0x01;
-                    _logger.LogWarning("Team {Team} is plugged into wrong station {Wrong}.",
-                        teamNumber, wrongDs.Station);
+                    _logger.LogWarning("[{DsType}] Team {Team} is plugged into wrong station {Wrong} (assigned: {Assigned}).",
+                        isNewDs ? "2027 DS" : "NI DS", teamNumber, wrongDs.Station, ds.Station);
                 }
             }
 
             // ── Send initial DS context ────────────────────────────────────────
-            // Station info establishes the assigned station and current context.
+            // Station info establishes the assigned station, status, and for 2027 DS echoes the team number.
             // Event code is a separate TCP tag that the DS displays in its UI.
-            await stream.WriteAsync(CreateStationInfoPacket(ds.Station, stationStatus), ct);
+            await stream.WriteAsync(CreateStationInfoPacket(ds.Station, stationStatus, teamNumber, isNewDs), ct);
             await stream.WriteAsync(CreateEventCodePacket(), ct);
 
             lock (_stationStateLock)
             {
-                var endpoint = new IPEndPoint(remoteIp, DsUdpReceivePort);
+                var endpoint = new IPEndPoint(remoteIp, udpSendPort);
 
                 if (ds.TcpClient is not null
                     && ds.ValidatedEndpoint?.Address.Equals(remoteIp) != true)
@@ -805,14 +950,17 @@ public sealed class DriverStationManager : BackgroundService
                 ds.UdpEndpoint = endpoint;
                 ds.ValidatedEndpoint = endpoint;
                 ds.TeamNumber  = teamNumber;
+                ds.IsNewDs     = isNewDs;
+                ds.UdpSendPort = udpSendPort;
                 ownsStation = true;
             }
 
-            _logger.LogInformation("Team {Team} connected in station {Station} ({IP}).",
-                teamNumber, ds.Station, remoteIp);
+            _logger.LogInformation("[{DsType}] Team {Team} connected in station {Station} ({IP}:{Port}).",
+                isNewDs ? "2027 DS" : "NI DS", teamNumber, ds.Station, remoteIp, udpSendPort);
 
             // Send current game data if already set (e.g., DS reconnects after auto).
-            if (IsDriverStationCommunicationEnabled() && _arena.GameData.Length > 0)
+            // Note: 2027 DS receives game data in UDP control packets (Tag 32), not over TCP.
+            if (!ds.IsNewDs && IsDriverStationCommunicationEnabled() && _arena.GameData.Length > 0)
                 await SendGameDataAsync(ds.Station, _arena.GameData, ct);
 
             // ── TCP read loop ──────────────────────────────────────────────────
@@ -828,7 +976,8 @@ public sealed class DriverStationManager : BackgroundService
             if (ds is not null && ownsStation)
             {
                 ClearStationConnectionState(ds, "TCP disconnected", closeTcpClient: false);
-                _logger.LogInformation("DS {Station} (team {Team}) TCP disconnected.", ds.Station, ds.TeamNumber);
+                _logger.LogInformation("[{DsType}] DS {Station} (team {Team}) TCP disconnected.",
+                    ds.IsNewDs ? "2027 DS" : "NI DS", ds.Station, ds.TeamNumber);
             }
             tcpClient.Dispose();
         }
@@ -871,12 +1020,19 @@ public sealed class DriverStationManager : BackgroundService
             return;
 
         foreach (var station in Stations.Keys)
+        {
+            var ds = Stations[station];
+            if (ds.IsNewDs)
+                continue; // 2027 DS receives game data in UDP control packets (Tag 32)
+
             _ = SendGameDataAsync(station, data, _ct);
+        }
     }
 
     /// <summary>
     /// Sends game-specific data to a driver station over TCP (type 28).
-    /// The DS forwards this string to the robot via DriverStation.getGameSpecificMessage().
+    /// Used for legacy NI Driver Stations. The 2027 Driver Station receives game data
+    /// embedded directly in the high-frequency UDP control packet.
     /// </summary>
     public async Task SendGameDataAsync(AllianceStation station, string gameData, CancellationToken ct = default)
     {
@@ -884,17 +1040,25 @@ public sealed class DriverStationManager : BackgroundService
             return;
 
         var ds = Stations[station];
+        if (ds.IsNewDs)
+            return; // 2027 DS receives game data via UDP control packet (Tag 32)
+
         if (ds.TcpClient?.GetStream() is not { } stream) return;
 
         byte[] payload = System.Text.Encoding.UTF8.GetBytes(gameData);
         var    packet  = new byte[payload.Length + 4];
         packet[0] = 0x00;
         packet[1] = (byte)(payload.Length + 2); // size = type byte + data-length byte + data
-        packet[2] = 0x1C;                        // packet type 28: game data
+        packet[2] = LegacyDsGameDataTag;        // packet type 28 (0x1C): game data
         packet[3] = (byte)payload.Length;
         payload.CopyTo(packet, 4);
 
-        try { await stream.WriteAsync(packet, ct); }
+        try
+        {
+            await stream.WriteAsync(packet, ct);
+            _logger.LogDebug("[NI DS] Sent TCP game data '{GameData}' to Team {Team} in station {Station}.",
+                gameData, ds.TeamNumber, station);
+        }
         catch (Exception ex)
         {
             ds.TcpClient = null;
@@ -1023,6 +1187,8 @@ public sealed class DriverStationManager : BackgroundService
             station.TcpClient   = null;
             station.UdpEndpoint = null;
             station.ValidatedEndpoint = null;
+            station.IsNewDs     = false;
+            station.UdpSendPort = DsUdpReceivePort;
             station.DsLinked    = false;
             station.RobotLinked = false;
             station.RadioLinked = false;

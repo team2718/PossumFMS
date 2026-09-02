@@ -72,6 +72,22 @@ public sealed class DriverStationConnectionTests
         Assert.Equal(string.Empty, ds.WrongStation);
     }
 
+    [Fact]
+    public void Constructor_DefaultIsNewDsIsFalse()
+    {
+        var ds = Make();
+
+        Assert.False(ds.IsNewDs);
+    }
+
+    [Fact]
+    public void Constructor_DefaultUdpSendPortIs1121()
+    {
+        var ds = Make();
+
+        Assert.Equal(1121, ds.UdpSendPort);
+    }
+
     // ── IsLinked ───────────────────────────────────────────────────────────────
 
     [Fact]

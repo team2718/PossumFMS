@@ -459,4 +459,167 @@ public sealed class DriverStationManagerTests
 
         Assert.Null(teamNumber);
     }
+
+    // ── Station Info & Rejection Packets (Legacy vs 2027 DS) ───────────────────
+
+    [Fact]
+    public void CreateStationInfoPacket_LegacyDs_ProducesTag25FiveBytes()
+    {
+        byte[] packet = DriverStationManager.CreateStationInfoPacket(
+            AllianceStations.Red1,
+            stationStatus: 0x00,
+            teamNumber: 2718,
+            isNewDs: false);
+
+        // [0x00, 0x03, 0x19 (tag 25), stationIndex=0 (R1), stationStatus=0]
+        Assert.Equal([0x00, 0x03, 0x19, 0x00, 0x00], packet);
+    }
+
+    [Fact]
+    public void CreateStationInfoPacket_2027Ds_ProducesTag31EightBytes()
+    {
+        byte[] packet = DriverStationManager.CreateStationInfoPacket(
+            AllianceStations.Blue3,
+            stationStatus: 0x01,
+            teamNumber: 2718,
+            isNewDs: true,
+            flags: 0x01);
+
+        // [0x00, 0x06, 0x1F (tag 31), stationIndex=5 (B3), stationStatus=1, flags=1, teamHi=0x0A, teamLo=0x9E]
+        Assert.Equal([0x00, 0x06, 0x1F, 0x05, 0x01, 0x01, 0x0A, 0x9E], packet);
+    }
+
+    [Fact]
+    public void CreateRejectionPacket_LegacyDs_ProducesTag25Rejection()
+    {
+        byte[] packet = DriverStationManager.CreateRejectionPacket(status: 0x02, isNewDs: false);
+
+        Assert.Equal([0x00, 0x03, 0x19, 0x00, 0x02], packet);
+    }
+
+    [Fact]
+    public void CreateRejectionPacket_2027Ds_ProducesTag31Rejection()
+    {
+        byte[] packet = DriverStationManager.CreateRejectionPacket(status: 0x03, isNewDs: true);
+
+        Assert.Equal([0x00, 0x06, 0x1F, 0x00, 0x03, 0x00, 0x00, 0x00], packet);
+    }
+
+    // ── Initial Handshake Parsing (Tag 24 vs Tag 30) ──────────────────────────
+
+    [Fact]
+    public void TryParseInitialHandshake_LegacyDs_ValidPayload_ReturnsTrue()
+    {
+        // Tag 24 (0x18), team 2718 (0x0A9E)
+        byte[] payload = [0x18, 0x0A, 0x9E];
+
+        bool success = DriverStationManager.TryParseInitialHandshake(
+            payload,
+            out bool isNewDs,
+            out int teamNumber,
+            out int udpSendPort,
+            out byte flags);
+
+        Assert.True(success);
+        Assert.False(isNewDs);
+        Assert.Equal(2718, teamNumber);
+        Assert.Equal(1121, udpSendPort);
+        Assert.Equal(0, flags);
+    }
+
+    [Fact]
+    public void TryParseInitialHandshake_LegacyDs_InvalidLength_ReturnsFalse()
+    {
+        byte[] payload = [0x18, 0x0A]; // Too short
+
+        bool success = DriverStationManager.TryParseInitialHandshake(
+            payload,
+            out _,
+            out _,
+            out _,
+            out _);
+
+        Assert.False(success);
+    }
+
+    [Fact]
+    public void TryParseInitialHandshake_2027Ds_ValidPayload_ReturnsTrueWithDynamicPortAndTeam()
+    {
+        // Tag 30 (0x1E), custom port 5801 (0x16A9), flags 0x01, team "2718" (4 chars)
+        byte[] payload = [0x1E, 0x16, 0xA9, 0x01, 0x04, (byte)'2', (byte)'7', (byte)'1', (byte)'8'];
+
+        bool success = DriverStationManager.TryParseInitialHandshake(
+            payload,
+            out bool isNewDs,
+            out int teamNumber,
+            out int udpSendPort,
+            out byte flags);
+
+        Assert.True(success);
+        Assert.True(isNewDs);
+        Assert.Equal(2718, teamNumber);
+        Assert.Equal(5801, udpSendPort);
+        Assert.Equal(0x01, flags);
+    }
+
+    [Fact]
+    public void TryParseInitialHandshake_2027Ds_TruncatedTeam_ReturnsFalse()
+    {
+        // Tag 30 specifies teamLen=4, but only provides 2 bytes
+        byte[] payload = [0x1E, 0x16, 0xA9, 0x00, 0x04, (byte)'2', (byte)'7'];
+
+        bool success = DriverStationManager.TryParseInitialHandshake(
+            payload,
+            out _,
+            out _,
+            out _,
+            out _);
+
+        Assert.False(success);
+    }
+
+    [Fact]
+    public void TryParseInitialHandshake_2027Ds_NonNumericTeam_ReturnsFalse()
+    {
+        byte[] payload = [0x1E, 0x04, 0x61, 0x00, 0x04, (byte)'W', (byte)'P', (byte)'I', (byte)'L'];
+
+        bool success = DriverStationManager.TryParseInitialHandshake(
+            payload,
+            out _,
+            out _,
+            out _,
+            out _);
+
+        Assert.False(success);
+    }
+
+    [Fact]
+    public void TryParseInitialHandshake_2027Ds_ZeroTeam_ReturnsFalse()
+    {
+        byte[] payload = [0x1E, 0x04, 0x61, 0x00, 0x01, (byte)'0'];
+
+        bool success = DriverStationManager.TryParseInitialHandshake(
+            payload,
+            out _,
+            out _,
+            out _,
+            out _);
+
+        Assert.False(success);
+    }
+
+    [Fact]
+    public void TryParseInitialHandshake_UnknownTag_ReturnsFalse()
+    {
+        byte[] payload = [0x99, 0x01, 0x02];
+
+        bool success = DriverStationManager.TryParseInitialHandshake(
+            payload,
+            out _,
+            out _,
+            out _,
+            out _);
+
+        Assert.False(success);
+    }
 }
