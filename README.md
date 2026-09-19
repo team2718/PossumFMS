@@ -46,33 +46,40 @@ Install these tools on Windows:
 
 ## 3. Open and restore dependencies
 
-From repo root:
+From the repository root:
 
-```powershell
-# Backend restore (from PossumFMS.Core)
-dotnet restore PossumFMS.sln
+```bash
+# Backend restore
+dotnet restore PossumFMS.Core/PossumFMS.sln
 
-# Frontend install (from PossumFMS.Web)
-pnpm install
+# Frontend install
+pnpm --prefix PossumFMS.Web install
+```
+
+Or navigate into each directory individually:
+
+```bash
+cd PossumFMS.Core && dotnet restore PossumFMS.sln && cd ..
+cd PossumFMS.Web && pnpm install && cd ..
 ```
 
 ## 4. Run in development
 
 ### Option A: Full-stack from `PossumFMS.Core` only (recommended for local field testing)
 
-Build the frontend once, then run only the backend:
+Build the frontend once, then run the backend:
 
-```powershell
-# Terminal 1 (from PossumFMS.Web)
-pnpm build
+```bash
+# Build frontend
+cd PossumFMS.Web && pnpm build && cd ..
 
-# Terminal 2 (from PossumFMS.Core)
-dotnet run
+# Run backend
+cd PossumFMS.Core && dotnet run
 ```
 
-Open the UI from the backend URL (typically `http://localhost:5000`).
+Open the UI from the backend URL (typically `http://localhost:5000` or `http://10.0.100.5`).
 
-The backend serves static files from `PossumFMS.Web/build`.
+The backend automatically serves static files from `PossumFMS.Web/build`.
 
 ### Option B: Frontend hot-reload development
 
@@ -93,63 +100,85 @@ Open the Vite URL shown in Terminal B (typically `http://localhost:5173`).
 Unit tests live in `PossumFMS.Core.Tests` (xUnit, targeting `net10.0`).
 
 ```powershell
-# Run all tests (from repo root or PossumFMS.Core.Tests/)
+# Run all tests (from repo root)
 dotnet test PossumFMS.Core.Tests/PossumFMS.Core.Tests.csproj
 
 # Run with detailed output
 dotnet test PossumFMS.Core.Tests/PossumFMS.Core.Tests.csproj --logger "console;verbosity=normal"
 
 # Run a specific test class
-dotnet test PossumFMS.Core.Tests/PossumFMS.Core.Tests.csproj --filter "FullyQualifiedName~ArenaTests"
+dotnet test PossumFMS.Core.Tests/PossumFMS.Core.Tests.csproj --filter "FullyQualifiedName~DriverStationManagerTests"
 
-# Run with code coverage (requires coverlet — installed automatically via xunit template)
+# Run with code coverage
 dotnet test PossumFMS.Core.Tests/PossumFMS.Core.Tests.csproj --collect:"XPlat Code Coverage"
 ```
 
-## 6. Optional validation commands
+## 6. Building the Application
+
+### Backend (`PossumFMS.Core`)
+
+Use the `build.sh` script inside `PossumFMS.Core` to build the Release configuration:
+
+```bash
+cd PossumFMS.Core
+./build.sh
+```
+
+On Windows (PowerShell):
 
 ```powershell
-# Backend build
-dotnet build .\PossumFMS.Core\PossumFMS.sln -c Release
+cd PossumFMS.Core
+dotnet build PossumFMS.sln -c Release
+```
 
-# Frontend checks/lint/build
-pnpm check
-pnpm lint
+### Frontend (`PossumFMS.Web`)
+
+```bash
+cd PossumFMS.Web
 pnpm build
 ```
 
-## Production Build Artifacts
+The output is generated in `PossumFMS.Web/build/`, which is directly picked up by `PossumFMS.Core`.
 
-The backend and frontend produce separate deployable artifacts.
+## 7. Deployment to Linux FMS Host (`fms`)
 
-## Backend artifacts (`PossumFMS.Core`)
+On the field server, `PossumFMS.Core` runs as a `systemd` service (`PossumFMS.Core.service`).
 
-From repo root:
+### Deploying directly on the server (recommended)
 
-```powershell
-# Windows x64 publish (framework-dependent)
-dotnet publish .\PossumFMS.Core.csproj -c Release -r win-x64 --self-contained false -o .\publish\win-x64
+If building directly on the Linux field computer:
 
-# Linux x64 publish (framework-dependent)
-dotnet publish .\PossumFMS.Core.csproj -c Release -r linux-x64 --self-contained false -o .\publish\linux-x64
-```
+```bash
+# 1. Pull the latest changes
+git pull
 
-Outputs:
-- Windows: `PossumFMS.Core\publish\win-x64\`
-- Linux: `PossumFMS.Core\publish\linux-x64\`
-
-If you want standalone binaries without requiring preinstalled .NET runtime, set `--self-contained true` (larger output).
-
-## Frontend artifacts (`PossumFMS.Web`)
-
-From repo root:
-
-```powershell
+# 2. Build the frontend static assets
+cd PossumFMS.Web
 pnpm install
 pnpm build
+
+# 3. Build the backend using build.sh
+cd ../PossumFMS.Core
+./build.sh
+
+# 4. Restart the systemd service
+sudo systemctl restart PossumFMS.Core
+
+# 5. Verify the service is running and inspect logs
+sudo systemctl status PossumFMS.Core
+journalctl -u PossumFMS.Core -f
 ```
 
-Output:
-- Static site: `PossumFMS.Web\build\`
+### Alternative: Publishing from a development machine
 
-Because this frontend is static (`adapter-static`), the same built files can be served on Windows or Linux by any static web server.
+To create standalone or framework-dependent published binaries:
+
+```powershell
+# Windows x64 publish (from repo root)
+dotnet publish PossumFMS.Core/PossumFMS.Core.csproj -c Release -r win-x64 --self-contained false -o ./publish/win-x64
+
+# Linux x64 publish (from repo root)
+dotnet publish PossumFMS.Core/PossumFMS.Core.csproj -c Release -r linux-x64 --self-contained false -o ./publish/linux-x64
+```
+
+Copy the contents of `publish/linux-x64/` to your target directory on `fms` and restart the `PossumFMS.Core` service.
