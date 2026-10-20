@@ -101,6 +101,7 @@ export interface MatchState {
 	accessPoint: { status: string }; // "ACTIVE" | "CONFIGURING" | "ERROR"
 	audienceView: string; // "live" | "matchResults" | "blank" | ...
 	allianceOrder: string; // "blueLeft" | "redLeft"
+	carterAudio: boolean;
 	lastCommittedMatch: MatchResultRecord | null;
 	stations: Station[]; // always 6: Red1, Red2, Red3, Blue1, Blue2, Blue3
 	fieldDevices: FieldDeviceDiagnostics[];
@@ -420,6 +421,14 @@ class FmsConnection {
 	/** Change the audience alliance display order ("blueLeft", "redLeft"). */
 	setAllianceOrder(order: string) {
 		return this.invoke('SetAllianceOrder', order);
+	}
+	/** Enable or disable alternate Carter sound effects on the audience display. */
+	setCarterAudio(enabled: boolean) {
+		return this.invoke('SetCarterAudio', enabled);
+	}
+	/** Alias for setCarterAudio */
+	setCarter(enabled: boolean) {
+		return this.setCarterAudio(enabled);
 	}
 }
 

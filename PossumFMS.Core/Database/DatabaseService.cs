@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Microsoft.Extensions.Hosting;
 
 namespace PossumFMS.Core.Database;
 
@@ -9,27 +10,39 @@ namespace PossumFMS.Core.Database;
 /// </summary>
 public sealed class DatabaseService
 {
-    private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        WriteIndented = true,
+        PropertyNameCaseInsensitive = true
+    };
 
     private readonly string _dataPath;
     private readonly string _matchesPath;
+    private readonly string _settingsPath;
     private readonly ILogger<DatabaseService> _logger;
     private readonly object _lock = new();
 
     private Dictionary<int, TeamRecord> _teamCache = [];
     private readonly List<MatchResultRecord> _matchCache = [];
+    private SystemSettings _settings = new();
 
-    public DatabaseService(IConfiguration configuration, ILogger<DatabaseService> logger)
+    public DatabaseService(IConfiguration configuration, ILogger<DatabaseService> logger, IHostEnvironment? hostEnvironment = null)
     {
         _logger = logger;
-        _dataPath = configuration["Database:DataPath"] ?? "./data";
+        var rawPath = configuration["Database:DataPath"] ?? "./data";
+        _dataPath = Path.IsPathRooted(rawPath) || hostEnvironment is null
+            ? rawPath
+            : Path.Combine(hostEnvironment.ContentRootPath, rawPath);
+
         _matchesPath = Path.Combine(_dataPath, "matches");
+        _settingsPath = Path.Combine(_dataPath, "settings.json");
 
         Directory.CreateDirectory(_dataPath);
         Directory.CreateDirectory(_matchesPath);
 
         LoadTeams();
         LoadMatches();
+        LoadSettings();
     }
 
     /// <summary>Returns a snapshot copy of the in-memory team cache.</summary>
@@ -42,6 +55,29 @@ public sealed class DatabaseService
     public List<MatchResultRecord> GetMatchResults()
     {
         lock (_lock) return new List<MatchResultRecord>(_matchCache);
+    }
+
+    /// <summary>Returns whether Carter audio alternates are enabled.</summary>
+    public bool GetCarterAudio()
+    {
+        lock (_lock) return _settings.CarterAudio;
+    }
+
+    /// <summary>
+    /// Atomically persists the Carter audio setting to settings.json.
+    /// </summary>
+    public void SaveCarterAudio(bool enabled)
+    {
+        var tempPath = _settingsPath + ".tmp";
+
+        lock (_lock)
+        {
+            _settings.CarterAudio = enabled;
+            File.WriteAllText(tempPath, JsonSerializer.Serialize(_settings, JsonOptions));
+            File.Move(tempPath, _settingsPath, overwrite: true);
+        }
+
+        _logger.LogInformation("Saved CarterAudio={Enabled} to {Path}.", enabled, _settingsPath);
     }
 
     /// <summary>
@@ -83,6 +119,29 @@ public sealed class DatabaseService
     }
 
     // ── Private boot loaders ──────────────────────────────────────────────────
+
+    private void LoadSettings()
+    {
+        if (!File.Exists(_settingsPath))
+        {
+            _logger.LogInformation("No settings.json found at {Path}; starting with default settings.", _settingsPath);
+            return;
+        }
+
+        try
+        {
+            var settings = JsonSerializer.Deserialize<SystemSettings>(File.ReadAllText(_settingsPath), JsonOptions);
+            if (settings is not null)
+            {
+                _settings = settings;
+                _logger.LogInformation("Loaded settings from {Path}. CarterAudio: {CarterAudio}.", _settingsPath, _settings.CarterAudio);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to load settings from {Path}; starting with default settings.", _settingsPath);
+        }
+    }
 
     private void LoadTeams()
     {

@@ -541,6 +541,18 @@ public sealed class FmsHub(
         await BroadcastMatchState();
     }
 
+    /// <summary>
+    /// Sets whether alternate Carter sound effects should be played on audience displays.
+    /// </summary>
+    public async Task SetCarterAudio(bool enabled)
+    {
+        displayManager.SetCarterAudio(enabled);
+        logger.LogInformation("SetCarterAudio to '{Enabled}' by {Client}.", enabled, Context.ConnectionId);
+        await BroadcastMatchState();
+    }
+
+    public Task SetCarter(bool enabled) => SetCarterAudio(enabled);
+
     // ── State push ─────────────────────────────────────────────────────────────
 
     public Task RequestMatchState() => BroadcastMatchState();

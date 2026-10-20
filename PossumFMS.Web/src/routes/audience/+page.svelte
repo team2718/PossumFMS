@@ -116,10 +116,23 @@
 			if (!audioCache.has(file)) {
 				const audio = new Audio(file);
 				audio.preload = 'auto';
+				audio.load();
 				audioCache.set(file, audio);
 			}
 		}
 	});
+
+	const carterAudio = $derived(matchState?.carterAudio ?? false);
+
+	function resolveSound(standardFile: SoundFile): SoundFile {
+		if (carterAudio) {
+			const carterVariant = standardFile.replace(/\.wav$/, '-carter.wav') as SoundFile;
+			if ((soundFiles as readonly string[]).includes(carterVariant)) {
+				return carterVariant;
+			}
+		}
+		return standardFile;
+	}
 
 	// Track phase transitions to fire the right sound.
 	// prevPhase is a plain (non-reactive) variable so reading it inside $effect
@@ -145,16 +158,16 @@
 
 		switch (phase) {
 			case 'Auto':
-				playSound('/sounds/match-start.wav');
+				playSound(resolveSound('/sounds/match-start.wav'));
 				break;
 			case 'AutoToTeleopTransition':
-				playSound('/sounds/auto-end-carter.wav');
+				playSound(resolveSound('/sounds/auto-end.wav'));
 				break;
 			case 'Teleop':
-				playSound('/sounds/teleop-start.wav');
+				playSound(resolveSound('/sounds/teleop-start.wav'));
 				break;
 			case 'PostMatch':
-				playSound(aborted ? '/sounds/match-abort-carter.wav' : '/sounds/match-end.wav');
+				playSound(resolveSound(aborted ? '/sounds/match-abort.wav' : '/sounds/match-end.wav'));
 				break;
 		}
 
@@ -185,7 +198,7 @@
 		const soundToPlay = (() => {
 			// Shift 4 → EndGame transition
 			if (prevTeleopPeriod === 'Shift4' && teleopPeriod === 'EndGame') {
-				return '/sounds/steam_whistle.wav';
+				return resolveSound('/sounds/steam_whistle.wav');
 			}
 
 			// All other shifts (TransitionShift → Shift1, Shift1 → Shift2, Shift2 → Shift3, Shift3 → Shift4)
@@ -195,7 +208,7 @@
 				(prevTeleopPeriod === 'Shift2' && teleopPeriod === 'Shift3') ||
 				(prevTeleopPeriod === 'Shift3' && teleopPeriod === 'Shift4')
 			) {
-				return '/sounds/alliance_shift.wav';
+				return resolveSound('/sounds/alliance_shift.wav');
 			}
 
 			return null;
@@ -224,7 +237,7 @@
 		if (view === prevAudienceView) return;
 
 		if (view === 'matchResults') {
-			playSound('/sounds/match_result.wav');
+			playSound(resolveSound('/sounds/match_result.wav'));
 		}
 
 		prevAudienceView = view;

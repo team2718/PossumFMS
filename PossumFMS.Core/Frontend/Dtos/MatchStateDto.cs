@@ -26,6 +26,7 @@ public sealed record MatchStateDto(
     [property: JsonPropertyName("accessPoint")] AccessPointDto AccessPoint,
     [property: JsonPropertyName("audienceView")] string AudienceView,
     [property: JsonPropertyName("allianceOrder")] string AllianceOrder,
+    [property: JsonPropertyName("carterAudio")] bool CarterAudio,
     [property: JsonPropertyName("lastCommittedMatch")] LastCommittedMatchDto? LastCommittedMatch,
     [property: JsonPropertyName("stations")] IReadOnlyList<StationStatusDto> Stations,
     [property: JsonPropertyName("fieldDevices")] IReadOnlyList<FieldDeviceDto> FieldDevices);
@@ -167,4 +168,3 @@ public sealed record CommittedRankingPointsDto(
     [property: JsonPropertyName("traversal")] bool Traversal,
     [property: JsonPropertyName("winTie")] int WinTie,
     [property: JsonPropertyName("total")] int Total);
-

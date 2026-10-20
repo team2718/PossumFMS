@@ -70,6 +70,27 @@
 	let optionsWarning = $state('');
 	let optionsSuccess = $state('');
 	let isTogglingFreePractice = $state(false);
+	let isTogglingCarterAudio = $state(false);
+
+	async function setCarterAudio(enabled: boolean) {
+		optionsWarning = '';
+		optionsSuccess = '';
+		isTogglingCarterAudio = true;
+
+		try {
+			await fms.setCarterAudio(enabled);
+			optionsSuccess = enabled
+				? 'Carter sound effects enabled on audience displays.'
+				: 'Carter sound effects disabled on audience displays.';
+		} catch (error) {
+			optionsWarning =
+				error instanceof Error
+					? error.message
+					: 'Failed to update Carter sounds setting. Please try again.';
+		} finally {
+			isTogglingCarterAudio = false;
+		}
+	}
 	let isSavingMatchDurations = $state(false);
 	let autoDurationSecondsInput = $state('20');
 	let autoToTeleopTransitionDurationSecondsInput = $state('3');
@@ -581,6 +602,44 @@
 									/>
 									<span>Blue Left, Red Right</span>
 								</label>
+							</div>
+						</div>
+
+						<!-- Carter -->
+						<div
+							class="w-full flex-1 rounded border border-slate-200 bg-slate-50 px-4 py-3 sm:w-auto sm:min-w-75 dark:border-slate-700 dark:bg-slate-900/60"
+						>
+							<div class="flex items-start justify-between gap-4">
+								<div>
+									<div
+										class="flex items-center gap-1.5 text-sm font-bold text-slate-900 dark:text-slate-100"
+									>
+										<span>Carter</span>
+									</div>
+									<div class="mt-1 max-w-xl text-xs text-slate-600 dark:text-slate-400">
+										Use alternate Carter sound effects on the audience display.
+									</div>
+								</div>
+								<label
+									class="flex cursor-pointer items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-200"
+								>
+									<input
+										type="checkbox"
+										name="carter"
+										aria-label="Carter"
+										checked={matchState?.carterAudio ?? false}
+										disabled={!matchState || isTogglingCarterAudio}
+										onchange={(event) =>
+											setCarterAudio((event.currentTarget as HTMLInputElement).checked)}
+										class="size-4 cursor-pointer disabled:cursor-not-allowed"
+									/>
+									<span>Carter</span>
+								</label>
+							</div>
+							<div class="mt-3 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+								{matchState?.carterAudio
+									? 'Alternate Carter sounds are active on audience displays.'
+									: 'Standard sounds are active on audience displays.'}
 							</div>
 						</div>
 					</div>

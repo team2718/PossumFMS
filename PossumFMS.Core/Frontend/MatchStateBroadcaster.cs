@@ -115,6 +115,7 @@ public sealed class MatchStateBroadcaster(
                 Status: apManager.ApStatus),
             AudienceView: displayManager.AudienceView,
             AllianceOrder: displayManager.AllianceOrder,
+            CarterAudio: displayManager.CarterAudio,
             LastCommittedMatch: BuildLastCommittedMatchDto(displayManager.LastCommittedMatch),
             Stations: AllianceStations.All.Select((s, i) =>
             {
